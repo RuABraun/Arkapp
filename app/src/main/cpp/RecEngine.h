@@ -25,6 +25,7 @@ private:
     int32_t mSampleRate;
     int32_t mFramesPerBurst = 2048;
     unsigned mChannelCount;
+    bool mIsfloat;
     oboe::AudioStream *mRecStream;
 
     size_t data_chunk_pos, odone, frames_out;
@@ -35,6 +36,8 @@ private:
     soxr_error_t soxr_error;
     soxr_t soxr;
 
+    std::ofstream f2;
+    size_t data_chunk_pos2;
 
     std::mutex mRestartingLock;
 
