@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Ark</string>
+    <string name="button_recstart">Record</string>
+    <string name="button_recstop">Stop</string>
+</resources>
