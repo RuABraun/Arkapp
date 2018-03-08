@@ -40,9 +40,10 @@ void RecEngine::createRecStream() {
 
     oboe::Result result = builder.openStream(&mRecStream);
 
+    oboe::AudioFormat mFormat;
     if (result == oboe::Result::OK && mRecStream != nullptr) {
         mSampleRate = mRecStream->getSampleRate();
-        oboe::AudioFormat mFormat = mRecStream->getFormat();
+        mFormat = mRecStream->getFormat();
         mChannelCount = mRecStream->getChannelCount();
 
         LOGI("Input sample rate: %d", mSampleRate);
@@ -66,18 +67,20 @@ void RecEngine::createRecStream() {
         if (!mIsfloat)
             fp_audio_in = static_cast<float*>(malloc(sizeof(float) * mFramesPerBurst * mChannelCount));
         frames_out = static_cast<size_t>(mFramesPerBurst * fin_sample_rate / mSampleRate + .5);
+
         resamp_audio = static_cast<float*>(malloc(sizeof(float) * frames_out * mChannelCount));
 
         // Wav header
         f.open("/storage/emulated/0/Android/data/ark.ark/files/Music/example.wav", std::ios::binary);
         f << "RIFF----WAVEfmt ";
+        const unsigned num_filechannels = 1;
         write_word(f, 16, 4);  // no extension data
         int16_t bytes_perSample = 2;
         write_word(f, 1, 2);  // PCM - int samples
-        write_word(f, mChannelCount, 2);
+        write_word(f, num_filechannels, 2);
         write_word(f, fin_sample_rate, 4);
-        write_word(f, fin_sample_rate * mChannelCount * bytes_perSample, 4 );  // (Sample Rate * Channels * BytesPerSample)
-        write_word(f, mChannelCount * bytes_perSample, 2);  // data block size (size of two integer samples, one for each channel, in bytes)
+        write_word(f, fin_sample_rate * num_filechannels * bytes_perSample, 4 );  // (Sample Rate * Channels * BytesPerSample)
+        write_word(f, num_filechannels * bytes_perSample, 2);  // data block size (size of two integer samples, one for each channel, in bytes)
         write_word(f, bytes_perSample * 8, 2);  // number of bits per sample (use a multiple of 8)
         data_chunk_pos = f.tellp();
         f << "data----";  // (chunk size to be filled in later)
@@ -97,6 +100,10 @@ void RecEngine::closeOutputStream() {
 
         oboe::Result result = mRecStream->requestStop();
 
+        if (result != oboe::Result::OK) {
+            LOGE("Error stopping output stream. %s", oboe::convertToText(result));
+        }
+
         soxr_delete(soxr);
         free(resamp_audio);
         if(!mIsfloat)
@@ -110,10 +117,6 @@ void RecEngine::closeOutputStream() {
         write_word(f, file_length - 8, 4);
         f.close();
 
-        if (result != oboe::Result::OK) {
-            LOGE("Error stopping output stream. %s", oboe::convertToText(result));
-        }
-
         result = mRecStream->close();
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
@@ -123,25 +126,39 @@ void RecEngine::closeOutputStream() {
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
 
-
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
         soxr_error = soxr_process(soxr, audio_data, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     } else {
+        const float mul = 1.0f / 32768.0f;
         int16_t* audio_data = static_cast<int16_t*>(audioData);
         int32_t num_samples_in = numFrames * mChannelCount;
         for (int i = 0; i < num_samples_in; i++) {
-            fp_audio_in[i] = static_cast<float>(audio_data[i]);
+            float val = static_cast<float>(audio_data[i]);
+            fp_audio_in[i] = (val * mul);
         }
         soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     }
 
-    int32_t num_samples_out = static_cast<int32_t>(frames_out*mChannelCount);
-    for(int i=0;i < num_samples_out;i++) {
-        int16_t val = static_cast<int16_t>(resamp_audio[i]);
-        write_word(f, val, 2);
+    const float mul = 32768.0f;
+    const float nmul = -32768.0f;
+    const float cnt_channel_fp = static_cast<float>(mChannelCount);
+    const float num_samples = frames_out * mChannelCount;
+    float val;
+    for(int i=0;i < num_samples;i+=mChannelCount) {
+        val = 0.0f;
+        for(int j=0;j<mChannelCount;j++) {
+            val += resamp_audio[i+j];
+        }
+
+        val = val / cnt_channel_fp;
+        val = val * mul;
+        if (val > mul) val = mul;
+        if (val < nmul) val = nmul;
+        int16_t valint = static_cast<int16_t>(val);
+        write_word(f, valint, 2);
     }
 
     int32_t bufferSize = mRecStream->getBufferSizeInFrames();
