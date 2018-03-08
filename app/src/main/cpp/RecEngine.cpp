@@ -72,14 +72,8 @@ void RecEngine::createRecStream() {
         f.open("/storage/emulated/0/Android/data/ark.ark/files/Music/example.wav", std::ios::binary);
         f << "RIFF----WAVEfmt ";
         write_word(f, 16, 4);  // no extension data
-        int16_t bytes_perSample;
-        if (mIsfloat) {
-            write_word(f, 3, 2);  // PCM - float samples
-            bytes_perSample = 4;
-        } else {
-            write_word(f, 1, 2);  // PCM - float samples
-            bytes_perSample = 2;
-        }
+        int16_t bytes_perSample = 2;
+        write_word(f, 1, 2);  // PCM - int samples
         write_word(f, mChannelCount, 2);
         write_word(f, fin_sample_rate, 4);
         write_word(f, fin_sample_rate * mChannelCount * bytes_perSample, 4 );  // (Sample Rate * Channels * BytesPerSample)
@@ -87,23 +81,6 @@ void RecEngine::createRecStream() {
         write_word(f, bytes_perSample * 8, 2);  // number of bits per sample (use a multiple of 8)
         data_chunk_pos = f.tellp();
         f << "data----";  // (chunk size to be filled in later)
-
-        f2.open("/storage/emulated/0/Android/data/ark.ark/files/Music/example2.wav", std::ios::binary);
-        f2 << "RIFF----WAVEfmt ";
-        write_word(f2, 18, 4);  // no extension data
-        write_word(f2, 3, 2);
-        bytes_perSample = 4;
-        write_word(f2, mChannelCount, 2);
-        write_word(f2, fin_sample_rate, 4);
-        write_word(f2, fin_sample_rate * mChannelCount * bytes_perSample, 4 );  // (Sample Rate * Channels * BytesPerSample)
-        write_word(f2, mChannelCount * bytes_perSample, 2);  // data block size (size of two integer samples, one for each channel, in bytes)
-        write_word(f2, bytes_perSample * 8, 2);  // number of bits per sample (use a multiple of 8)
-        write_word(f2, 0, 2);
-        f2 << "fact";
-        write_word(f2, 4, 4);
-        write_word(f2, mChannelCount * frames_out, 4);
-        data_chunk_pos2 = f2.tellp();
-        f2 << "data----";  // (chunk size to be filled in later)
 
         result = mRecStream->requestStart();
         if (result != oboe::Result::OK) {
@@ -122,7 +99,8 @@ void RecEngine::closeOutputStream() {
 
         soxr_delete(soxr);
         free(resamp_audio);
-        if(!mIsfloat) free(fp_audio_in);
+        if(!mIsfloat)
+            free(fp_audio_in);
 
         // Finishing wav write
         size_t file_length = f.tellp();
@@ -131,13 +109,6 @@ void RecEngine::closeOutputStream() {
         f.seekp(0 + 4);
         write_word(f, file_length - 8, 4);
         f.close();
-
-        file_length = f2.tellp();
-        f2.seekp(data_chunk_pos2 + 4);
-        write_word(f2, file_length - data_chunk_pos2 + 8);
-        f2.seekp(0 + 4);
-        write_word(f, file_length - 8, 4);
-        f2.close();
 
         if (result != oboe::Result::OK) {
             LOGE("Error stopping output stream. %s", oboe::convertToText(result));
@@ -169,13 +140,8 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     int32_t num_samples_out = static_cast<int32_t>(frames_out*mChannelCount);
     for(int i=0;i < num_samples_out;i++) {
-        if(mIsfloat) {
-            write_float(f, resamp_audio[i], 4);
-        } else {
-            write_float(f2, resamp_audio[i], 4);
-            int16_t val = static_cast<int16_t>(resamp_audio[i]);
-            write_word(f, val, 2);
-        }
+        int16_t val = static_cast<int16_t>(resamp_audio[i]);
+        write_word(f, val, 2);
     }
 
     int32_t bufferSize = mRecStream->getBufferSizeInFrames();
@@ -211,8 +177,3 @@ void RecEngine::restartStream() {
         // Internal issue b/63087953
     }
 }
-
-/*void write_wav(int16_t audio_data, int32_t num_frames, int32_t num_channels, int32_t sample_rate,
-               std::string wavpath) {
-
-}*/

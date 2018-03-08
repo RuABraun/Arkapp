@@ -36,9 +36,6 @@ private:
     soxr_error_t soxr_error;
     soxr_t soxr;
 
-    std::ofstream f2;
-    size_t data_chunk_pos2;
-
     std::mutex mRestartingLock;
 
     void createRecStream();
