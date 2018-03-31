@@ -47,7 +47,6 @@ void RecEngine::createRecStream() {
         mSampleRate = mRecStream->getSampleRate();
         mFormat = mRecStream->getFormat();
         mChannelCount = mRecStream->getChannelCount();
-        fin_sample_rate = mSampleRate;
         LOGI("Input sample rate: %d", mSampleRate);
         LOGI("AudioStream input format is %s", oboe::convertToText(mFormat));
         LOGI("Channel count: %d", mChannelCount);
@@ -60,7 +59,6 @@ void RecEngine::createRecStream() {
         } else {
             mIsfloat = false;
         }
-
         // Soxr prep
         soxr = soxr_create(mSampleRate, fin_sample_rate, mChannelCount,
                            &soxr_error, NULL, NULL, NULL);
@@ -92,6 +90,7 @@ void RecEngine::createRecStream() {
         if (result != oboe::Result::OK) {
             LOGE("Error starting stream. %s", oboe::convertToText(result));
         }
+
     } else {
         LOGE("Failed to create stream. Error: %s", oboe::convertToText(result));
     }
@@ -159,7 +158,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     for(int i=0;i < num_samples;i+=mChannelCount) {
         val = 0.0f;
         for(int j=0;j<mChannelCount;j++) {
-            val += fp_audio_in[i+j];
+            val += resamp_audio[i+j];
         }
 
         val = val / cnt_channel_fp;
