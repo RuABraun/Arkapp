@@ -59,16 +59,18 @@ void RecEngine::createRecStream() {
         } else {
             mIsfloat = false;
         }
-        // Soxr prep
-        soxr = soxr_create(mSampleRate, fin_sample_rate, mChannelCount,
-                           &soxr_error, NULL, NULL, NULL);
-        if (soxr_error) LOGE("Error creating soxr resampler.");
 
         if (!mIsfloat)
             fp_audio_in = static_cast<float*>(malloc(sizeof(float) * mFramesPerBurst * mChannelCount));
         frames_out = static_cast<size_t>(mFramesPerBurst * fin_sample_rate / mSampleRate + .5);
 
         resamp_audio = static_cast<float*>(malloc(sizeof(float) * frames_out * mChannelCount));
+        memset(resamp_audio, 0, sizeof(float) * frames_out * mChannelCount);
+
+        // Soxr prep
+        soxr = soxr_create(mSampleRate, fin_sample_rate, mChannelCount,
+                           &soxr_error, NULL, NULL, NULL);
+        if (soxr_error) LOGE("Error creating soxr resampler.");
 
         // Wav header
         f.open(savedir + "example.wav", std::ios::binary);
@@ -136,6 +138,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
+        //resamp_audio = audio_data;
         soxr_error = soxr_process(soxr, audio_data, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     } else {
@@ -164,7 +167,11 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         val = val / cnt_channel_fp;
         val = val * mul;
         if (val > mul) val = mul;
-        if (val < nmul) val = nmul;
+        if (val < nmul) {
+            LOGI("%f", val);
+            val = nmul;
+            LOGW("NEGMAX");
+        }
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
@@ -173,7 +180,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     int32_t underrunCount = audioStream->getXRunCount();
 
     LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
-         numFrames, underrunCount, bufferSize, frames_out);
+         numFrames, underrunCount, bufferSize, odone);
 
     return oboe::DataCallbackResult::Continue;
 }
