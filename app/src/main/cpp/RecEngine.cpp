@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <cstring>
 #include <string>
 #include <cmath>
@@ -5,6 +6,7 @@
 #include "logging_macros.h"
 #include "RecEngine.h"
 #include <android/log.h>
+#include "feat/wave-reader.h"
 
 
 namespace little_endian_io {
@@ -45,7 +47,7 @@ void RecEngine::createRecStream() {
         mSampleRate = mRecStream->getSampleRate();
         mFormat = mRecStream->getFormat();
         mChannelCount = mRecStream->getChannelCount();
-
+        fin_sample_rate = mSampleRate;
         LOGI("Input sample rate: %d", mSampleRate);
         LOGI("AudioStream input format is %s", oboe::convertToText(mFormat));
         LOGI("Channel count: %d", mChannelCount);
@@ -71,7 +73,8 @@ void RecEngine::createRecStream() {
         resamp_audio = static_cast<float*>(malloc(sizeof(float) * frames_out * mChannelCount));
 
         // Wav header
-        f.open("/storage/emulated/0/Android/data/ark.ark/files/Music/example.wav", std::ios::binary);
+        f.open(savedir + "example.wav", std::ios::binary);
+
         f << "RIFF----WAVEfmt ";
         const unsigned num_filechannels = 1;
         write_word(f, 16, 4);  // no extension data
@@ -106,17 +109,23 @@ void RecEngine::closeOutputStream() {
 
         soxr_delete(soxr);
         free(resamp_audio);
-        if(!mIsfloat)
+        if(!mIsfloat) {
             free(fp_audio_in);
+        }
 
         // Finishing wav write
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
-        write_word(f, file_length - data_chunk_pos + 8);
-        f.seekp(0 + 4);
+        write_word(f, file_length - data_chunk_pos + 8, 4);
+        f.seekp(4);
         write_word(f, file_length - 8, 4);
         f.close();
 
+        kaldi::WaveData wavreader;
+        std::ifstream is(savedir + "example.wav", std::ios::binary);
+        wavreader.Read(is);
+        float sampfreq = wavreader.SampFreq();
+        LOGI("KALDI SAMPLING FREQ! %f", sampfreq);
         result = mRecStream->close();
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
@@ -150,7 +159,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     for(int i=0;i < num_samples;i+=mChannelCount) {
         val = 0.0f;
         for(int j=0;j<mChannelCount;j++) {
-            val += resamp_audio[i+j];
+            val += fp_audio_in[i+j];
         }
 
         val = val / cnt_channel_fp;

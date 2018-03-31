@@ -2,4 +2,7 @@
     <string name="app_name">Ark</string>
     <string name="button_recstart">Record</string>
     <string name="button_recstop">Stop</string>
+    <string name="SaveDir">/sdcard/Ark/</string>
+    <string name="Contact">contact@ark.com</string>
+    <string name="HelloMsg">"Start transcribing by clicking the record button!"</string>
 </resources>

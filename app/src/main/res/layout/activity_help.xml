@@ -4,28 +4,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="ark.ark.MainActivity">
-
-    <Button
-        android:id="@+id/button_rec"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="100dp"
-        android:onClick="record_switch"
-        android:text="@string/button_recstart"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent" />
+    tools:context="ark.ark.Help">
 
     <TextView
-        android:id="@+id/sample_text"
+        android:id="@+id/textView"
         android:layout_width="wrap_content"
-        android:layout_height="19dp"
-        android:layout_marginTop="50dp"
+        android:layout_height="wrap_content"
+        android:text="@string/Contact"
+        android:textSize="30sp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
 </android.support.constraint.ConstraintLayout>

@@ -27,6 +27,7 @@ private:
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
+    std::string savedir = "/sdcard/Ark/";
 
     size_t data_chunk_pos, odone, frames_out;
     std::ofstream f;

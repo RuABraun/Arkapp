@@ -6,7 +6,8 @@
 cmake_minimum_required(VERSION 3.4.1)
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -Wall -Werror")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -Wall ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -Wall -Werror -Wno-unused-variable")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -22,7 +23,6 @@ include_directories(${DEBUG_UTILS_PATH})
 
 add_subdirectory (/home/seni/git/soxr soxr)
 include_directories(/home/seni/git/soxr/src)
-link_directories(/home/seni/AndroidStudioProjects/Ark/app/libs)
 
 add_library( # Sets the name of the library.
              rec-engine
@@ -48,12 +48,21 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
+
+# kaldi
+# add_subdirectory(/home/seni/git/kaldi/src kaldi)
+include_directories(/home/seni/androidkaldi/kaldi-android/src)
+
+
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-                       rec-engine oboe android soxr
+                       rec-engine oboe android soxr /home/seni/androidkaldi/kaldi-android/src/feat/kaldi-feat.a /home/seni/androidkaldi/kaldi-android/src/matrix/kaldi-matrix.a /home/seni/androidkaldi/kaldi-android/src/base/kaldi-base.a
+                       /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
+                       /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a
+                       /home/seni/androidkaldi/OpenBLAS/install/lib/libf2c.a
 
                        # Links the target library to the log library
                        # included in the NDK.

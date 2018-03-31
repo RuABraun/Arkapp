@@ -5,13 +5,6 @@
 
 
 extern "C" {
-JNIEXPORT jstring JNICALL
-Java_ark_ark_MainActivity_stringFromJNI(
-        JNIEnv *env,
-        jobject /* this */) {
-    std::string hello = "Hello from C++";
-    return env->NewStringUTF(hello.c_str());
-}
 
 JNIEXPORT jlong JNICALL
 Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass) {
@@ -42,5 +35,4 @@ Java_ark_ark_RecEngine_native_1setAudioDeviceId(
     }
     engine->setDeviceId(deviceId);
 }
-
 }
