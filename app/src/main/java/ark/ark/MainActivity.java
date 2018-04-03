@@ -3,6 +3,7 @@ package ark.ark;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
@@ -11,11 +12,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -50,6 +47,9 @@ public class MainActivity extends Base {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        String storedir = Environment.getExternalStorageDirectory().getAbsolutePath();
+        Log.i("STORAGE", storedir);
+
         // Handle permissions
         ArrayList<String> need_permissions = new ArrayList<>();
         for(String perm: permissions) {
@@ -69,28 +69,10 @@ public class MainActivity extends Base {
         // Example of a call to a native method
         TextView tv = (TextView) findViewById(R.id.sample_text);
         tv.setText(R.string.HelloMsg);
-        String[] files = null;
-        try {
-            files = getAssets().list("model");
-        } catch ( Exception e) { Log.e("APP", "ERROR|"); finishAffinity(); }
-        for(int i=0;i<files.length;i++) {
-            Log.i("APP", files[i]);
-        }
-        File file = new File(getCacheDir() + "/model/fbank.conf");
-        //Log.i("MYAPP", "PATH " + path);
-        if (file.exists()) {
-            try {
-                FileInputStream is = new FileInputStream(file);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-                String line = reader.readLine();
-                while (line != null) {
-                    Log.i("StackOverflow", line);
-                    line = reader.readLine();
-                }
-            } catch (IOException e) {}
-        } else {
-            Log.i("MYAPP", "DOESNT EXIST!");
-        }
+
+        mgr = getResources().getAssets();
+        load(mgr);
+
         Log.i("MYAPP", "Starting!");
     }
 

@@ -46,8 +46,6 @@ public class Manage extends Base {
                 android.R.layout.simple_list_item_multiple_choice, files);
         lv.setAdapter(lv_adapt);
 
-        mgr = getResources().getAssets();
-        load(mgr);
     }
 
     public void play_switch(View view) {

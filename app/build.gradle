@@ -28,7 +28,7 @@ android {
         }
     }
     aaptOptions {
-        noCompress 'conf', 'fst', 'txt', 'int', 'mdl'
+        noCompress 'fst', 'txt', 'int', 'mdl'
     }
 }
 

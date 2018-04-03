@@ -13,16 +13,57 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
     AAssetDir* assetDir = AAssetManager_openDir(mgr, "model");
     const char* filename = (const char*)NULL;
     LOGI("IN LOAD FUNCTION");
-    while ((filename = AAssetDir_getNextFileName(assetDir)) != NULL) {
-        LOGI("FILENAME: %s", filename);
-        AAsset* file = AAssetManager_open(mgr, filename, AASSET_MODE_BUFFER);
-        size_t fileLength = AAsset_getLength(file);
 
-        char* fileContent = new char[fileLength+1];
-        AAsset_read(file, fileContent, fileLength);
-        fileContent[fileLength] = '\0';
-        delete[] fileContent;
-        AAsset_close(file);
+    const char* rootdir = "/sdcard/Ark/";
+    while ((filename = AAssetDir_getNextFileName(assetDir)) != NULL) {
+
+        LOGI("FILENAME: %s", filename);
+
+        if (strcmp(filename, "fbank.conf") == 0) {
+            char fin[6 + strlen(filename)];
+
+            strcpy(fin, "model/");
+            strcat(fin, filename);
+            AAsset* file = AAssetManager_open(mgr, fin, AASSET_MODE_BUFFER);
+            size_t fileLength = AAsset_getLength(file);
+            char* buf = new char[fileLength+1];
+            AAsset_read(file, buf, fileLength);
+            buf[fileLength] = '\0';
+            LOGI("%s", buf);
+            delete[] buf;
+            AAsset_close(file);
+
+
+            /*char fpath[strlen(rootdir) + strlen(filename)];
+            strcpy(fpath, rootdir);
+            strcat(fpath, filename);
+            LOGI("FILEPATH: %s", fpath);
+
+            int nb_read = 0;
+            size_t BUFSZ = 1000 * 512;
+            char* buf = new char[BUFSZ];
+            LOGI("test");
+            AAsset* file = AAssetManager_open(mgr, filename, AASSET_MODE_BUFFER);
+            LOGI("test1");
+            FILE* out = fopen(fpath, "w");
+            if (!out)
+                LOGE("ERROR OPENING FILE");
+            LOGI("test2");
+            AAsset_read(file, buf, BUFSZ);
+            LOGI("test2a");
+            LOGI("%d", nb_read);
+            fwrite(buf, nb_read, 1, out);
+            while (nb_read > 0) {
+                nb_read = AAsset_read(file, buf, BUFSZ);
+                LOGI("test2b");
+                LOGI("%d", nb_read);
+                fwrite(buf, nb_read, 1, out);
+            }
+            LOGI("test3");
+            delete[] buf;
+            fclose(out);
+            AAsset_close(file);*/
+        }
     }
     AAssetDir_close(assetDir);
 }
