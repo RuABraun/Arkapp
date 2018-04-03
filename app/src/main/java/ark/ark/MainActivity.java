@@ -2,18 +2,23 @@ package ark.ark;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.os.Environment;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class MainActivity extends Base {
 
@@ -64,15 +69,45 @@ public class MainActivity extends Base {
         // Example of a call to a native method
         TextView tv = (TextView) findViewById(R.id.sample_text);
         tv.setText(R.string.HelloMsg);
-
-        String fpath = getExternalFilesDir(Environment.DIRECTORY_MUSIC).getAbsolutePath();
+        String[] files = null;
+        try {
+            files = getAssets().list("model");
+        } catch ( Exception e) { Log.e("APP", "ERROR|"); finishAffinity(); }
+        for(int i=0;i<files.length;i++) {
+            Log.i("APP", files[i]);
+        }
+        File file = new File(getCacheDir() + "/model/fbank.conf");
+        //Log.i("MYAPP", "PATH " + path);
+        if (file.exists()) {
+            try {
+                FileInputStream is = new FileInputStream(file);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+                String line = reader.readLine();
+                while (line != null) {
+                    Log.i("StackOverflow", line);
+                    line = reader.readLine();
+                }
+            } catch (IOException e) {}
+        } else {
+            Log.i("MYAPP", "DOESNT EXIST!");
+        }
         Log.i("MYAPP", "Starting!");
     }
 
     public void record_switch(View view) {
         Button button_rec = findViewById(R.id.button_rec);
         if (!is_recording ) {
-            RecEngine.create();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmm");
+            Date now = new Date();
+            String name = getString(R.string.SaveDir) + sdf.format(now);
+            String fname = name + ".wav";
+
+            while (new File(fname).exists()) {
+                int i = 1;
+                fname = name + "_" + Integer.toString(i) + ".wav";
+                i++;
+            }
+            RecEngine.create(fname);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
         } else {

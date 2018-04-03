@@ -11,7 +11,7 @@
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
-    RecEngine();
+    RecEngine(std::string fname);
 
     ~RecEngine();
 
@@ -20,6 +20,8 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
                                           int32_t numFrames);
 
+    //static void transcribe_file(std::string wavpath, std::string ctm);
+
 private:
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
@@ -27,7 +29,6 @@ private:
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
-    std::string savedir = "/sdcard/Ark/";
 
     size_t data_chunk_pos, odone, frames_out;
     std::ofstream f;
@@ -39,9 +40,8 @@ private:
 
     std::mutex mRestartingLock;
 
-    void createRecStream();
+    void createRecStream(std::string fname);
     void closeOutputStream();
-    void restartStream();
 };
 
 #endif //ARK_RECENGINE_H

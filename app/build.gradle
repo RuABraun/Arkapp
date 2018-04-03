@@ -27,6 +27,9 @@ android {
             path "CMakeLists.txt"
         }
     }
+    aaptOptions {
+        noCompress 'conf', 'fst', 'txt', 'int', 'mdl'
+    }
 }
 
 dependencies {
