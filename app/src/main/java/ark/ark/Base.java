@@ -2,15 +2,19 @@ package ark.ark;
 
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
 public class Base extends AppCompatActivity {
 
-    static AssetManager mgr;
+    public static AssetManager mgr;
+    public static String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Ark/";
+    public static String filesdir = rootdir + "files/";
+    public static String modeldir = rootdir + "model/";
 
-    public static native void load(AssetManager mgr);
+    public static native void load(AssetManager mgr, String modeldir);
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

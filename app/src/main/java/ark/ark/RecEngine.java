@@ -24,6 +24,10 @@ public class RecEngine {
         mEngineHandle = 0;
     }
 
+    static void transcribe(String wavpath, String modeldir, String ctm) {
+        native_transcribe(wavpath, modeldir, ctm);
+    }
+
     static void setAudioDeviceId(int deviceId){
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
@@ -31,4 +35,5 @@ public class RecEngine {
     private static native long native_createEngine(String fname);
     private static native void native_deleteEngine(long engineHandle);
     private static native void native_setAudioDeviceId(long engineHandle, int deviceId);
+    private static native void native_transcribe(String wavpath, String modeldir, String ctm);
 }

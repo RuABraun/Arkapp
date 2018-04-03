@@ -7,15 +7,15 @@
 #include "RecEngine.h"
 #include <android/log.h>
 #include "feat/wave-reader.h"
-/*#include "online2/online-nnet3-decoding.h"
+#include "fstext/fstext-lib.h"
+#include "lat/lattice-functions.h"
+#include "util/kaldi-thread.h"
+#include "online2/online-nnet3-decoding.h"
 #include "online2/online-nnet2-feature-pipeline.h"
 #include "online2/onlinebin-util.h"
 #include "online2/online-timing.h"
-#include "fstext/fstext-lib.h"
-#include "lat/lattice-functions.h"
 #include "lat/word-align-lattice-lexicon.h"
-#include "util/kaldi-thread.h"
-#include "nnet3/nnet-utils.h"*/
+#include "nnet3/nnet-utils.h"
 
 
 namespace little_endian_io {
@@ -34,7 +34,6 @@ namespace little_endian_io {
 using namespace little_endian_io;
 
 RecEngine::RecEngine(std::string fname) {
-
     createRecStream(fname);
 }
 
@@ -179,8 +178,8 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         write_word(f, valint, 2);
     }
 
-    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-    int32_t underrunCount = audioStream->getXRunCount();
+    //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+    //int32_t underrunCount = audioStream->getXRunCount();
 
     //LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
     //     numFrames, underrunCount, bufferSize, odone);
@@ -192,8 +191,7 @@ void RecEngine::setDeviceId(int32_t deviceId) {
     mRecDeviceId = deviceId;
 }
 
-/*void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
-
+void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::string ctm) {
     try {
         using namespace kaldi;
         using namespace fst;
@@ -203,24 +201,19 @@ void RecEngine::setDeviceId(int32_t deviceId) {
 
         // feature_opts includes configuration for the iVector adaptation,
         // as well as the basic features.
-        OnlineNnet2FeaturePipelineConfig feature_opts();
-        nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
-        LatticeFasterDecoderConfig decoder_opts;
+        OnlineNnet2FeaturePipelineConfig feature_opts(modeldir + "fbank.conf", "fbank");
+        nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
+        LatticeFasterDecoderConfig decoder_opts(10.0, 3000, 5.0, 25);
 
         BaseFloat chunk_length_secs = 0.18;
         bool online = true;
 
-
-        feature_opts.Register(&po);
-        decodable_opts.Register(&po);
-        decoder_opts.Register(&po);
-
-        std::string nnet3_rxfilename = po.GetArg(1),
-        fst_rxfilename = po.GetArg(2),
-        wav_rspecifier = po.GetArg(3),
-        align_lex = po.GetArg(4),
-        wsyms = po.GetArg(5),
-        ctm_wxfilename = po.GetArg(6);
+        std::string nnet3_rxfilename = modeldir + "final.mdl",
+        fst_rxfilename = modeldir + "HCLG.fst",
+        wav_rspecifier = wavpath,
+        align_lex = modeldir + "align_lexicon.int",
+        wsyms = modeldir + "words.txt",
+        ctm_wxfilename = ctm;
 
         OnlineNnet2FeaturePipelineInfo feature_info(feature_opts);
 
@@ -244,11 +237,6 @@ void RecEngine::setDeviceId(int32_t deviceId) {
 
         fst::Fst<fst::StdArc> *decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
 
-        fst::SymbolTable *word_syms = NULL;
-        if (word_syms_rxfilename != "")
-        if (!(word_syms = fst::SymbolTable::ReadText(word_syms_rxfilename)))
-        KALDI_ERR << "Could not read symbol table from file " << word_syms_rxfilename;
-
         OnlineTimingStats timing_stats;
 
         std::ifstream is(align_lex, std::ifstream::in);
@@ -261,7 +249,7 @@ void RecEngine::setDeviceId(int32_t deviceId) {
         ko.Stream() << std::fixed;
         ko.Stream().precision(2);
         BaseFloat frame_shift = 0.03;
-        word_syms = fst::SymbolTable::ReadText(wsyms);
+        fst::SymbolTable* word_syms = fst::SymbolTable::ReadText(wsyms);
 
         WaveHolder wavholder;
         std::ifstream wavis(wav_rspecifier, std::ios::binary);
@@ -345,10 +333,8 @@ void RecEngine::setDeviceId(int32_t deviceId) {
 
         delete decode_fst;
         delete word_syms; // will delete if non-NULL.
-        return 0;
     } catch(const std::exception& e) {
         std::cerr << e.what();
-        return -1;
     }
-}*/
+}
 

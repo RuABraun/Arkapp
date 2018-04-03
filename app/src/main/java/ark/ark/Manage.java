@@ -31,7 +31,7 @@ public class Manage extends Base {
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
 
-        File dir = new File(getString(R.string.SaveDir));
+        File dir = new File(filesdir);
         File[] fpaths = dir.listFiles();
         Arrays.sort(fpaths);
         files = new ArrayList<String>();
@@ -66,6 +66,17 @@ public class Manage extends Base {
         }
     }
 
+    public void transcribe_switch(View view) {
+        if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
+            return;
+        }
+
+        ArrayList<String> fpaths = get_sel_files();
+        for (String fpath : fpaths) {
+            RecEngine.transcribe(fpath, modeldir, filesdir + "out.ctm");
+        }
+    }
+
     public void delete_switch(View view) {
         Log.i("APP", "Num items " + Integer.toString(lv.getCount()));
         ArrayList<String> fpaths = get_sel_files();
@@ -86,7 +97,7 @@ public class Manage extends Base {
         for(int i=0; i < spa.size(); i++) {
             boolean boolvar = spa.valueAt(i);
             Log.i("APP", Boolean.toString(boolvar));
-            String tmp = getString(R.string.SaveDir) + ((TextView) lv.getChildAt(spa.keyAt(i))).getText().toString();
+            String tmp = filesdir + ((TextView) lv.getChildAt(spa.keyAt(i))).getText().toString();
             Log.i("APP", tmp);
             if (boolvar) {
                 ret.add(tmp);
@@ -103,7 +114,7 @@ public class Manage extends Base {
 
     public void list_reset() {
         files.clear();
-        File dir = new File(getString(R.string.SaveDir));
+        File dir = new File(filesdir);
         File[] fpaths = dir.listFiles();
         Arrays.sort(fpaths);
         ArrayList<String> tmp = new ArrayList<String>();

@@ -20,7 +20,7 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
                                           int32_t numFrames);
 
-    //static void transcribe_file(std::string wavpath, std::string ctm);
+    static void transcribe_file(std::string wavpath, std::string modeldir, std::string ctm);
 
 private:
     int32_t mRecDeviceId = oboe::kUnspecified;
