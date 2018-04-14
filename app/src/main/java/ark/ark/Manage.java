@@ -73,7 +73,7 @@ public class Manage extends Base {
 
         ArrayList<String> fpaths = get_sel_files();
         for (String fpath : fpaths) {
-            RecEngine.transcribe(fpath, modeldir, filesdir + "out.ctm");
+            RecEngine.transcribe(fpath, modeldir, filesdir + "out.txt");
         }
     }
 

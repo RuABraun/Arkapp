@@ -32,7 +32,7 @@ private:
 
     size_t data_chunk_pos, odone, frames_out;
     std::ofstream f;
-    int32_t fin_sample_rate = 16000;
+    const static int32_t fin_sample_rate = 16000;
     float* fp_audio_in;
     float* resamp_audio;  // resampled audio data
     soxr_error_t soxr_error;
