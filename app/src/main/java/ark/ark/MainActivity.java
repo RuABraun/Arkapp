@@ -103,10 +103,9 @@ public class MainActivity extends Base {
         }
     }
 
-    public void set_text() {
+    public void set_text(String text) {
         EditText ed = findViewById(R.id.transText);
-        String a = "blabla";
-        ed.setText(a, TextView.BufferType.EDITABLE);
+        ed.setText(text, TextView.BufferType.EDITABLE);
     }
 
     private void do_setup() {

@@ -54,13 +54,15 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
 JNIEXPORT jlong JNICALL
 Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname, jobject jobj) {
     jclass jcls = env->FindClass("ark/ark/MainActivity");
-    jmethodID sett = env->GetMethodID(jcls, "set_text", "()V");
-    //jstring jstr = env->NewStringUTF("This string comes from JNI");
-    env->CallVoidMethod(jobj, sett);
+    jmethodID sett = env->GetMethodID(jcls, "set_text", "(Ljava/lang/String;)V");
+    jstring jstr = env->NewStringUTF("This string comes from JNI");
+    env->CallVoidMethod(jobj, sett, jstr);
+    //JavaVM** jjvm = NULL;
+    //env->GetJavaVM(jjvm);
 
     const char* cstr = env->GetStringUTFChars(fname, NULL);
     std::string fnamenew = std::string(cstr);
-    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew);
+    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew, env, jobj);
     return (jlong) engine;
 }
 

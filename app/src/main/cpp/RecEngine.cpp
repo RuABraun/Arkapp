@@ -68,7 +68,11 @@ int start_logger()
     return 0;
 }*/
 
-RecEngine::RecEngine(std::string wavpath) {
+RecEngine::RecEngine(std::string wavpath, JNIEnv* envin, jobject jobjin) {
+    env = envin;
+    jobj = jobjin;
+    jclass jcls = env->FindClass("ark/ark/MainActivity");
+    sett = env->GetMethodID(jcls, "set_text", "(Ljava/lang/String;)V");
     createRecStream(wavpath);
 }
 
@@ -78,6 +82,8 @@ RecEngine::~RecEngine() {
 
 void RecEngine::createRecStream(std::string wavpath) {
     //, std::string tname, std::string ctm, std::string modeldir
+    jstring jstr = env->NewStringUTF("Starting");
+    env->CallVoidMethod(jobj, sett, jstr);
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -108,6 +114,7 @@ void RecEngine::createRecStream(std::string wavpath) {
         if (!mIsfloat)
             fp_audio_in = static_cast<float*>(malloc(sizeof(float) * mFramesPerBurst * mChannelCount));
         frames_out = static_cast<size_t>(mFramesPerBurst * fin_sample_rate / mSampleRate + .5);
+        frames_min = (size_t) (((float) frames_out) * 0.8);
 
         resamp_audio = static_cast<float*>(calloc(frames_out * mChannelCount, sizeof(float)));
 
@@ -182,15 +189,15 @@ void RecEngine::closeOutputStream() {
         }
 
         // Finishing wav write
-        LOGI("frames written: %d", frames_written);
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
-        LOGI("lenfile: %zu", file_length);
-        LOGI("data_chunksz: %zu", data_chunk_pos);
         write_word(f, file_length - data_chunk_pos - 8, 4);
         f.seekp(4);
         write_word(f, file_length - 8, 4);
         f.close();
+
+        //jstring jstr = env->NewStringUTF("Done writing file");
+        //env->CallVoidMethod(jobj, sett, jstr);
 
         result = mRecStream->close();
         if (result != oboe::Result::OK) {
@@ -217,7 +224,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     }
-    if (odone > frames_out - 240) {
+    if (odone > frames_min) {
 
         const float mul = 32768.0f;
         const float nmul = -32768.0f;
@@ -225,7 +232,6 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         const float num_samples = frames_out * mChannelCount;
         float val;
         for (int i = 0; i < num_samples; i += mChannelCount) {
-            frames_written++;
             val = 0.0f;
             for (int j = 0; j < mChannelCount; j++) {
                 val += resamp_audio[i + j];
@@ -241,11 +247,14 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             write_word(f, valint, 2);
         }
 
-        int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-        int32_t underrunCount = audioStream->getXRunCount();
+        jstring jstr = env->NewStringUTF("This comes from the loop");
+        env->CallVoidMethod(jobj, sett, jstr);
 
-        LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
-             numFrames, underrunCount, bufferSize, odone);
+        //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+        //int32_t underrunCount = audioStream->getXRunCount();
+
+        //LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
+        //     numFrames, underrunCount, bufferSize, odone);
     }
     memset(resamp_audio, 0, frames_out);
 
