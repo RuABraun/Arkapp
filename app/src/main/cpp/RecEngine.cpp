@@ -32,7 +32,41 @@ namespace little_endian_io {
 }
 using namespace little_endian_io;
 
-kaldi::SubVector<kaldi::BaseFloat> readwav(std::string wavpath);
+/*static int pfd[2];
+static pthread_t thr;
+static const char *tag = "myapp";
+
+static void *thread_func(void*)
+{
+    ssize_t rdsz;
+    char buf[128];
+    for(;;) {
+        if((rdsz = read(pfd[0], buf, sizeof buf - 1)) > 0) {
+            if(buf[rdsz - 1] == '\n') --rdsz;
+            buf[rdsz] = 0;
+            __android_log_write(ANDROID_LOG_DEBUG, tag, buf);
+        }
+    }
+    return 0;
+}
+
+int start_logger()
+{
+
+    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stderr, 0, _IONBF, 0);
+
+    //
+    pipe(pfd);
+    dup2(pfd[1], 1);
+    dup2(pfd[1], 2);
+
+
+    if(pthread_create(&thr, 0, thread_func, 0) == -1)
+        return -1;
+    pthread_detach(thr);
+    return 0;
+}*/
 
 RecEngine::RecEngine(std::string wavpath) {
     createRecStream(wavpath);
@@ -50,7 +84,7 @@ void RecEngine::createRecStream(std::string wavpath) {
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
     builder.setFramesPerCallback(mFramesPerBurst);
-
+    //start_logger();
     oboe::Result result = builder.openStream(&mRecStream);
 
     oboe::AudioFormat mFormat;
@@ -102,7 +136,7 @@ void RecEngine::createRecStream(std::string wavpath) {
         // ! -- ASR setup begin
         /*kaldi::OnlineNnet2FeaturePipelineConfig feature_opts(modeldir + "fbank.conf", "fbank");
         kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
-        kaldi::LatticeFasterDecoderConfig decoder_opts(6.0, 3000, 5.0, 25);
+        kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
 
         kaldi::BaseFloat chunk_length_secs = 0.18;
         bool online = true;
@@ -148,9 +182,12 @@ void RecEngine::closeOutputStream() {
         }
 
         // Finishing wav write
+        LOGI("frames written: %d", frames_written);
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
-        write_word(f, file_length - data_chunk_pos + 8, 4);
+        LOGI("lenfile: %zu", file_length);
+        LOGI("data_chunksz: %zu", data_chunk_pos);
+        write_word(f, file_length - data_chunk_pos - 8, 4);
         f.seekp(4);
         write_word(f, file_length - 8, 4);
         f.close();
@@ -180,33 +217,37 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     }
+    if (odone > frames_out - 240) {
 
-    const float mul = 32768.0f;
-    const float nmul = -32768.0f;
-    const float cnt_channel_fp = static_cast<float>(mChannelCount);
-    const float num_samples = frames_out * mChannelCount;
-    float val;
-    for(int i=0;i < num_samples;i+=mChannelCount) {
-        val = 0.0f;
-        for(int j=0;j<mChannelCount;j++) {
-            val += resamp_audio[i+j];
+        const float mul = 32768.0f;
+        const float nmul = -32768.0f;
+        const float cnt_channel_fp = static_cast<float>(mChannelCount);
+        const float num_samples = frames_out * mChannelCount;
+        float val;
+        for (int i = 0; i < num_samples; i += mChannelCount) {
+            frames_written++;
+            val = 0.0f;
+            for (int j = 0; j < mChannelCount; j++) {
+                val += resamp_audio[i + j];
+            }
+
+            val = val / cnt_channel_fp;
+            val = val * mul;
+            if (val > mul) val = mul;
+            if (val < nmul) {
+                val = nmul;
+            }
+            int16_t valint = static_cast<int16_t>(val);
+            write_word(f, valint, 2);
         }
 
-        val = val / cnt_channel_fp;
-        val = val * mul;
-        if (val > mul) val = mul;
-        if (val < nmul) {
-            val = nmul;
-        }
-        int16_t valint = static_cast<int16_t>(val);
-        write_word(f, valint, 2);
+        int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+        int32_t underrunCount = audioStream->getXRunCount();
+
+        LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
+             numFrames, underrunCount, bufferSize, odone);
     }
-
-    //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-    //int32_t underrunCount = audioStream->getXRunCount();
-
-    //LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
-    //     numFrames, underrunCount, bufferSize, odone);
+    memset(resamp_audio, 0, frames_out);
 
     return oboe::DataCallbackResult::Continue;
 }
@@ -216,6 +257,7 @@ void RecEngine::setDeviceId(int32_t deviceId) {
 }
 
 void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::string ctm) {
+    //start_logger();
     try {
         LOGI("Transcribing file");
         using namespace kaldi;
@@ -228,7 +270,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
         // as well as the basic features.
         OnlineNnet2FeaturePipelineConfig feature_opts(modeldir + "fbank.conf", "fbank");
         nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
-        LatticeFasterDecoderConfig decoder_opts(6.0, 3000, 5.0, 25);
+        LatticeFasterDecoderConfig decoder_opts(8.0, 3000, 5.0, 25);
 
         BaseFloat chunk_length_secs = 0.18;
         bool online = true;
@@ -262,7 +304,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
 
         LOGI("Reading HCLG");
         fst::Fst<fst::StdArc> *decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
-        LOGI("Done reading HCLG");
+
         OnlineTimingStats timing_stats;
 
         std::vector<std::vector<int32>> lexicon;
@@ -281,26 +323,27 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
         if (!(word_syms = fst::SymbolTable::ReadText(wsyms)))
             LOGE("ERROR READING SYM TABLE");
 
-        SubVector<BaseFloat> data = readwav(wav_rspecifier);
+        kaldi::WaveHolder wavholder;
+        std::ifstream wavis(wavpath, std::ios::binary);
+        wavholder.Read(wavis);
+        const kaldi::WaveData &wave_data = wavholder.Value();
+        kaldi::SubVector<kaldi::BaseFloat> data(wave_data.Data(), 0);
 
-        LOGI("Done reading wav");
         OnlineNnet2FeaturePipeline feature_pipeline(feature_info);
 
-        LOGI("Setting up decoder.");
         SingleUtteranceNnet3Decoder decoder(decoder_opts, trans_model, decodable_info, *decode_fst,
                                             &feature_pipeline);
-        OnlineTimer decoding_timer("wavfile");
-        LOGI("Before decoding1.");
-        BaseFloat samp_freq = (BaseFloat) fin_sample_rate;
+
+        BaseFloat samp_freq = wave_data.SampFreq();
         int32 chunk_length;
-        LOGI("Before decoding2.");
+
         if (chunk_length_secs > 0) {
             chunk_length = int32(samp_freq * chunk_length_secs);
         if (chunk_length == 0) chunk_length = 1;
         } else {
             chunk_length = std::numeric_limits<int32>::max();
         }
-        LOGI("Before decoding3.");
+
         int32 samp_offset = 0;
         LOGI("Starting decoding.");
         while (samp_offset < data.Dim()) {
@@ -311,7 +354,6 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
             feature_pipeline.AcceptWaveform(samp_freq, wave_part);
 
             samp_offset += num_samp;
-            decoding_timer.WaitUntil(samp_offset / samp_freq);
             if (samp_offset == data.Dim()) {
                 // no more input. flush out last frames
                 feature_pipeline.InputFinished();
@@ -324,8 +366,6 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
         CompactLattice clat;
         bool end_of_utterance = true;
         decoder.GetLattice(end_of_utterance, &clat);
-
-        decoding_timer.OutputStats(&timing_stats);
 
         CompactLattice aligned_clat;
         WordAlignLatticeLexicon(clat, trans_model, lexicon_info, opts, &aligned_clat);
@@ -342,22 +382,13 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
             ko.Stream() << word_syms->Find(words[j]) << ' ' << (frame_shift * times[j]) << ' '
             << (frame_shift * lengths[j]) << std::endl;
         }
-        LOGI("Decoded file");
-        timing_stats.Print(online);
+        LOGI("Decoded file.");
 
         delete decode_fst;
         delete word_syms; // will delete if non-NULL.
     } catch(const std::exception& e) {
         LOGE("FAILED FAILED FAILED");
         LOGE("ERROR %s",  e.what());
+        throw;
     }
-}
-
-kaldi::SubVector<kaldi::BaseFloat> readwav(std::string wavpath) {
-    kaldi::WaveHolder wavholder;
-    std::ifstream wavis(wavpath, std::ios::binary);
-    wavholder.Read(wavis);
-    const kaldi::WaveData &wave_data = wavholder.Value();
-    kaldi::SubVector<kaldi::BaseFloat> data(wave_data.Data(), 0);
-    return data;
 }

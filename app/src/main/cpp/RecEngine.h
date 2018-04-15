@@ -25,7 +25,7 @@ public:
 private:
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
-    int32_t mFramesPerBurst = 2048;
+    int32_t mFramesPerBurst = 8000;
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
@@ -37,6 +37,7 @@ private:
     float* resamp_audio;  // resampled audio data
     soxr_error_t soxr_error;
     soxr_t soxr;
+    int32_t frames_written = 0;
 
     std::mutex mRestartingLock;
 

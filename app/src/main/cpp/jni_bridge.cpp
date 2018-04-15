@@ -7,6 +7,10 @@
 
 extern "C" {
 
+//JNIEXPORT void JNICALL Java_ark_ark_RecEngine_native_1settext(JNIEnv* env, jclass jcls) {//
+//
+//}
+
 JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject Amgr, jstring modeldir) {
 
     AAssetManager *mgr = AAssetManager_fromJava(env, Amgr);
@@ -15,7 +19,7 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
     const char* filename = (const char*)NULL;
     LOGI("IN LOAD FUNCTION");
     size_t BUFSZ = 1000 * 512;
-    const char* rootdir = (env)->GetStringUTFChars(modeldir, 0);//"/sdcard/Ark/";//
+    const char* rootdir = (env)->GetStringUTFChars(modeldir, 0);
     while ((filename = AAssetDir_getNextFileName(assetDir)) != NULL) {
 
         LOGI("FILENAME: %s", filename);
@@ -48,7 +52,12 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
 }
 
 JNIEXPORT jlong JNICALL
-Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname) {
+Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname, jobject jobj) {
+    jclass jcls = env->FindClass("ark/ark/MainActivity");
+    jmethodID sett = env->GetMethodID(jcls, "set_text", "()V");
+    //jstring jstr = env->NewStringUTF("This string comes from JNI");
+    env->CallVoidMethod(jobj, sett);
+
     const char* cstr = env->GetStringUTFChars(fname, NULL);
     std::string fnamenew = std::string(cstr);
     RecEngine *engine = new(std::nothrow) RecEngine(fnamenew);

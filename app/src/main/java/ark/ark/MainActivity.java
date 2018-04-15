@@ -93,7 +93,7 @@ public class MainActivity extends Base {
                 fname = name + "_" + Integer.toString(i) + ".wav";
                 i++;
             }
-            RecEngine.create(fname);
+            RecEngine.create(fname, this);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
         } else {
@@ -101,6 +101,12 @@ public class MainActivity extends Base {
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
         }
+    }
+
+    public void set_text() {
+        EditText ed = findViewById(R.id.transText);
+        String a = "blabla";
+        ed.setText(a, TextView.BufferType.EDITABLE);
     }
 
     private void do_setup() {
