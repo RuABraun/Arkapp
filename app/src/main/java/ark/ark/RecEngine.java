@@ -9,10 +9,10 @@ public class RecEngine {
         System.loadLibrary("rec-engine");
     }
 
-    static boolean create(String fname, MainActivity jobj){
+    static boolean create(String fname){
 
         if (mEngineHandle == 0){
-            mEngineHandle = native_createEngine(fname, jobj);
+            mEngineHandle = native_createEngine(fname);
         }
         return (mEngineHandle != 0);
     }
@@ -28,12 +28,21 @@ public class RecEngine {
         native_transcribe(wavpath, modeldir, ctm);
     }
 
+    static String get_text() {
+        if (mEngineHandle != 0) {
+            return native_getText(mEngineHandle);
+        } else {
+            return "!ERROR";
+        }
+    }
+
     static void setAudioDeviceId(int deviceId){
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
 
-    private static native long native_createEngine(String fname, MainActivity jobj);
+    private static native long native_createEngine(String fname);
     private static native void native_deleteEngine(long engineHandle);
     private static native void native_setAudioDeviceId(long engineHandle, int deviceId);
+    private static native String native_getText(long engineHandle);
     private static native void native_transcribe(String wavpath, String modeldir, String ctm);
 }

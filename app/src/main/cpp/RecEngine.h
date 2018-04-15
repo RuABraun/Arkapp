@@ -5,18 +5,19 @@
 #include<oboe/Oboe.h>
 #include <thread>
 #include <array>
-#include <mutex>
 #include <fstream>
 #include <soxr.h>
 #include <jni.h>
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
-    RecEngine(std::string fname, JNIEnv* env, jobject jobj);
+    RecEngine(std::string fname);
 
     ~RecEngine();
 
     void setDeviceId(int32_t deviceId);
+
+    const char* get_text();
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
                                           int32_t numFrames);
@@ -24,9 +25,8 @@ public:
     static void transcribe_file(std::string wavpath, std::string modeldir, std::string ctm);
 
 private:
-    JNIEnv* env;
-    jobject jobj;
-    jmethodID sett;
+    std::string outtext;
+    int nrmb = 0;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;

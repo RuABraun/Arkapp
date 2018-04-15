@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
@@ -31,6 +33,8 @@ public class MainActivity extends Base {
                                      Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "fbank.conf", "align_lexicon.int");
+    Handler h = new Handler(Looper.getMainLooper());
+    Runnable runnable;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -93,19 +97,29 @@ public class MainActivity extends Base {
                 fname = name + "_" + Integer.toString(i) + ".wav";
                 i++;
             }
-            RecEngine.create(fname, this);
+            RecEngine.create(fname);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
+
+            h.postDelayed(new Runnable() {
+                public void run() {
+                    runnable=this;
+                    update_text();
+                    h.postDelayed(runnable, 500);
+                }
+            }, 500);
         } else {
+            h.removeCallbacks(runnable);
             RecEngine.delete();
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
         }
     }
 
-    public void set_text(String text) {
+    public void update_text() {
+        String str = RecEngine.get_text();
         EditText ed = findViewById(R.id.transText);
-        ed.setText(text, TextView.BufferType.EDITABLE);
+        ed.setText(str, TextView.BufferType.EDITABLE);
     }
 
     private void do_setup() {

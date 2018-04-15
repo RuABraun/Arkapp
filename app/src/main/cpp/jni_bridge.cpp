@@ -52,17 +52,11 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
 }
 
 JNIEXPORT jlong JNICALL
-Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname, jobject jobj) {
-    jclass jcls = env->FindClass("ark/ark/MainActivity");
-    jmethodID sett = env->GetMethodID(jcls, "set_text", "(Ljava/lang/String;)V");
-    jstring jstr = env->NewStringUTF("This string comes from JNI");
-    env->CallVoidMethod(jobj, sett, jstr);
-    //JavaVM** jjvm = NULL;
-    //env->GetJavaVM(jjvm);
+Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname) {
 
     const char* cstr = env->GetStringUTFChars(fname, NULL);
     std::string fnamenew = std::string(cstr);
-    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew, env, jobj);
+    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew);
     return (jlong) engine;
 }
 
@@ -73,6 +67,16 @@ Java_ark_ark_RecEngine_native_1deleteEngine(
         jlong engineHandle) {
 
     delete (RecEngine *) engineHandle;
+}
+
+JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jclass, jlong engineHandle) {
+    RecEngine *engine = (RecEngine*) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid, call createHandle() to create a new one");
+        return env->NewStringUTF("!ERROR");
+    }
+    jstring jstr = env->NewStringUTF(engine->get_text());
+    return jstr;
 }
 
 JNIEXPORT void JNICALL

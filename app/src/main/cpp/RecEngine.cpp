@@ -68,11 +68,8 @@ int start_logger()
     return 0;
 }*/
 
-RecEngine::RecEngine(std::string wavpath, JNIEnv* envin, jobject jobjin) {
-    env = envin;
-    jobj = jobjin;
-    jclass jcls = env->FindClass("ark/ark/MainActivity");
-    sett = env->GetMethodID(jcls, "set_text", "(Ljava/lang/String;)V");
+RecEngine::RecEngine(std::string wavpath) {
+
     createRecStream(wavpath);
 }
 
@@ -80,10 +77,14 @@ RecEngine::~RecEngine() {
     closeOutputStream();
 }
 
+const char* RecEngine::get_text(){
+    return outtext.c_str();
+}
+
 void RecEngine::createRecStream(std::string wavpath) {
     //, std::string tname, std::string ctm, std::string modeldir
-    jstring jstr = env->NewStringUTF("Starting");
-    env->CallVoidMethod(jobj, sett, jstr);
+    outtext = "Starting";
+
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -247,9 +248,6 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             write_word(f, valint, 2);
         }
 
-        jstring jstr = env->NewStringUTF("This comes from the loop");
-        env->CallVoidMethod(jobj, sett, jstr);
-
         //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
         //int32_t underrunCount = audioStream->getXRunCount();
 
@@ -257,7 +255,8 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         //     numFrames, underrunCount, bufferSize, odone);
     }
     memset(resamp_audio, 0, frames_out);
-
+    outtext = "val %d" + std::to_string(nrmb);
+    nrmb++;
     return oboe::DataCallbackResult::Continue;
 }
 
