@@ -54,7 +54,7 @@ private:
     soxr_t soxr;
 
     // ASR vars
-    /*kaldi::nnet3::AmNnetSimple am_nnet;
+    kaldi::nnet3::AmNnetSimple am_nnet;
     kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
     kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
     kaldi::LatticeFasterDecoderConfig decoder_opts;
@@ -65,8 +65,7 @@ private:
     kaldi::OnlineNnet2FeaturePipeline* feature_pipeline = NULL;
     fst::SymbolTable* word_syms;
     kaldi::BaseFloat fin_sample_rate_fp;
-    //kaldi::Lattice olat;
-    kaldi::TransitionModel trans_model;*/
+    kaldi::TransitionModel trans_model;
 
     void createRecStream(std::string fname, std::string modeldir);
     void closeOutputStream();

@@ -59,9 +59,8 @@ int start_logger()
     return 0;
 }
 
-//RecEngine::RecEngine(std::string wavpath, std::string modeldir): decoder_opts(7.0, 3000, 6.0, 25),
-//                                                                 decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
-RecEngine::RecEngine(std::string wavpath, std::string modeldir) {
+RecEngine::RecEngine(std::string wavpath, std::string modeldir): decoder_opts(7.0, 3000, 6.0, 25),
+                                                                 decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
     createRecStream(wavpath, modeldir);
 }
 
@@ -137,7 +136,7 @@ void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
         //kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
         //kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
 
-        /*std::string nnet3_rxfilename = modeldir + "final.mdl",
+        std::string nnet3_rxfilename = modeldir + "final.mdl",
                 fst_rxfilename = modeldir + "HCLG.fst",
                 wav_rspecifier = wavpath,
                 align_lex = modeldir + "align_lexicon.int",
@@ -166,19 +165,19 @@ void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
             std::ifstream is(align_lex, std::ifstream::in);
             kaldi::ReadLexiconForWordAlign(is, &lexicon);
         }
-        kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
-        kaldi::WordAlignLatticeLexiconOpts opts;
+        //kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
+        //kaldi::WordAlignLatticeLexiconOpts opts;
 
         //ko.Open(ctm_wxfilename, false, true);
         //ko.Stream() << std::fixed;
         //ko.Stream().precision(2);
-        kaldi::BaseFloat frame_shift = 0.03;
+        //kaldi::BaseFloat frame_shift = 0.03;
 
         word_syms = fst::SymbolTable::ReadText(wsyms);
         feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
         decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
                                                         *decodable_info, *decode_fst, feature_pipeline);
-        fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;*/
+        fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
 
         //kaldi::SubVector<float> data(resamp_audio, frames_out);
         // ! -- ASR setup end
@@ -207,14 +206,15 @@ void RecEngine::closeOutputStream() {
         free(resamp_audio);
         free(fp_audio_in);
 
-        /*feature_pipeline->InputFinished();
+        feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
 
         delete word_syms;
         delete decode_fst;
         delete feature_pipeline;
-        delete decoder;*/
+        delete decoder;
+        delete decodable_info;
 
         // Finishing wav write
         size_t file_length = f.tellp();
@@ -232,7 +232,7 @@ void RecEngine::closeOutputStream() {
 }
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    //if (callb_cnt == 2) start_logger();
+    if (callb_cnt == 2) start_logger();
     const float mul = 32768.0f;
     const float cnt_channel_fp = static_cast<float>(mChannelCount);
     float val;
@@ -266,36 +266,39 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
                                   &odone);
     }
-    kaldi::SubVector<float> data(resamp_audio, frames_out);
-    std::cout << "YOYOYOYOYOYOYYOYOYOYOYOYO" <<std::endl;
+    float resamp_int[frames_out];
     for (int i = 0; i < frames_out; i++) {
         val = resamp_audio[i];
         val *= mul;
+        resamp_int[i] = val;
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
 
-    /*if (odone > frames_min || callb_cnt > 0) {
-        LOGI("TEST1");
+    if (odone > frames_min || callb_cnt > 0) {
+
+        kaldi::SubVector<float> data(resamp_int, frames_out);
+
         feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
         decoder->AdvanceDecoding();
 
         if ((callb_cnt + 1) % 3 == 0) {
+            kaldi::Lattice olat;
+            decoder->GetBestPath(false, &olat);
 
-            //decoder->GetBestPath(false, &olat);
             std::vector<int32> words, tmpa;
-            //kaldi::LatticeWeight tmpb;
-            //GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb);
+            kaldi::LatticeWeight tmpb;
+            if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
+
             std::string tmpstr = "";
             for (size_t j = 0; j < words.size(); j++) {
-                LOGI("%d", words[j]);
                 tmpstr += (word_syms->Find(words[j]) + " ");
             }
-            LOGI("sent %s", tmpstr.c_str());
+
             outtext = tmpstr;
 
         }
-    }*/
+    }
      
     //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
     //int32_t underrunCount = audioStream->getXRunCount();
@@ -328,7 +331,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
         nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
         LatticeFasterDecoderConfig decoder_opts(8.0, 3000, 5.0, 25);
 
-        BaseFloat chunk_length_secs = 0.166625;
+        BaseFloat chunk_length_secs = 0.18;
 
         std::string nnet3_rxfilename = modeldir + "final.mdl",
         fst_rxfilename = modeldir + "HCLG.fst",
@@ -396,11 +399,13 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
 
         int32 samp_offset = 0;
         LOGI("Starting decoding.");
+
         while (samp_offset < data.Dim()) {
             int32 samp_remaining = data.Dim() - samp_offset;
             int32 num_samp = chunk_length < samp_remaining ? chunk_length : samp_remaining;
 
             SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
+
             feature_pipeline.AcceptWaveform(samp_freq, wave_part);
 
             samp_offset += num_samp;
@@ -411,19 +416,8 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
 
             decoder.AdvanceDecoding();
 
-            /*Lattice olat;
-            decoder.GetBestPath(false, &olat);
-
-            std::vector<int32> words, tmpa;
-            LatticeWeight tmpb;
-            GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb);
-            for(size_t j=0; j < words.size(); j++) {
-                ko.Stream() << word_syms->Find(words[j]) << ' ';
-            }
-            ko.Stream() << std::endl;*/
         }
         decoder.FinalizeDecoding();
-
         CompactLattice clat;
         bool end_of_utterance = true;
         decoder.GetLattice(end_of_utterance, &clat);
@@ -447,8 +441,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
 
         delete decode_fst;
         delete word_syms; // will delete if non-NULL.
-        //delete feature_pipeline;
-        //delete decoder;
+
     } catch(const std::exception& e) {
         LOGE("FAILED FAILED FAILED");
         LOGE("ERROR %s",  e.what());
