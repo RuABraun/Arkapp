@@ -52,11 +52,13 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
 }
 
 JNIEXPORT jlong JNICALL
-Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname) {
+Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname, jstring jmodeldir) {
 
     const char* cstr = env->GetStringUTFChars(fname, NULL);
     std::string fnamenew = std::string(cstr);
-    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew);
+    const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
+    std::string modeldir = std::string(cstrb);
+    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew, modeldir);
     return (jlong) engine;
 }
 

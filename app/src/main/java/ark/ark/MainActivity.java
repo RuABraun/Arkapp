@@ -97,7 +97,7 @@ public class MainActivity extends Base {
                 fname = name + "_" + Integer.toString(i) + ".wav";
                 i++;
             }
-            RecEngine.create(fname);
+            RecEngine.create(fname, modeldir);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
 
@@ -119,6 +119,7 @@ public class MainActivity extends Base {
     public void update_text() {
         String str = RecEngine.get_text();
         EditText ed = findViewById(R.id.transText);
+        //String s = ed.getText().toString();
         ed.setText(str, TextView.BufferType.EDITABLE);
     }
 

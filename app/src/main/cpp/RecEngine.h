@@ -8,10 +8,20 @@
 #include <fstream>
 #include <soxr.h>
 #include <jni.h>
+#include "feat/wave-reader.h"
+#include "fstext/fstext-lib.h"
+#include "lat/lattice-functions.h"
+#include "util/kaldi-thread.h"
+#include "online2/online-nnet3-decoding.h"
+#include "online2/online-nnet2-feature-pipeline.h"
+#include "online2/onlinebin-util.h"
+#include "online2/online-timing.h"
+#include "lat/word-align-lattice-lexicon.h"
+#include "nnet3/nnet-utils.h"
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
-    RecEngine(std::string fname);
+    RecEngine(std::string fname, std::string modeldir);
 
     ~RecEngine();
 
@@ -26,7 +36,7 @@ public:
 
 private:
     std::string outtext;
-    int nrmb = 0;
+    int callb_cnt = 0;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
@@ -43,7 +53,22 @@ private:
     soxr_error_t soxr_error;
     soxr_t soxr;
 
-    void createRecStream(std::string fname);
+    // ASR vars
+    /*kaldi::nnet3::AmNnetSimple am_nnet;
+    kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
+    kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
+    kaldi::LatticeFasterDecoderConfig decoder_opts;
+    fst::Fst<fst::StdArc>* decode_fst;
+    kaldi::OnlineNnet2FeaturePipelineInfo* feature_info = NULL;
+    kaldi::nnet3::DecodableNnetSimpleLoopedInfo* decodable_info = NULL;
+    kaldi::SingleUtteranceNnet3Decoder* decoder = NULL;
+    kaldi::OnlineNnet2FeaturePipeline* feature_pipeline = NULL;
+    fst::SymbolTable* word_syms;
+    kaldi::BaseFloat fin_sample_rate_fp;
+    //kaldi::Lattice olat;
+    kaldi::TransitionModel trans_model;*/
+
+    void createRecStream(std::string fname, std::string modeldir);
     void closeOutputStream();
 };
 
