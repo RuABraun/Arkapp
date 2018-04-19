@@ -33,7 +33,9 @@ public class RecEngine {
 
     static void transcribe_stream(String wavpath) {
         Log.i("APP", String.format("Using %d", mEngineHandle));
-        native_transcribe_stream(mEngineHandle, wavpath);
+        if (mEngineHandle != 0) {
+            native_transcribe_stream(mEngineHandle, wavpath);
+        }
     }
 
     static void stop_trans_stream() {

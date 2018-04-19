@@ -40,7 +40,7 @@ public:
 
 private:
     std::string outtext;
-    int callb_cnt = 0;
+    int callb_cnt;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;

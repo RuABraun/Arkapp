@@ -150,7 +150,7 @@ void RecEngine::transcribe_stream(std::string wavpath){
         fp_audio_in = static_cast<float*>(malloc(sizeof(float) * mFramesPerBurst));
         frames_out = static_cast<size_t>(mFramesPerBurst * fin_sample_rate / mSampleRate + .5);
         LOGI("Frames out %d", frames_out);
-        frames_min = (size_t) (((float) frames_out) * 0.8);
+        frames_min = (size_t) (((float) frames_out) * 0.5);
 
         resamp_audio = static_cast<float*>(calloc(frames_out, sizeof(float)));
 
@@ -186,6 +186,7 @@ void RecEngine::transcribe_stream(std::string wavpath){
 
         // ---------------- Done
 
+        callb_cnt = 0;
         result = mRecStream->requestStart();
         if (result != oboe::Result::OK) {
             LOGE("Error starting stream. %s", oboe::convertToText(result));
@@ -205,17 +206,20 @@ void RecEngine::stop_trans_stream() {
             LOGE("Error stopping output stream. %s", oboe::convertToText(result));
         }
 
+        result = mRecStream->close();
+        LOGI("CLOSED");
+        if (result != oboe::Result::OK) {
+            LOGE("Error closing output stream. %s", oboe::convertToText(result));
+        }
+        
         soxr_delete(soxr);
         free(resamp_audio);
         free(fp_audio_in);
-        LOGI("FINALISING");
+
         feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
-        LOGI("DONE");
-        //delete feature_pipeline;
-        //delete decoder;
-        //LOGI("DELETED");
+
         // Finishing wav write
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
@@ -224,13 +228,6 @@ void RecEngine::stop_trans_stream() {
         write_word(f, file_length - 8, 4);
         f.close();
 
-        callb_cnt = 0;
-
-        result = mRecStream->close();
-        LOGI("CLOSED");
-        if (result != oboe::Result::OK) {
-            LOGE("Error closing output stream. %s", oboe::convertToText(result));
-        }
     }
 }
 
@@ -287,6 +284,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         decoder->AdvanceDecoding();
 
         if ((callb_cnt + 1) % 3 == 0) {
+            LOGI("getting bestpath");
             kaldi::Lattice olat;
             decoder->GetBestPath(false, &olat);
 

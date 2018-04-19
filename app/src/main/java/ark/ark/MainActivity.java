@@ -110,6 +110,7 @@ public class MainActivity extends Base {
     }
 
     public void record_switch(View view) {
+        if (is_spamclick()) return;
 
         Button button_rec = findViewById(R.id.button_rec);
         Log.i("APP", "isrecording: " + String.valueOf(is_recording));
@@ -119,9 +120,8 @@ public class MainActivity extends Base {
             Date now = new Date();
             String name = filesdir + sdf.format(now);
             String wavpath = name + ".wav";
-
+            int i = 1;
             while (new File(wavpath).exists()) {
-                int i = 1;
                 wavpath = name + "_" + Integer.toString(i) + ".wav";
                 i++;
             }
@@ -139,15 +139,16 @@ public class MainActivity extends Base {
         } else {
             h.removeCallbacks(runnable);
             RecEngine.stop_trans_stream();
+            Log.i("APP", "out");
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
+            Log.i("APP", "finfunc");
         }
     }
 
     public void update_text() {
         String str = RecEngine.get_text();
         EditText ed = findViewById(R.id.transText);
-        //String s = ed.getText().toString();
         ed.setText(str, TextView.BufferType.EDITABLE);
     }
 
