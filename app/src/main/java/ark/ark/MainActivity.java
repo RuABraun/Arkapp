@@ -76,28 +76,56 @@ public class MainActivity extends Base {
 
     }
 
+    private void do_setup() {
+        Log.i("STORAGE", rootdir);
+        File f = new File(rmodeldir);
+        if (!f.exists()) f.mkdirs();
+        File f2 = new File(filesdir);
+        if (!f2.exists()) f2.mkdirs();
+        boolean all_exist = true;
+        for(String fname: mfiles) {
+            File mf = new File(rmodeldir + fname);
+            if (!mf.exists()) all_exist = false;
+        }
+        if (!all_exist) {
+            mgr = getResources().getAssets();
+            load(mgr, rmodeldir);
+        }
+    }
+
     @Override
     public void onStart() {
         super.onStart();
 
         do_setup();
-        Log.i("MYAPP", "Starting!");
+        Log.i("APP", String.format("enghandle %d", RecEngine.mEngineHandle));
+        RecEngine.create(rmodeldir);
+        Log.i("APP", String.format("enghandle %d", RecEngine.mEngineHandle));
+    }
+
+    @Override
+    protected void onStop() {
+        RecEngine.delete();
+        super.onStop();
     }
 
     public void record_switch(View view) {
+
         Button button_rec = findViewById(R.id.button_rec);
+        Log.i("APP", "isrecording: " + String.valueOf(is_recording));
         if (!is_recording ) {
+
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmm");
             Date now = new Date();
             String name = filesdir + sdf.format(now);
-            String fname = name + ".wav";
+            String wavpath = name + ".wav";
 
-            while (new File(fname).exists()) {
+            while (new File(wavpath).exists()) {
                 int i = 1;
-                fname = name + "_" + Integer.toString(i) + ".wav";
+                wavpath = name + "_" + Integer.toString(i) + ".wav";
                 i++;
             }
-            RecEngine.create(fname, modeldir);
+            RecEngine.transcribe_stream(wavpath);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
 
@@ -110,7 +138,7 @@ public class MainActivity extends Base {
             }, 500);
         } else {
             h.removeCallbacks(runnable);
-            RecEngine.delete();
+            RecEngine.stop_trans_stream();
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
         }
@@ -121,29 +149,6 @@ public class MainActivity extends Base {
         EditText ed = findViewById(R.id.transText);
         //String s = ed.getText().toString();
         ed.setText(str, TextView.BufferType.EDITABLE);
-    }
-
-    private void do_setup() {
-        Log.i("STORAGE", rootdir);
-        File f = new File(modeldir);
-        if (!f.exists()) f.mkdirs();
-        File f2 = new File(filesdir);
-        if (!f2.exists()) f2.mkdirs();
-        boolean all_exist = true;
-        for(String fname: mfiles) {
-            File mf = new File(modeldir + fname);
-            if (!mf.exists()) all_exist = false;
-        }
-        if (!all_exist) {
-            mgr = getResources().getAssets();
-            load(mgr, modeldir);
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        RecEngine.delete();
-        super.onStop();
     }
 
     @Override
@@ -169,8 +174,4 @@ public class MainActivity extends Base {
         return ret;
     }
 
-    // Used to load the 'native-lib' library on application startup.
-    static {
-        System.loadLibrary("rec-engine");
-    }
 }

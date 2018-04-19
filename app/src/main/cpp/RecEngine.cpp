@@ -59,21 +59,67 @@ int start_logger()
     return 0;
 }
 
-RecEngine::RecEngine(std::string wavpath, std::string modeldir): decoder_opts(7.0, 3000, 6.0, 25),
-                                                                 decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
-    createRecStream(wavpath, modeldir);
+void write_ctm(kaldi::CompactLattice* clat, kaldi::TransitionModel* trans_model,
+               kaldi::WordAlignLatticeLexiconInfo lexicon_info, kaldi::WordAlignLatticeLexiconOpts opts,
+               kaldi::BaseFloat frame_shift, fst::SymbolTable* word_syms, kaldi::Output* ko);
+
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
+    // ! -- ASR setup begin
+    LOGI("Constructing rec");
+    model_dir = modeldir;
+    std::string nnet3_rxfilename = modeldir + "final.mdl",
+            fst_rxfilename = modeldir + "HCLG.fst",
+            align_lex = modeldir + "align_lexicon.int",
+            wsyms = modeldir + "words.txt";
+
+    {
+        bool binary;
+        kaldi::Input ki(nnet3_rxfilename, &binary);
+        LOGI("Reading nnet");
+        trans_model.Read(ki.Stream(), binary);
+        am_nnet.Read(ki.Stream(), binary);
+        SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
+        SetDropoutTestMode(true, &(am_nnet.GetNnet()));
+        kaldi::nnet3::CollapseModel(kaldi::nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
+    }
+
+    decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
+    feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
+
+    decode_fst = fst::ReadFstKaldiGeneric(fst_rxfilename);
+    word_syms = fst::SymbolTable::ReadText(wsyms);
+
+    std::vector<std::vector<int32>> lexicon;
+    {
+        std::ifstream is(align_lex, std::ifstream::in);
+        kaldi::ReadLexiconForWordAlign(is, &lexicon);
+    }
+    //kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
+    //kaldi::WordAlignLatticeLexiconOpts opts;
+
+    //ko.Open(ctm_wxfilename, false, true);
+    //ko.Stream() << std::fixed;
+    //ko.Stream().precision(2);
+    //kaldi::BaseFloat frame_shift = 0.03;
+
+    // ! -- ASR setup end
 }
 
 RecEngine::~RecEngine() {
-    closeOutputStream();
+    delete word_syms;
+    delete decode_fst;
+    delete feature_pipeline;
+    delete decoder;
+    delete decodable_info;
+    delete feature_info;
 }
 
 const char* RecEngine::get_text(){
     return outtext.c_str();
 }
 
-void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
-    //start_logger();
+void RecEngine::transcribe_stream(std::string wavpath){
+    start_logger();
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -108,13 +154,13 @@ void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
 
         resamp_audio = static_cast<float*>(calloc(frames_out, sizeof(float)));
 
-        // Soxr prep
+        // ---------------- Soxr prep
         const unsigned num_filechannels = 1;
         soxr = soxr_create(mSampleRate, fin_sample_rate, num_filechannels,
                            &soxr_error, NULL, NULL, NULL);
         if (soxr_error) LOGE("Error creating soxr resampler.");
 
-        // Wav header
+        // ---------------- Wav header
         LOGI("FPATH OUT %s", wavpath.c_str());
         f.open(wavpath.c_str(), std::ios::binary);
 
@@ -130,57 +176,15 @@ void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
         data_chunk_pos = f.tellp();
         f << "data----";  // (chunk size to be filled in later)
 
-        // ! -- ASR setup begin
+        // ---------------- Setting up ASR vars
+        kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
 
-        //kaldi::OnlineNnet2FeaturePipelineConfig feature_opts(modeldir + "fbank.conf", "fbank");
-        //kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
-        //kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
-
-        std::string nnet3_rxfilename = modeldir + "final.mdl",
-                fst_rxfilename = modeldir + "HCLG.fst",
-                wav_rspecifier = wavpath,
-                align_lex = modeldir + "align_lexicon.int",
-                wsyms = modeldir + "words.txt";
-                //ctm_wxfilename = ctm;
-
-        feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
-
-        {
-            bool binary;
-            kaldi::Input ki(nnet3_rxfilename, &binary);
-            LOGI("Reading nnet");
-            trans_model.Read(ki.Stream(), binary);
-            am_nnet.Read(ki.Stream(), binary);
-            SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
-            SetDropoutTestMode(true, &(am_nnet.GetNnet()));
-            kaldi::nnet3::CollapseModel(kaldi::nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
-        }
-
-        decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
-
-        decode_fst = fst::ReadFstKaldiGeneric(fst_rxfilename);
-
-        std::vector<std::vector<int32>> lexicon;
-        {
-            std::ifstream is(align_lex, std::ifstream::in);
-            kaldi::ReadLexiconForWordAlign(is, &lexicon);
-        }
-        //kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
-        //kaldi::WordAlignLatticeLexiconOpts opts;
-
-        //ko.Open(ctm_wxfilename, false, true);
-        //ko.Stream() << std::fixed;
-        //ko.Stream().precision(2);
-        //kaldi::BaseFloat frame_shift = 0.03;
-
-        word_syms = fst::SymbolTable::ReadText(wsyms);
         feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
         decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
-                                                        *decodable_info, *decode_fst, feature_pipeline);
+                                                         *decodable_info, *decode_fst, feature_pipeline);
         fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
 
-        //kaldi::SubVector<float> data(resamp_audio, frames_out);
-        // ! -- ASR setup end
+        // ---------------- Done
 
         result = mRecStream->requestStart();
         if (result != oboe::Result::OK) {
@@ -192,8 +196,7 @@ void RecEngine::createRecStream(std::string wavpath, std::string modeldir) {
     }
 }
 
-void RecEngine::closeOutputStream() {
-
+void RecEngine::stop_trans_stream() {
     if (mRecStream != nullptr) {
 
         oboe::Result result = mRecStream->requestStop();
@@ -205,17 +208,14 @@ void RecEngine::closeOutputStream() {
         soxr_delete(soxr);
         free(resamp_audio);
         free(fp_audio_in);
-
+        LOGI("FINALISING");
         feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
-
-        delete word_syms;
-        delete decode_fst;
-        delete feature_pipeline;
-        delete decoder;
-        delete decodable_info;
-
+        LOGI("DONE");
+        //delete feature_pipeline;
+        //delete decoder;
+        //LOGI("DELETED");
         // Finishing wav write
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
@@ -224,7 +224,10 @@ void RecEngine::closeOutputStream() {
         write_word(f, file_length - 8, 4);
         f.close();
 
+        callb_cnt = 0;
+
         result = mRecStream->close();
+        LOGI("CLOSED");
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
         }
@@ -232,7 +235,8 @@ void RecEngine::closeOutputStream() {
 }
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    if (callb_cnt == 2) start_logger();
+    LOGI("In callback");
+    //if (callb_cnt == 2) start_logger();
     const float mul = 32768.0f;
     const float cnt_channel_fp = static_cast<float>(mChannelCount);
     float val;
@@ -274,7 +278,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
-
+    LOGI("callb cnt %d", callb_cnt);
     if (odone > frames_min || callb_cnt > 0) {
 
         kaldi::SubVector<float> data(resamp_int, frames_out);
@@ -298,8 +302,9 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             outtext = tmpstr;
 
         }
+    } else {
+        callb_cnt--;
     }
-     
     //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
     //int32_t underrunCount = audioStream->getXRunCount();
 
@@ -315,7 +320,7 @@ void RecEngine::setDeviceId(int32_t deviceId) {
     mRecDeviceId = deviceId;
 }
 
-void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::string ctm) {
+void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
     //start_logger();
     try {
         LOGI("Transcribing file");
@@ -325,67 +330,36 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
         typedef kaldi::int32 int32;
         typedef kaldi::int64 int64;
 
-        // feature_opts includes configuration for the iVector adaptation,
-        // as well as the basic features.
-        OnlineNnet2FeaturePipelineConfig feature_opts(modeldir + "fbank.conf", "fbank");
-        nnet3::NnetSimpleLoopedComputationOptions decodable_opts(1.0, 20);
-        LatticeFasterDecoderConfig decoder_opts(8.0, 3000, 5.0, 25);
-
         BaseFloat chunk_length_secs = 0.18;
 
-        std::string nnet3_rxfilename = modeldir + "final.mdl",
-        fst_rxfilename = modeldir + "HCLG.fst",
-        wav_rspecifier = wavpath,
-        align_lex = modeldir + "align_lexicon.int",
-        wsyms = modeldir + "words.txt",
-        ctm_wxfilename = ctm;
+        kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
 
-        OnlineNnet2FeaturePipelineInfo feature_info(feature_opts);
+        feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
+        decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
+                                                         *decodable_info, *decode_fst, feature_pipeline);
+        fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
 
-        TransitionModel trans_model;
-        nnet3::AmNnetSimple am_nnet;
-        {
-            bool binary;
-            Input ki(nnet3_rxfilename, &binary);
-            LOGI("Reading nnet");
-            trans_model.Read(ki.Stream(), binary);
-            am_nnet.Read(ki.Stream(), binary);
-            SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
-            SetDropoutTestMode(true, &(am_nnet.GetNnet()));
-            nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
-        }
-
-        // this object contains precomputed stuff that is used by all decodable
-        // objects.    It takes a pointer to am_nnet because if it has iVectors it has
-        // to modify the nnet to accept iVectors at intervals.
-        nnet3::DecodableNnetSimpleLoopedInfo decodable_info(decodable_opts, &am_nnet);
-
-        LOGI("Reading HCLG");
-        fst::Fst<fst::StdArc> *decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
+        std::string wav_rspecifier = wavpath, ctm_wxfilename = ctm;
+        std::string align_lex = model_dir + "align_lexicon.int";
 
         std::vector<std::vector<int32>> lexicon;
         {
             std::ifstream is(align_lex, std::ifstream::in);
-            ReadLexiconForWordAlign(is, &lexicon);
+            kaldi::ReadLexiconForWordAlign(is, &lexicon);
         }
-        WordAlignLatticeLexiconInfo lexicon_info(lexicon);
-        WordAlignLatticeLexiconOpts opts;
+        kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
+        kaldi::WordAlignLatticeLexiconOpts opts;
 
         Output ko(ctm_wxfilename, false);
         ko.Stream() << std::fixed;
         ko.Stream().precision(2);
         BaseFloat frame_shift = 0.03;
-        fst::SymbolTable* word_syms = fst::SymbolTable::ReadText(wsyms);
 
         kaldi::WaveHolder wavholder;
         std::ifstream wavis(wavpath, std::ios::binary);
         wavholder.Read(wavis);
         const kaldi::WaveData &wave_data = wavholder.Value();
         kaldi::SubVector<kaldi::BaseFloat> data(wave_data.Data(), 0);
-
-        OnlineNnet2FeaturePipeline feature_pipeline(feature_info);
-        SingleUtteranceNnet3Decoder decoder(decoder_opts, trans_model, decodable_info, *decode_fst,
-            &feature_pipeline);
 
         BaseFloat samp_freq = wave_data.SampFreq();
         int32 chunk_length;
@@ -406,45 +380,50 @@ void RecEngine::transcribe_file(std::string wavpath, std::string modeldir, std::
 
             SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
 
-            feature_pipeline.AcceptWaveform(samp_freq, wave_part);
+            feature_pipeline->AcceptWaveform(samp_freq, wave_part);
 
             samp_offset += num_samp;
             if (samp_offset == data.Dim()) {
                 // no more input. flush out last frames
-                feature_pipeline.InputFinished();
+                feature_pipeline->InputFinished();
             }
 
-            decoder.AdvanceDecoding();
+            decoder->AdvanceDecoding();
 
         }
-        decoder.FinalizeDecoding();
+        decoder->FinalizeDecoding();
         CompactLattice clat;
         bool end_of_utterance = true;
-        decoder.GetLattice(end_of_utterance, &clat);
+        decoder->GetLattice(end_of_utterance, &clat);
 
-        CompactLattice aligned_clat;
-        WordAlignLatticeLexicon(clat, trans_model, lexicon_info, opts, &aligned_clat);
+        write_ctm(&clat, &trans_model, lexicon_info, opts, frame_shift, word_syms, &ko);
 
-        CompactLattice best_path;
-        CompactLatticeShortestPath(aligned_clat, &best_path);
-
-        std::vector<int32> words, times, lengths;
-        CompactLatticeToWordAlignment(best_path, &words, &times, &lengths);
-
-        for(size_t j=0; j < words.size(); j++) {
-            if(words[j] == 0)
-                continue;
-            ko.Stream() << word_syms->Find(words[j]) << ' ' << (frame_shift * times[j]) << ' '
-            << (frame_shift * lengths[j]) << std::endl;
-        }
         LOGI("Decoded file.");
-
-        delete decode_fst;
-        delete word_syms; // will delete if non-NULL.
 
     } catch(const std::exception& e) {
         LOGE("FAILED FAILED FAILED");
         LOGE("ERROR %s",  e.what());
         throw;
+    }
+}
+
+void write_ctm(kaldi::CompactLattice* clat, kaldi::TransitionModel* trans_model,
+               kaldi::WordAlignLatticeLexiconInfo lexicon_info, kaldi::WordAlignLatticeLexiconOpts opts,
+               kaldi::BaseFloat frame_shift, fst::SymbolTable* word_syms, kaldi::Output* ko) {
+
+    kaldi::CompactLattice aligned_clat;
+    WordAlignLatticeLexicon(*clat, *trans_model, lexicon_info, opts, &aligned_clat);
+
+    kaldi::CompactLattice best_path;
+    kaldi::CompactLatticeShortestPath(aligned_clat, &best_path);
+
+    std::vector<int32> words, times, lengths;
+    kaldi::CompactLatticeToWordAlignment(best_path, &words, &times, &lengths);
+
+    for(size_t j=0; j < words.size(); j++) {
+        if(words[j] == 0)
+            continue;
+        ko->Stream() << word_syms->Find(words[j]) << ' ' << (frame_shift * times[j]) << ' '
+                    << (frame_shift * lengths[j]) << std::endl;
     }
 }

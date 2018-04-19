@@ -3,6 +3,7 @@ package ark.ark;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.Environment;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -12,9 +13,10 @@ public class Base extends AppCompatActivity {
     public static AssetManager mgr;
     public static String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Ark/";
     public static String filesdir = rootdir + "files/";
-    public static String modeldir = rootdir + "model/";
+    public static String rmodeldir = rootdir + "model/";
+    private long time_lastclick = 0;
 
-    public static native void load(AssetManager mgr, String modeldir);
+    public static native void load(AssetManager mgr, String rmodeldir);
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -49,4 +51,11 @@ public class Base extends AppCompatActivity {
         }
     }
 
+    public boolean is_spamclick() {
+        if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
+            return true;
+        }
+        time_lastclick = SystemClock.elapsedRealtime();
+        return false;
+    }
 }

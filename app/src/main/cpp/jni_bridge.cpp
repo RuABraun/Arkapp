@@ -52,13 +52,11 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject 
 }
 
 JNIEXPORT jlong JNICALL
-Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring fname, jstring jmodeldir) {
-
-    const char* cstr = env->GetStringUTFChars(fname, NULL);
-    std::string fnamenew = std::string(cstr);
+Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring jmodeldir) {
     const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
     std::string modeldir = std::string(cstrb);
-    RecEngine *engine = new(std::nothrow) RecEngine(fnamenew, modeldir);
+
+    RecEngine* engine = new (std::nothrow) RecEngine(modeldir);
     return (jlong) engine;
 }
 
@@ -71,6 +69,43 @@ Java_ark_ark_RecEngine_native_1deleteEngine(
     delete (RecEngine *) engineHandle;
 }
 
+JNIEXPORT void JNICALL
+Java_ark_ark_RecEngine_native_1transcribe_1stream(JNIEnv *env, jclass, jlong engineHandle, jstring jwavpath) {
+    const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
+    std::string wavpath = std::string(cstr);
+
+    RecEngine* engine = (RecEngine*) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid");
+        return;
+    }
+    engine->transcribe_stream(wavpath);
+}
+
+JNIEXPORT void JNICALL
+Java_ark_ark_RecEngine_native_1stop_1trans_1stream(JNIEnv *env, jclass, jlong engineHandle) {
+    RecEngine* engine = (RecEngine*) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid");
+        return;
+    }
+    engine->stop_trans_stream();
+}
+
+JNIEXPORT void JNICALL
+Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jclass, jlong engineHandle, jstring jwavpath, jstring jctm) {
+    const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
+    std::string wavpath = std::string(cstr);
+    const char* cstr3 = env->GetStringUTFChars(jctm, NULL);
+    std::string ctm = std::string(cstr3);
+    RecEngine* engine = (RecEngine*) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid");
+        return;
+    }
+    engine->transcribe_file(wavpath, ctm);
+}
+
 JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jclass, jlong engineHandle) {
     RecEngine *engine = (RecEngine*) engineHandle;
     if (engine == nullptr) {
@@ -80,6 +115,7 @@ JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jc
     jstring jstr = env->NewStringUTF(engine->get_text());
     return jstr;
 }
+
 
 JNIEXPORT void JNICALL
 Java_ark_ark_RecEngine_native_1setAudioDeviceId(
@@ -94,15 +130,5 @@ Java_ark_ark_RecEngine_native_1setAudioDeviceId(
         return;
     }
     engine->setDeviceId(deviceId);
-}
-JNIEXPORT void JNICALL
-Java_ark_ark_RecEngine_native_1transcribe(JNIEnv *env, jclass, jstring jwavpath, jstring jmodeldir, jstring jctm) {
-    const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
-    std::string wavpath = std::string(cstr);
-    const char* cstr2 = env->GetStringUTFChars(jmodeldir, NULL);
-    std::string modeldir = std::string(cstr2);
-    const char* cstr3 = env->GetStringUTFChars(jctm, NULL);
-    std::string ctm = std::string(cstr3);
-    RecEngine::transcribe_file(wavpath, modeldir, ctm);
 }
 }

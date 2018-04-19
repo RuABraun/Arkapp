@@ -3,7 +3,6 @@ package ark.ark;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
@@ -19,7 +18,6 @@ import java.util.Arrays;
 
 public class Manage extends Base {
 
-    private long time_lastclick = 0;
     MediaPlayer mp = null;
     ListView lv = null;
     ArrayAdapter<String> lv_adapt = null;
@@ -31,6 +29,11 @@ public class Manage extends Base {
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
 
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
         File dir = new File(filesdir);
         File[] fpaths = dir.listFiles();
         Arrays.sort(fpaths);
@@ -46,12 +49,23 @@ public class Manage extends Base {
                 android.R.layout.simple_list_item_multiple_choice, files);
         lv.setAdapter(lv_adapt);
 
+        RecEngine.create(rmodeldir);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        lv = null;
+        lv_adapt = null;
+        if (mp != null) {
+            mp.release();
+            mp = null;
+        }
+        RecEngine.delete();
     }
 
     public void play_switch(View view) {
-        if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
-            return;
-        }
+        if (is_spamclick()) return;
 
         ArrayList<String> fpaths = get_sel_files();
         for (String fpath : fpaths) {
@@ -67,17 +81,17 @@ public class Manage extends Base {
     }
 
     public void transcribe_switch(View view) {
-        if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
-            return;
-        }
+        if (is_spamclick()) return;
 
         ArrayList<String> fpaths = get_sel_files();
         for (String fpath : fpaths) {
-            RecEngine.transcribe(fpath, modeldir, filesdir + "out.txt");
+            RecEngine.transcribe_file(fpath, filesdir + "out.txt", rmodeldir);
         }
     }
 
     public void delete_switch(View view) {
+        if (is_spamclick()) return;
+
         Log.i("APP", "Num items " + Integer.toString(lv.getCount()));
         ArrayList<String> fpaths = get_sel_files();
         for(String fpath: fpaths) {
@@ -124,16 +138,5 @@ public class Manage extends Base {
         }
         files.addAll(tmp);
         lv_adapt.notifyDataSetChanged();
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        lv = null;
-        lv_adapt = null;
-        if (mp != null) {
-            mp.release();
-            mp = null;
-        }
     }
 }

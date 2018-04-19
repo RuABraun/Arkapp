@@ -6,6 +6,12 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/colBackground</item>
+        <item name="buttonStyle">@style/btnstyle</item>
+    </style>
+
+    <style name="btnstyle" parent="@style/Widget.AppCompat.Button.Colored">
+        <item name="android:translationZ">10dp</item>
     </style>
 
 </resources>

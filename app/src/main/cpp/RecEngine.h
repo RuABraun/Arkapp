@@ -21,7 +21,7 @@
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
-    RecEngine(std::string fname, std::string modeldir);
+    RecEngine(std::string modeldir);
 
     ~RecEngine();
 
@@ -32,7 +32,11 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
                                           int32_t numFrames);
 
-    static void transcribe_file(std::string wavpath, std::string modeldir, std::string ctm);
+    void transcribe_stream(std::string wavpath);
+
+    void stop_trans_stream();
+
+    void transcribe_file(std::string wavpath, std::string ctm);
 
 private:
     std::string outtext;
@@ -54,10 +58,10 @@ private:
     soxr_t soxr;
 
     // ASR vars
+    std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;
     kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
     kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
-    kaldi::LatticeFasterDecoderConfig decoder_opts;
     fst::Fst<fst::StdArc>* decode_fst;
     kaldi::OnlineNnet2FeaturePipelineInfo* feature_info = NULL;
     kaldi::nnet3::DecodableNnetSimpleLoopedInfo* decodable_info = NULL;
@@ -67,8 +71,6 @@ private:
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
 
-    void createRecStream(std::string fname, std::string modeldir);
-    void closeOutputStream();
 };
 
 #endif //ARK_RECENGINE_H
