@@ -3,10 +3,27 @@ package ark.ark;
 
 import android.util.Log;
 
+class CreateRecEngRunnable implements Runnable {
+    String mdir;
+    CreateRecEngRunnable(String mdir) {
+        this.mdir = mdir;
+    }
+
+    @Override
+    public void run() {
+        if (Base.available.tryAcquire()) {
+            RecEngine.create(this.mdir);
+            RecEngine.isready = true;
+            Base.available.release();
+        }
+    }
+}
+
 public class RecEngine {
 
     static long mEngineHandle = 0;
     static long cnt_start = 0;
+    static boolean isready = false;
 
     static {
         System.loadLibrary("rec-engine");
@@ -14,7 +31,6 @@ public class RecEngine {
 
     static long create(String modeldir){
         cnt_start++;
-        Log.i("APP", String.format("In create %d", mEngineHandle));
         if (mEngineHandle == 0){
             mEngineHandle = native_createEngine(modeldir);
         }
@@ -23,11 +39,11 @@ public class RecEngine {
 
     static void delete(){
         cnt_start--;
-        Log.i("APP", String.format("Deleting %d", mEngineHandle));
+
         if (mEngineHandle != 0 && cnt_start == 0){
-            Log.i("APP", String.format("Actually deleting %d", mEngineHandle));
             native_deleteEngine(mEngineHandle);
             mEngineHandle = 0;
+            isready = false;
         }
     }
 
@@ -43,9 +59,6 @@ public class RecEngine {
     }
 
     static void transcribe_file(String wavpath, String ctm, String modeldir) {
-        if (mEngineHandle == 0) {
-            mEngineHandle = create(modeldir);
-        }
         native_transcribe_file(mEngineHandle, wavpath, ctm);
     }
 

@@ -70,10 +70,6 @@ public class MainActivity extends Base {
                     REQUEST_PERMISSIONS_CODE);
         }
 
-        // Example of a call to a native method
-        TextView tv = (TextView) findViewById(R.id.sample_text);
-        tv.setText(R.string.HelloMsg);
-
     }
 
     private void do_setup() {
@@ -96,11 +92,21 @@ public class MainActivity extends Base {
     @Override
     public void onStart() {
         super.onStart();
-
+        TextView tv = findViewById(R.id.rec_help_text);
+        tv.setText(R.string.LoadingMsg);
         do_setup();
-        Log.i("APP", String.format("enghandle %d", RecEngine.mEngineHandle));
-        RecEngine.create(rmodeldir);
-        Log.i("APP", String.format("enghandle %d", RecEngine.mEngineHandle));
+        createRecEng(rmodeldir);
+        h.postDelayed(new Runnable() {
+            public void run() {
+                runnable=this;
+                if (RecEngine.isready) {
+                    TextView tv = findViewById(R.id.rec_help_text);
+                    tv.setText(R.string.HelloMsg);
+                    h.removeCallbacks(runnable);
+                }
+                h.postDelayed(runnable, 200);
+            }
+        }, 200);
     }
 
     @Override
@@ -115,7 +121,7 @@ public class MainActivity extends Base {
         Button button_rec = findViewById(R.id.button_rec);
         Log.i("APP", "isrecording: " + String.valueOf(is_recording));
         if (!is_recording ) {
-
+            if (!RecEngine.isready) return;
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmm");
             Date now = new Date();
             String name = filesdir + sdf.format(now);

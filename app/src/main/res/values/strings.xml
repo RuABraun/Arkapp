@@ -4,6 +4,7 @@
     <string name="button_recstop">Stop</string>
     <string name="Contact">contact@ark.com</string>
     <string name="HelloMsg">"Start transcribing by clicking the record button!"</string>
+    <string name="LoadingMsg">"...starting up..."</string>
     <string name="ManButtonPlay">Play</string>
     <string name="ManButtonTrans">Transcribe</string>
     <string name="ManButtonDel">Delete</string>

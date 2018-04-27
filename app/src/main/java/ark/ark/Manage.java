@@ -49,7 +49,7 @@ public class Manage extends Base {
                 android.R.layout.simple_list_item_multiple_choice, files);
         lv.setAdapter(lv_adapt);
 
-        RecEngine.create(rmodeldir);
+        createRecEng(rmodeldir);
     }
 
     @Override
@@ -82,6 +82,7 @@ public class Manage extends Base {
 
     public void transcribe_switch(View view) {
         if (is_spamclick()) return;
+        if (!RecEngine.isready) return;
 
         ArrayList<String> fpaths = get_sel_files();
         for (String fpath : fpaths) {

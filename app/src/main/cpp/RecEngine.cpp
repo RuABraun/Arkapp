@@ -119,13 +119,14 @@ const char* RecEngine::get_text(){
 }
 
 void RecEngine::transcribe_stream(std::string wavpath){
-    start_logger();
+    //start_logger();
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
     builder.setFramesPerCallback(mFramesPerBurst);
+
 
     oboe::Result result = builder.openStream(&mRecStream);
 
@@ -211,7 +212,7 @@ void RecEngine::stop_trans_stream() {
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
         }
-        
+
         soxr_delete(soxr);
         free(resamp_audio);
         free(fp_audio_in);
@@ -232,7 +233,7 @@ void RecEngine::stop_trans_stream() {
 }
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    LOGI("In callback");
+
     //if (callb_cnt == 2) start_logger();
     const float mul = 32768.0f;
     const float cnt_channel_fp = static_cast<float>(mChannelCount);
@@ -275,7 +276,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
-    LOGI("callb cnt %d", callb_cnt);
+
     if (odone > frames_min || callb_cnt > 0) {
 
         kaldi::SubVector<float> data(resamp_int, frames_out);
@@ -284,7 +285,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         decoder->AdvanceDecoding();
 
         if ((callb_cnt + 1) % 3 == 0) {
-            LOGI("getting bestpath");
+
             kaldi::Lattice olat;
             decoder->GetBestPath(false, &olat);
 
