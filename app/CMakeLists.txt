@@ -19,8 +19,8 @@ include_directories (${OBOE_DIR}/include)
 set (DEBUG_UTILS_PATH "../debug-utils")
 include_directories(${DEBUG_UTILS_PATH})
 
-add_subdirectory (/home/seni/git/soxr soxr)
-include_directories(/home/seni/git/soxr/src)
+#add_subdirectory (/home/seni/git/soxr soxr)
+#include_directories(/home/seni/git/soxr/src)
 
 add_library( # Sets the name of the library.
              rec-engine
@@ -56,7 +56,7 @@ link_directories(/tmp/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
 
 
 target_link_libraries( # Specifies the target library.
-                       rec-engine android oboe soxr
+                       rec-engine android oboe
                        /home/seni/androidkaldi/kaldi-android/src/online2/kaldi-online2.a /home/seni/androidkaldi/kaldi-android/src/base/kaldi-base.a /home/seni/androidkaldi/kaldi-android/src/util/kaldi-util.a
                        /home/seni/androidkaldi/kaldi-android/src/lat/kaldi-lat.a /home/seni/androidkaldi/kaldi-android/src/decoder/kaldi-decoder.a /home/seni/androidkaldi/kaldi-android/src/matrix/kaldi-matrix.a
                        /home/seni/androidkaldi/kaldi-android/src/hmm/kaldi-hmm.a /home/seni/androidkaldi/kaldi-android/src/base/kaldi-base.a /home/seni/androidkaldi/kaldi-android/tools/openfst-1.6.5/lib/libfst.a

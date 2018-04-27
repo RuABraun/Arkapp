@@ -6,7 +6,6 @@
 #include <thread>
 #include <array>
 #include <fstream>
-#include <soxr.h>
 #include <jni.h>
 #include "feat/wave-reader.h"
 #include "fstext/fstext-lib.h"
@@ -44,18 +43,15 @@ private:
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
-    int32_t mFramesPerBurst = 8000;
+    int32_t mFramesPerBurst = 2400;
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
 
-    size_t data_chunk_pos, odone, frames_out, frames_min;
+    size_t data_chunk_pos, frames_out, frames_min;
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
-    float* fp_audio_in;
-    float* resamp_audio;  // resampled audio data
-    soxr_error_t soxr_error;
-    soxr_t soxr;
+    float* fp_audio;
 
     // ASR vars
     std::string model_dir;
@@ -70,6 +66,7 @@ private:
     fst::SymbolTable* word_syms;
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
+    int32 num_frames_context;
 
 };
 

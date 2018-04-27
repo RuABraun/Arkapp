@@ -82,6 +82,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opt
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
         kaldi::nnet3::CollapseModel(kaldi::nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
+    //num_frames_context = am_nnet.LeftContext() + am_nnet.RightContext();
 
     decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
@@ -126,7 +127,7 @@ void RecEngine::transcribe_stream(std::string wavpath){
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
     builder.setFramesPerCallback(mFramesPerBurst);
-    //builder.setSampleRate(fin_sample_rate);
+    builder.setSampleRate(fin_sample_rate);
 
     oboe::Result result = builder.openStream(&mRecStream);
 
@@ -148,18 +149,12 @@ void RecEngine::transcribe_stream(std::string wavpath){
             mIsfloat = false;
         }
 
-        fp_audio_in = static_cast<float*>(malloc(sizeof(float) * mFramesPerBurst));
-        frames_out = static_cast<size_t>(mFramesPerBurst * fin_sample_rate / mSampleRate + .5);
+        fp_audio = static_cast<float*>(calloc(mFramesPerBurst, sizeof(float)));
+        frames_out = static_cast<int32_t>(mFramesPerBurst);
         LOGI("Frames out %d", frames_out);
         frames_min = (size_t) (((float) frames_out) * 0.5);
 
-        resamp_audio = static_cast<float*>(calloc(frames_out, sizeof(float)));
-
-        // ---------------- Soxr prep
         const unsigned num_filechannels = 1;
-        soxr = soxr_create(mSampleRate, fin_sample_rate, num_filechannels,
-                           &soxr_error, NULL, NULL, NULL);
-        if (soxr_error) LOGE("Error creating soxr resampler.");
 
         // ---------------- Wav header
         LOGI("FPATH OUT %s", wavpath.c_str());
@@ -213,10 +208,6 @@ void RecEngine::stop_trans_stream() {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
         }
 
-        soxr_delete(soxr);
-        free(resamp_audio);
-        free(fp_audio_in);
-
         feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
@@ -249,12 +240,9 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
                 val += audio_data[i + j];
             }
 
-            fp_audio_in[k] = (val / cnt_channel_fp);
+            fp_audio[k] = (val / cnt_channel_fp);
             k++;
         }
-
-        soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
-                                  &odone);
     } else {
         const float mul = 1.0f / 32768.0f;
         int16_t* audio_data = static_cast<int16_t*>(audioData);
@@ -263,21 +251,20 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             for (int j = 0; j < mChannelCount; j++) {
                 val += (static_cast<float>(audio_data[i + j]) * mul);
             }
-            fp_audio_in[i] = (val / cnt_channel_fp);
+            fp_audio[i] = (val / cnt_channel_fp);
         }
-        soxr_error = soxr_process(soxr, fp_audio_in, numFrames, NULL, resamp_audio, frames_out,
-                                  &odone);
     }
+
     float resamp_int[frames_out];
     for (int i = 0; i < frames_out; i++) {
-        val = resamp_audio[i];
+        val = fp_audio[i];
         val *= mul;
         resamp_int[i] = val;
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
 
-    if (odone > frames_min || callb_cnt > 0) {
+    if (callb_cnt >= 0) {
 
         kaldi::SubVector<float> data(resamp_int, frames_out);
 
@@ -304,13 +291,12 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     } else {
         callb_cnt--;
     }
-    //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-    //int32_t underrunCount = audioStream->getXRunCount();
+    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+    int32_t underrunCount = audioStream->getXRunCount();
 
-    //LOGI("numFrames %d, Underruns %d, buffer size %d, outframes %zu",
-    //     numFrames, underrunCount, bufferSize, odone);
+    LOGI("numFrames %d, Underruns %d, buffer size %d", numFrames, underrunCount, bufferSize);
 
-    memset(resamp_audio, 0, frames_out);
+    memset(fp_audio, 0, frames_out);
     callb_cnt++;
     return oboe::DataCallbackResult::Continue;
 }
