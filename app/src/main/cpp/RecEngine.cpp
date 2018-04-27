@@ -126,7 +126,7 @@ void RecEngine::transcribe_stream(std::string wavpath){
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
     builder.setFramesPerCallback(mFramesPerBurst);
-
+    //builder.setSampleRate(fin_sample_rate);
 
     oboe::Result result = builder.openStream(&mRecStream);
 
