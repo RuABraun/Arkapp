@@ -82,7 +82,9 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opt
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
         kaldi::nnet3::CollapseModel(kaldi::nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
-    //num_frames_context = am_nnet.LeftContext() + am_nnet.RightContext();
+    left_context = am_nnet.LeftContext();
+    right_context = am_nnet.RightContext();
+    num_frames_ext = mFramesPerBurst + left_context;
 
     decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
@@ -149,10 +151,8 @@ void RecEngine::transcribe_stream(std::string wavpath){
             mIsfloat = false;
         }
 
-        fp_audio = static_cast<float*>(calloc(mFramesPerBurst, sizeof(float)));
-        frames_out = static_cast<int32_t>(mFramesPerBurst);
-        LOGI("Frames out %d", frames_out);
-        frames_min = (size_t) (((float) frames_out) * 0.5);
+        fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
+        int_audio = static_cast<float_t*>(calloc(num_frames_ext, sizeof(float_t)));
 
         const unsigned num_filechannels = 1;
 
@@ -212,6 +212,18 @@ void RecEngine::stop_trans_stream() {
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
 
+        kaldi::Lattice olat;
+        decoder->GetBestPath(true, &olat);
+        std::vector<int32> words, tmpa;
+        kaldi::LatticeWeight tmpb;
+        if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
+
+        std::string tmpstr = "";
+        for (size_t j = 0; j < words.size(); j++) {
+            tmpstr += (word_syms->Find(words[j]) + " ");
+        }
+        outtext = tmpstr;
+
         // Finishing wav write
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
@@ -234,7 +246,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
         int k = 0;
-        for (int i = 0; i < num_samples_in; i += mChannelCount) {
+        for (int i = 0; i < num_samples_in ; i += mChannelCount) {
             val = 0.0f;
             for (int j = 0; j < mChannelCount; j++) {
                 val += audio_data[i + j];
@@ -254,49 +266,51 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             fp_audio[i] = (val / cnt_channel_fp);
         }
     }
-
-    float resamp_int[frames_out];
-    for (int i = 0; i < frames_out; i++) {
+    int numframes_cap = numFrames + left_context;
+    for (int i = left_context; i < numframes_cap; i++) {
         val = fp_audio[i];
         val *= mul;
-        resamp_int[i] = val;
+        int_audio[i] = val;
         int16_t valint = static_cast<int16_t>(val);
         write_word(f, valint, 2);
     }
 
-    if (callb_cnt >= 0) {
+    kaldi::SubVector<float> data(int_audio, num_frames_ext);
 
-        kaldi::SubVector<float> data(resamp_int, frames_out);
+    feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
+    decoder->AdvanceDecoding();
 
-        feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
-        decoder->AdvanceDecoding();
+    if ((callb_cnt + 1) % 3 == 0) {
 
-        if ((callb_cnt + 1) % 3 == 0) {
+        kaldi::Lattice olat;
+        decoder->GetBestPath(false, &olat);
 
-            kaldi::Lattice olat;
-            decoder->GetBestPath(false, &olat);
+        std::vector<int32> words, tmpa;
+        kaldi::LatticeWeight tmpb;
+        if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
 
-            std::vector<int32> words, tmpa;
-            kaldi::LatticeWeight tmpb;
-            if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
-
-            std::string tmpstr = "";
-            for (size_t j = 0; j < words.size(); j++) {
-                tmpstr += (word_syms->Find(words[j]) + " ");
-            }
-
-            outtext = tmpstr;
-
+        std::string tmpstr = "";
+        for (size_t j = 0; j < words.size(); j++) {
+            tmpstr += (word_syms->Find(words[j]) + " ");
         }
-    } else {
-        callb_cnt--;
+        outtext = tmpstr;
     }
-    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-    int32_t underrunCount = audioStream->getXRunCount();
 
-    LOGI("numFrames %d, Underruns %d, buffer size %d", numFrames, underrunCount, bufferSize);
+    //int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+    //int32_t underrunCount = audioStream->getXRunCount();
 
-    memset(fp_audio, 0, frames_out);
+    //LOGI("numFrames %d, Underruns %d, buffer size %d", mFramesPerBurst, underrunCount, bufferSize);
+
+    // Moving first values of current callback to left context window
+    for(int i = 0; i < left_context; i++) {
+        int_audio[i] = int_audio[i + left_context];
+    }
+    if (numFrames < mFramesPerBurst) {
+        for(int i = left_context; i < num_frames_ext; i++) {
+            int_audio[i] = 0.0;
+        }
+    }
+    //memset(resamp_int, 0, num);
     callb_cnt++;
     return oboe::DataCallbackResult::Continue;
 }

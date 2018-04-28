@@ -44,14 +44,16 @@ private:
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
     int32_t mFramesPerBurst = 2400;
+    int32_t num_frames_ext;  // with previous left frames
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
 
-    size_t data_chunk_pos, frames_out, frames_min;
+    size_t data_chunk_pos;
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
-    float* fp_audio;
+    float_t* fp_audio;
+    float_t* int_audio; // is in int16 range
 
     // ASR vars
     std::string model_dir;
@@ -66,7 +68,8 @@ private:
     fst::SymbolTable* word_syms;
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
-    int32 num_frames_context;
+    int32 left_context;
+    int32 right_context;
 
 };
 
