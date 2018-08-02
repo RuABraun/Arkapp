@@ -65,6 +65,7 @@ void write_ctm(kaldi::CompactLattice* clat, kaldi::TransitionModel* trans_model,
 
 RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
     // ! -- ASR setup begin
+    fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
     model_dir = modeldir;
     std::string nnet3_rxfilename = modeldir + "final.mdl",
@@ -84,7 +85,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opt
     }
     left_context = am_nnet.LeftContext();
     right_context = am_nnet.RightContext();
-    num_frames_ext = mFramesPerBurst + left_context;
+    mFramesPerBurst = int32_t(0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
 
     decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
@@ -152,7 +153,7 @@ void RecEngine::transcribe_stream(std::string wavpath){
         }
 
         fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-        int_audio = static_cast<float_t*>(calloc(num_frames_ext, sizeof(float_t)));
+        int_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
 
         const unsigned num_filechannels = 1;
 
@@ -178,7 +179,6 @@ void RecEngine::transcribe_stream(std::string wavpath){
         feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
         decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
-        fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
 
         // ---------------- Done
 
@@ -266,8 +266,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             fp_audio[i] = (val / cnt_channel_fp);
         }
     }
-    int numframes_cap = numFrames + left_context;
-    for (int i = left_context; i < numframes_cap; i++) {
+    for (int i = left_context; i < numFrames; i++) {
         val = fp_audio[i];
         val *= mul;
         int_audio[i] = val;
@@ -275,11 +274,12 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         write_word(f, valint, 2);
     }
 
-    kaldi::SubVector<float> data(int_audio, num_frames_ext);
+    kaldi::SubVector<float> data(int_audio, mFramesPerBurst);
 
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
     decoder->AdvanceDecoding();
-
+    //LOGI("frames ready %d", feature_pipeline->NumFramesReady());
+    //LOGI("frames decoded %d", decoder->NumFramesDecoded());
     if ((callb_cnt + 1) % 3 == 0) {
 
         kaldi::Lattice olat;
@@ -301,12 +301,9 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     //LOGI("numFrames %d, Underruns %d, buffer size %d", mFramesPerBurst, underrunCount, bufferSize);
 
-    // Moving first values of current callback to left context window
-    for(int i = 0; i < left_context; i++) {
-        int_audio[i] = int_audio[i + left_context];
-    }
+
     if (numFrames < mFramesPerBurst) {
-        for(int i = left_context; i < num_frames_ext; i++) {
+        for(int i = 0; i < mFramesPerBurst; i++) {
             int_audio[i] = 0.0;
         }
     }
@@ -336,7 +333,6 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
         feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
         decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
-        fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
 
         std::string wav_rspecifier = wavpath, ctm_wxfilename = ctm;
         std::string align_lex = model_dir + "align_lexicon.int";

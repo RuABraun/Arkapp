@@ -143,12 +143,10 @@ public class MainActivity extends Base {
                 }
             }, 500);
         } else {
-            h.removeCallbacks(runnable);
             RecEngine.stop_trans_stream();
-            Log.i("APP", "out");
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
-            Log.i("APP", "finfunc");
+            h.removeCallbacks(runnable);
         }
     }
 
