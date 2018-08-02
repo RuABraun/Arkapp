@@ -7,11 +7,7 @@
 
 extern "C" {
 
-//JNIEXPORT void JNICALL Java_ark_ark_RecEngine_native_1settext(JNIEnv* env, jclass jcls) {//
-//
-//}
-
-JNIEXPORT void JNICALL Java_ark_ark_Base_load(JNIEnv* env, jobject obj, jobject Amgr, jstring modeldir) {
+JNIEXPORT void JNICALL Java_ark_ark_Base_native_1load(JNIEnv* env, jobject, jobject Amgr, jstring modeldir) {
 
     AAssetManager *mgr = AAssetManager_fromJava(env, Amgr);
 

@@ -85,7 +85,7 @@ public class MainActivity extends Base {
         }
         if (!all_exist) {
             mgr = getResources().getAssets();
-            load(mgr, rmodeldir);
+            native_load(mgr, rmodeldir);
         }
     }
 
