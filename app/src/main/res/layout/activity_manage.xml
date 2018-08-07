@@ -7,56 +7,17 @@
     android:clipToPadding="false"
     tools:context="ark.ark.Manage">
 
-    <ListView
-        android:id="@+id/filesview"
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/rv_files"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="120dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="64dp"
+        android:background="@drawable/recview_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/ManButtonPlay"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:onClick="play_switch"
-        android:text="@string/ManButtonPlay"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/filesview"
-        app:layout_constraintTop_toTopOf="parent"
-        android:elevation="15dp"/>
-
-    <Button
-        android:id="@+id/ManButtonTrans"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:onClick="transcribe_switch"
-        android:text="@string/ManButtonTrans"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/filesview"
-        app:layout_constraintTop_toBottomOf="@+id/ManButtonPlay" />
-
-    <Button
-        android:id="@+id/ManButtonDel"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:onClick="delete_switch"
-        android:text="@string/ManButtonDel"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/filesview"
-        app:layout_constraintTop_toBottomOf="@+id/ManButtonTrans" />
 </android.support.constraint.ConstraintLayout>

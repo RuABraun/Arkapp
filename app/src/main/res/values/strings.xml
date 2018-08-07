@@ -8,4 +8,5 @@
     <string name="ManButtonPlay">Play</string>
     <string name="ManButtonTrans">Transcribe</string>
     <string name="ManButtonDel">Delete</string>
+    <string name="CloseX">X</string>
 </resources>

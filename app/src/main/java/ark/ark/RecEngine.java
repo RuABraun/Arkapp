@@ -54,8 +54,8 @@ public class RecEngine {
         }
     }
 
-    static void stop_trans_stream() {
-        native_stop_trans_stream(mEngineHandle);
+    static long stop_trans_stream() {
+        return native_stop_trans_stream(mEngineHandle);
     }
 
     static void transcribe_file(String wavpath, String ctm, String modeldir) {
@@ -74,11 +74,11 @@ public class RecEngine {
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
 
-    private static native long native_createEngine(String modeldir);
-    private static native void native_deleteEngine(long engineHandle);
-    private static native void native_setAudioDeviceId(long engineHandle, int deviceId);
-    private static native String native_getText(long engineHandle);
-    private static native void native_transcribe_stream(long engineHandle, String wavpath);
-    private static native void native_stop_trans_stream(long engineHandle);
-    private static native void native_transcribe_file(long engineHandle, String wavpath, String ctm);
+    public static native long native_createEngine(String modeldir);
+    public static native void native_deleteEngine(long engineHandle);
+    public static native void native_setAudioDeviceId(long engineHandle, int deviceId);
+    public static native String native_getText(long engineHandle);
+    public static native void native_transcribe_stream(long engineHandle, String wavpath);
+    public static native long native_stop_trans_stream(long engineHandle);
+    public static native void native_transcribe_file(long engineHandle, String wavpath, String ctm);
 }

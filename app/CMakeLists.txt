@@ -19,9 +19,6 @@ include_directories (${OBOE_DIR}/include)
 set (DEBUG_UTILS_PATH "../debug-utils")
 include_directories(${DEBUG_UTILS_PATH})
 
-#add_subdirectory (/home/seni/git/soxr soxr)
-#include_directories(/home/seni/git/soxr/src)
-
 add_library( # Sets the name of the library.
              rec-engine
 
@@ -29,7 +26,7 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/cpp/jni_bridge.cpp
+             src/main/cpp/jni-bridge.cpp
              src/main/cpp/RecEngine.cpp
              ${DEBUG_UTILS_PATH}/trace.cpp)
 
@@ -49,7 +46,7 @@ find_library( # Sets the name of the path variable.
 # kaldi
 include_directories(/home/seni/androidkaldi/kaldi-android/src)
 
-link_directories(/tmp/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
+link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
@@ -63,15 +60,7 @@ target_link_libraries( # Specifies the target library.
                        /home/seni/androidkaldi/kaldi-android/src/nnet3/kaldi-nnet3.a /home/seni/androidkaldi/kaldi-android/src/cudamatrix/kaldi-cudamatrix.a /home/seni/androidkaldi/kaldi-android/src/fstext/kaldi-fstext.a
                        /home/seni/androidkaldi/kaldi-android/src/gmm/kaldi-gmm.a /home/seni/androidkaldi/kaldi-android/src/tree/kaldi-tree.a /home/seni/androidkaldi/kaldi-android/src/ivector/kaldi-ivector.a
                        /home/seni/androidkaldi/kaldi-android/src/feat/kaldi-feat.a /home/seni/androidkaldi/kaldi-android/src/online2/kaldi-online2.a /home/seni/androidkaldi/kaldi-android/src/transform/kaldi-transform.a
-                       #
-                       #
-                       #
-                       #
-                       #
-                       #
-                       # /home/seni/androidkaldi/kaldi-android/src/chain/kaldi-chain.a
-                       #/home/seni/androidkaldi/kaldi-android/src/transform/kaldi-transform.a
-                       #
+
 
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a

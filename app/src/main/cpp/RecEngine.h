@@ -33,7 +33,7 @@ public:
 
     void transcribe_stream(std::string wavpath);
 
-    void stop_trans_stream();
+    int stop_trans_stream();
 
     void transcribe_file(std::string wavpath, std::string ctm);
 
@@ -55,6 +55,9 @@ private:
     float_t* fp_audio;
     float_t* int_audio; // is in int16 range
 
+    kaldi::Output* os_ctm;
+    kaldi::Output* os_txt;
+
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;
@@ -66,10 +69,13 @@ private:
     kaldi::SingleUtteranceNnet3Decoder* decoder = NULL;
     kaldi::OnlineNnet2FeaturePipeline* feature_pipeline = NULL;
     fst::SymbolTable* word_syms;
+    kaldi::LatticeFasterDecoderConfig* decoder_opts;
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
+    kaldi::WordAlignLatticeLexiconInfo* lexicon_info;
     int32 left_context;
     int32 right_context;
+    float_t frame_shift = 0.03;
 
 };
 

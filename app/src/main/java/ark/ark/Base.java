@@ -19,10 +19,6 @@ public class Base extends AppCompatActivity {
     public static Semaphore available = new Semaphore(1);
     private long time_lastclick = 0;
 
-    static {
-        System.loadLibrary("rec-engine");
-    }
-
     public native void native_load(AssetManager mgr, String rmodeldir);
 
     @Override

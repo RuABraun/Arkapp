@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<android.support.v7.widget.CardView
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:layout_margin="2dp"
+    card_view:cardCornerRadius="3dp"
+    card_view:cardElevation="3dp">
+
+    <android.support.constraint.ConstraintLayout
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/cardview_background">
+
+        <TextView
+            android:id="@+id/Row_Filename"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="serif-monospace"
+            android:text="Filename"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/colorText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/Row_Audiolength"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:layout_marginTop="4dp"
+            android:fontFamily="serif-monospace"
+            android:text="Audiolength"
+            android:textColor="@color/colorText"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="@+id/Row_Filename"
+            app:layout_constraintTop_toBottomOf="@+id/Row_Filename" />
+
+        <TextView
+            android:id="@+id/Row_Date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="140dp"
+            android:fontFamily="serif-monospace"
+            android:text="Date"
+            android:textSize="14sp"
+            android:textColor="@color/colorText"
+            app:layout_constraintBottom_toBottomOf="@+id/Row_Audiolength"
+            app:layout_constraintStart_toStartOf="@+id/Row_Audiolength" />
+
+    </android.support.constraint.ConstraintLayout>
+</android.support.v7.widget.CardView>

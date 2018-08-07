@@ -48,7 +48,7 @@ JNIEXPORT void JNICALL Java_ark_ark_Base_native_1load(JNIEnv* env, jobject, jobj
 }
 
 JNIEXPORT jlong JNICALL
-Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring jmodeldir) {
+Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jobject, jstring jmodeldir) {
     const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
     std::string modeldir = std::string(cstrb);
 
@@ -59,14 +59,14 @@ Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jclass, jstring jmodeld
 JNIEXPORT void JNICALL
 Java_ark_ark_RecEngine_native_1deleteEngine(
         JNIEnv *env,
-        jclass,
+        jobject,
         jlong engineHandle) {
 
     delete (RecEngine *) engineHandle;
 }
 
 JNIEXPORT void JNICALL
-Java_ark_ark_RecEngine_native_1transcribe_1stream(JNIEnv *env, jclass, jlong engineHandle, jstring jwavpath) {
+Java_ark_ark_RecEngine_native_1transcribe_1stream(JNIEnv *env, jobject, jlong engineHandle, jstring jwavpath) {
     const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
     std::string wavpath = std::string(cstr);
 
@@ -78,18 +78,19 @@ Java_ark_ark_RecEngine_native_1transcribe_1stream(JNIEnv *env, jclass, jlong eng
     engine->transcribe_stream(wavpath);
 }
 
-JNIEXPORT void JNICALL
-Java_ark_ark_RecEngine_native_1stop_1trans_1stream(JNIEnv *env, jclass, jlong engineHandle) {
+JNIEXPORT jlong JNICALL
+Java_ark_ark_RecEngine_native_1stop_1trans_1stream(JNIEnv *env, jobject, jlong engineHandle) {
     RecEngine* engine = (RecEngine*) engineHandle;
     if (engine == nullptr) {
         LOGE("Engine handle is invalid");
-        return;
+        return 0;
     }
-    engine->stop_trans_stream();
+    int num_out_frames = engine->stop_trans_stream();
+    return num_out_frames;
 }
 
 JNIEXPORT void JNICALL
-Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jclass, jlong engineHandle, jstring jwavpath, jstring jctm) {
+Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, jlong engineHandle, jstring jwavpath, jstring jctm) {
     const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
     std::string wavpath = std::string(cstr);
     const char* cstr3 = env->GetStringUTFChars(jctm, NULL);
@@ -102,7 +103,7 @@ Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jclass, jlong engin
     engine->transcribe_file(wavpath, ctm);
 }
 
-JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jclass, jlong engineHandle) {
+JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jobject, jlong engineHandle) {
     RecEngine *engine = (RecEngine*) engineHandle;
     if (engine == nullptr) {
         LOGE("Engine handle is invalid, call createHandle() to create a new one");
@@ -116,7 +117,7 @@ JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jc
 JNIEXPORT void JNICALL
 Java_ark_ark_RecEngine_native_1setAudioDeviceId(
         JNIEnv *env,
-        jclass,
+        jobject,
         jlong engineHandle,
         jint deviceId) {
 

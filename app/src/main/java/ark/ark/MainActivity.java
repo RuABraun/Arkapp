@@ -35,6 +35,7 @@ public class MainActivity extends Base {
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "fbank.conf", "align_lexicon.int");
     Handler h = new Handler(Looper.getMainLooper());
     Runnable runnable;
+    private FileRepository f_repo;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -70,6 +71,7 @@ public class MainActivity extends Base {
                     REQUEST_PERMISSIONS_CODE);
         }
 
+        f_repo = new FileRepository(getApplication());
     }
 
     private void do_setup() {
@@ -122,16 +124,8 @@ public class MainActivity extends Base {
         Log.i("APP", "isrecording: " + String.valueOf(is_recording));
         if (!is_recording ) {
             if (!RecEngine.isready) return;
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmm");
-            Date now = new Date();
-            String name = filesdir + sdf.format(now);
-            String wavpath = name + ".wav";
-            int i = 1;
-            while (new File(wavpath).exists()) {
-                wavpath = name + "_" + Integer.toString(i) + ".wav";
-                i++;
-            }
-            RecEngine.transcribe_stream(wavpath);
+            String fpath= filesdir + "tmpfile";
+            RecEngine.transcribe_stream(fpath);
             is_recording = true;
             button_rec.setText(R.string.button_recstop);
 
@@ -143,11 +137,42 @@ public class MainActivity extends Base {
                 }
             }, 500);
         } else {
-            RecEngine.stop_trans_stream();
+
             is_recording = false;
             button_rec.setText(R.string.button_recstart);
             h.removeCallbacks(runnable);
+
+            long num_out_frames = RecEngine.stop_trans_stream();
+
+            String fpath = getFileName();
+            String[] suffixes = {".txt", ".ctm", ".wav"};
+            String name = new File(fpath).getName();
+            File from, to;
+            for (int i = 0; i < suffixes.length; i++) {
+                from = new File(filesdir + "tmpfile" + suffixes[i]);
+                to = new File(fpath + suffixes[i]);
+                from.renameTo(to);
+            }
+
+            int duration_s = (int) (3 * num_out_frames) / 100;
+            AFile afile = new AFile(name, duration_s, name);
+            f_repo.insert(afile);
         }
+    }
+
+    public String getFileName() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmm");
+        Date now = new Date();
+        String name = sdf.format(now);
+        String fpath = filesdir + name + "_file";
+        String wavpath = fpath + ".wav";
+        int i = 1;
+        while (new File(wavpath).exists()) {
+            fpath = fpath + "_" + Integer.toString(i);
+            wavpath = fpath  + ".wav";
+            i++;
+        }
+        return fpath;
     }
 
     public void update_text() {
