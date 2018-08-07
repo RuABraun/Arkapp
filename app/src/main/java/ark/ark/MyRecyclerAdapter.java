@@ -2,6 +2,7 @@ package ark.ark;
 
 import android.app.FragmentManager;
 import android.content.Context;
+import android.content.Intent;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -84,7 +85,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Toast.makeText(context, String.valueOf(curr_pos), Toast.LENGTH_SHORT).show();
 
                     PopupMenu popup = new PopupMenu(context, v);
 
@@ -96,15 +96,16 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                             AFile afile_to_use = data_.get(curr_pos);
                             switch (item.getItemId()) {
                                 case R.id.View:
-                                    FileFragment fileview = new FileFragment();
-                                    fileview.setFileFields(afile_to_use);
-                                    fileview.show(fragmentManager, "fileview");
+                                    Intent intent = new Intent(context, FileInfo.class);
+                                    intent.putExtra("file_obj", afile_to_use);
+                                    context.startActivity(intent);
                                     break;
                                 case R.id.Export:
                                     break;
                                 case R.id.Delete:
                                     f_repo.delete(afile_to_use);
                                     data_.remove(curr_pos);
+                                    Toast.makeText(context, "File " + afile_to_use.fname + " deleted.", Toast.LENGTH_SHORT).show();
                                     break;
                             }
                             return false;

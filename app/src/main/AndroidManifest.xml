@@ -3,8 +3,8 @@
     package="ark.ark">
 
     <uses-permission-sdk-23 android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission-sdk-23  android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission-sdk-23  android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission-sdk-23 android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission-sdk-23 android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -22,7 +22,16 @@
         <activity android:name=".Help" />
         <activity android:name=".Base" />
         <activity android:name=".Settings" />
-        <activity android:name=".Manage"></activity>
+        <activity android:name=".Manage" />
+        <activity
+            android:name=".FileInfo"
+            android:label="@string/title_activity_file_info"
+            android:parentActivityName=".Manage"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="ark.ark.Manage" />
+        </activity>
     </application>
 
 </manifest>

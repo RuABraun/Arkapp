@@ -39,9 +39,12 @@ public class RecEngine {
 
     static void delete(){
         cnt_start--;
+        Log.d("APP RecEng", "DEL START " + String.valueOf(isready));
 
-        if (mEngineHandle != 0 && cnt_start == 0){
+        if (mEngineHandle != 0 && cnt_start == 0) {
+            Log.d("APP RecEng", "WILL DEL");
             native_deleteEngine(mEngineHandle);
+            Log.d("APP RecEng", "DONE DEL");
             mEngineHandle = 0;
             isready = false;
         }

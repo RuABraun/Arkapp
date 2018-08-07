@@ -9,4 +9,5 @@
     <string name="ManButtonTrans">Transcribe</string>
     <string name="ManButtonDel">Delete</string>
     <string name="CloseX">X</string>
+    <string name="title_activity_file_info">FileInfo</string>
 </resources>

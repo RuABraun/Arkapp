@@ -3,18 +3,17 @@ package ark.ark;
 import android.app.FragmentManager;
 import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
-import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 
 import java.util.List;
 
 
 public class Manage extends Base {
 
-    MediaPlayer mp = null;
     MyRecyclerAdapter adapter;
     private FileViewModel fviewmodel;
     private FileRepository f_repo;
@@ -48,17 +47,17 @@ public class Manage extends Base {
     @Override
     public void onStart() {
         super.onStart();
+        Log.d("APP MANAGE", "IN ON START");
         createRecEng(rmodeldir);
+        Log.d("APP MANAGE", "DONE ON START");
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        if (mp != null) {
-            mp.release();
-            mp = null;
-        }
+        Log.d("APP MANAGE", "IN ON STOP");
         RecEngine.delete();
+        Log.d("APP MANAGE", "DONE ON STOP");
     }
 
 
