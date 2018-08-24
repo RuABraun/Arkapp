@@ -4,7 +4,6 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
@@ -25,7 +24,6 @@ public class FileInfo extends Base {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.d("APP", "IN ON CREATE");
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_fileinfo);
@@ -42,7 +40,6 @@ public class FileInfo extends Base {
 
     @Override
     public void onStart() {
-        Log.d("APP", "IN ON START");
         super.onStart();
         mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));
         mSeekBar.setMax(mPlayer.getDuration());
@@ -64,12 +61,11 @@ public class FileInfo extends Base {
 
             }
         });
-        Log.d("APP", "\nFINISHED START\n");
     }
 
     public void setFileFields() {
         TextView tv = findViewById(R.id.file_title);
-        tv.setText(afile.fname);
+        tv.setText(afile.title);
         tv = findViewById(R.id.file_date);
         tv.setText(afile.date);
         tv = findViewById(R.id.file_duration);
@@ -103,6 +99,14 @@ public class FileInfo extends Base {
                 }
             };
             mHandler.post(mRunnable);
+            mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    mSeekBar.setProgress(0);
+                    mediaButton.setImageResource(R.drawable.play);
+                    mHandler.removeCallbacks(mRunnable);
+                }
+            });
             mPlayer.start();
         } else {
             mediaButton.setImageResource(R.drawable.play);
@@ -122,13 +126,17 @@ public class FileInfo extends Base {
 
     @Override
     protected void onStop() {
-        Log.d("APP FILEINFO", "IN ON STOP");
         super.onStop();
+        if (mHandler != null) {
+            mHandler.removeCallbacks(mRunnable);
+        }
         if (mSeekBar != null) {
             mSeekBar.setOnSeekBarChangeListener(null);
         }
         if (mPlayer != null) {
+            mPlayer.pause();
             mPlayer.stop();
+            mPlayer.reset();
             mPlayer.release();
             mPlayer = null;
         }

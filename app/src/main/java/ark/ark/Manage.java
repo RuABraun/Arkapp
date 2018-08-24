@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 
 import java.util.List;
 
@@ -43,22 +42,4 @@ public class Manage extends Base {
         });
 
     }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-        Log.d("APP MANAGE", "IN ON START");
-        createRecEng(rmodeldir);
-        Log.d("APP MANAGE", "DONE ON START");
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-        Log.d("APP MANAGE", "IN ON STOP");
-        RecEngine.delete();
-        Log.d("APP MANAGE", "DONE ON STOP");
-    }
-
-
 }

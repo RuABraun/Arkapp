@@ -16,13 +16,22 @@
 #include "online2/onlinebin-util.h"
 #include "online2/online-timing.h"
 #include "lat/word-align-lattice-lexicon.h"
+#include "lat/compose-lattice-pruned.h"
+#include "rnnlm/rnnlm-lattice-rescoring.h"
+#include "rnnlm/rnnlm-utils.h"
 #include "nnet3/nnet-utils.h"
+#include <thread>
+
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
     RecEngine(std::string modeldir);
 
     ~RecEngine();
+
+    void readObj(std::string wsyms, std::string align_lex);
+
+    void readFst(std::string fst_rxfilename);
 
     void setDeviceId(int32_t deviceId);
 
@@ -77,6 +86,17 @@ private:
     int32 right_context;
     float_t frame_shift = 0.03;
 
+    // RNN vars
+    kaldi::CuMatrix<kaldi::BaseFloat> feat_emb_mat;
+    kaldi::CuSparseMatrix<kaldi::BaseFloat> word_feat;
+    kaldi::CuMatrix<kaldi::BaseFloat>* word_emb_mat = NULL;
+    fst::ScaleDeterministicOnDemandFst* lm_to_subtract_det_scale = NULL;
+    fst::BackoffDeterministicOnDemandFst<fst::StdArc>* lm_to_subtract_det_backoff = NULL;
+    fst::VectorFst<fst::StdArc>* lm_to_subtract_fst = NULL;
+    kaldi::nnet3::Nnet rnnlm;
+    kaldi::rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig;
+    fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
+    fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
 };
 
 #endif //ARK_RECENGINE_H

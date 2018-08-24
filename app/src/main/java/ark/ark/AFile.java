@@ -11,6 +11,8 @@ public class AFile implements Parcelable {
 
     @PrimaryKey(autoGenerate = true)
     private int id;
+    @ColumnInfo(name = "title")
+    public String title;
     @ColumnInfo(name = "fname")
     public String fname;
     @ColumnInfo(name = "len_s")
@@ -18,7 +20,8 @@ public class AFile implements Parcelable {
     @ColumnInfo(name = "date")
     public String date;
 
-    AFile(String fname, int len_s, String date) {
+    AFile(String title, String fname, int len_s, String date) {
+        this.title = title;
         this.fname = fname;
         this.len_s = len_s;
         this.date = date;
@@ -30,6 +33,14 @@ public class AFile implements Parcelable {
 
     public void setId(int id) {
         this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public String getFname() {
@@ -64,6 +75,7 @@ public class AFile implements Parcelable {
     @Override
     public void writeToParcel(Parcel out, int flags) {
         out.writeInt(id);
+        out.writeString(title);
         out.writeString(fname);
         out.writeInt(len_s);
         out.writeString(date);
@@ -81,6 +93,7 @@ public class AFile implements Parcelable {
 
     private AFile(Parcel in) {
         id = in.readInt();
+        title = in.readString();
         fname = in.readString();
         len_s = in.readInt();
         date = in.readString();

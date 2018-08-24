@@ -18,4 +18,5 @@ public interface AFileDao {
 
     @Query("DELETE FROM AFile WHERE id = :elemid")
     void delete(int elemid);
+
 }

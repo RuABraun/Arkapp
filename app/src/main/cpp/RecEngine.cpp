@@ -3,21 +3,19 @@
 #include <string>
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include "logging_macros.h"
 #include "RecEngine.h"
+#include<sstream>
 
-
+using namespace kaldi;
+using namespace fst;
 
 namespace little_endian_io {
     template <typename Word>
     std::ostream& write_word( std::ostream& outs, Word value, unsigned size = sizeof( Word ) ) {
         for (; size; --size, value >>= 8)
             outs.put( static_cast <char> (value & 0xFF) );
-        return outs;
-    }
-
-    std::ostream& write_float(std::ostream& outs, float value, unsigned size) {
-        outs.write((char*) &value, size);
         return outs;
     }
 }
@@ -59,53 +57,121 @@ int start_logger()
     return 0;
 }
 
-void write_ctm(kaldi::CompactLattice* clat_best, kaldi::TransitionModel* trans_model,
-               kaldi::WordAlignLatticeLexiconInfo* lexicon_info,
-               kaldi::BaseFloat frame_shift, fst::SymbolTable* word_syms, kaldi::Output* os_ctm);
+void write_ctm(CompactLattice* clat_best, TransitionModel* trans_model,
+               WordAlignLatticeLexiconInfo* lexicon_info,
+               BaseFloat frame_shift, SymbolTable* word_syms, Output* os_ctm);
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 20), feature_opts(modeldir + "fbank.conf", "fbank") {
+void RecEngine::readObj(std::string wsyms, std::string align_lex) {
+    word_syms = SymbolTable::ReadText(wsyms);
+    std::vector<std::vector<int32>> lexicon;
+    {
+        std::ifstream is(align_lex, std::ifstream::in);
+        ReadLexiconForWordAlign(is, &lexicon);
+    }
+    lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
+}
+
+void RecEngine::readFst(std::string fst_rxfilename) {
+
+}
+
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 40, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
+    start_logger();
     // ! -- ASR setup begin
-    fin_sample_rate_fp = (kaldi::BaseFloat) fin_sample_rate;
+    fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
     model_dir = modeldir;
     std::string nnet3_rxfilename = modeldir + "final.mdl",
             fst_rxfilename = modeldir + "HCLG.fst",
-            align_lex = modeldir + "align_lexicon.int",
+            align_lex = modeldir + "align_lexicon.bin",
             wsyms = modeldir + "words.txt";
 
+//    std::thread t(&RecEngine::readObj, this, wsyms, align_lex);
+//    std::thread t2(&RecEngine::readFst, this, fst_rxfilename);
+    word_syms = SymbolTable::ReadText(wsyms);
+    LOGI("A");
+    std::vector<std::vector<int32>> lexicon;
+    {
+//        std::ifstream is(align_lex, std::ifstream::in);
+        ReadLexiconForWordAlignBin(align_lex, &lexicon);
+    }
+    LOGI("B");
+    lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
+    LOGI("C");
+    decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
+    LOGI("D");
     {
         bool binary;
-        kaldi::Input ki(nnet3_rxfilename, &binary);
-        LOGI("Reading nnet");
+        Input ki(nnet3_rxfilename, &binary);
+        LOGI("halfway a");
         trans_model.Read(ki.Stream(), binary);
         am_nnet.Read(ki.Stream(), binary);
+
         SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
-        kaldi::nnet3::CollapseModel(kaldi::nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
+        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
     left_context = am_nnet.LeftContext();
     right_context = am_nnet.RightContext();
     mFramesPerBurst = int32_t(0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
 
-    decodable_info = new kaldi::nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
-    feature_info = new kaldi::OnlineNnet2FeaturePipelineInfo(feature_opts);
+    decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
+    feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);
+    LOGI("halfway B");
 
-    decode_fst = fst::ReadFstKaldiGeneric(fst_rxfilename);
-    word_syms = fst::SymbolTable::ReadText(wsyms);
+    // ! -- AM setup end, doing RNN setup
 
-    std::vector<std::vector<int32>> lexicon;
+    std::string lm_to_subtract_fname = modeldir + "G.fst",
+            word_feat_fname = modeldir + "word_feats.bin",
+            feat_emb_fname = modeldir + "feat_embedding.final.mat",
+            rnnlm_raw_fname = modeldir + "final.raw";
+
+    BaseFloat rnn_scale = 0.9f;
+    int32 max_ngram_order = 4;
+
+    ReadKaldiObject(feat_emb_fname, &feat_emb_mat);
+    LOGI("b");
     {
-        std::ifstream is(align_lex, std::ifstream::in);
-        kaldi::ReadLexiconForWordAlign(is, &lexicon);
+        //  Input input(word_feat_fname);
+        int32 rnn_featdim = feat_emb_mat.NumRows();
+        SparseMatrix<BaseFloat> cpu_word_feat;
+        rnnlm::ReadSparseWordFeaturesBinary(word_feat_fname, rnn_featdim,
+                               &cpu_word_feat);
+        word_feat.Swap(&cpu_word_feat);
     }
-    lexicon_info = new kaldi::WordAlignLatticeLexiconInfo(lexicon);
-    //
+    LOGI("c");
+    word_emb_mat = new CuMatrix<BaseFloat>(word_feat.NumRows(), feat_emb_mat.NumCols());
+    word_emb_mat->AddSmatMat(1.0, word_feat, kNoTrans, feat_emb_mat, 0.0);
+    LOGI("d");
+    lm_to_subtract_fst = ReadAndPrepareLmFst(lm_to_subtract_fname);
+    LOGI("e");
+    lm_to_subtract_det_backoff = new BackoffDeterministicOnDemandFst<StdArc>(*lm_to_subtract_fst);
+    lm_to_subtract_det_scale = new ScaleDeterministicOnDemandFst(-rnn_scale, lm_to_subtract_det_backoff);
 
-    //ko.Open(ctm_wxfilename, false, true);
-    //ko.Stream() << std::fixed;
-    //ko.Stream().precision(2);
+//    t.join();
+//    t2.join();
+    LOGI("reading rnnlm");
+    ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
+    LOGI("reading rnnlm done");
 
-    // ! -- ASR setup end
+    rnnlm::RnnlmComputeStateComputationOptions rnn_opts(word_syms->Find("<sb>"),
+                                                               word_syms->Find("<sb>"),
+                                                               word_syms->Find("<brk>"));
+    LOGI("coopb");
+    ComposeLatticePrunedOptions compose_opts(2.0, 300, 1.25, 75);
+    LOGI("eoopa");
+    const rnnlm::RnnlmComputeStateInfo rnn_info(rnn_opts, rnnlm, (*word_emb_mat));
+    LOGI("eoopb");
+    rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig =
+            new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, rnn_info);
+    LOGI("eoopc");
+    DeterministicOnDemandFst<StdArc>* lm_to_add =
+            new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
+
+    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
+    LOGI("foop");
+
+    LOGI("Finished constructing rec");
 }
 
 RecEngine::~RecEngine() {
@@ -125,7 +191,6 @@ const char* RecEngine::get_text(){
 }
 
 void RecEngine::transcribe_stream(std::string fpath){
-    //start_logger();
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -177,18 +242,20 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new kaldi::LatticeFasterDecoderConfig(7.0, 3000, 6.0, 25);
+        decoder_opts = new LatticeFasterDecoderConfig(7.0, 3000, 6.0, 25, 4.0);
         decoder_opts->determinize_lattice = true;
 
-        feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
-        decoder = new kaldi::SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
+        feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
+        decoder = new SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
+
+        lm_to_add_orig->Clear();
 
         // Text output
         std::string ctmpath = fpath + ".ctm";
-        os_ctm = new kaldi::Output(ctmpath, false);
+        os_ctm = new Output(ctmpath, false);
         std::string txtpath = fpath + ".txt";
-        os_txt = new kaldi::Output(txtpath, false);
+        os_txt = new Output(txtpath, false);
 
         // ---------------- Done
 
@@ -222,17 +289,17 @@ int RecEngine::stop_trans_stream() {
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
 
-        kaldi::CompactLattice olat;
+        CompactLattice olat;
         decoder->GetLattice(true, &olat);
-        kaldi::CompactLattice clat_bestpath;
+        CompactLattice clat_bestpath;
 
-        kaldi::CompactLatticeShortestPath(olat, &clat_bestpath);
-        kaldi::Lattice bestpath;
+        CompactLatticeShortestPath(olat, &clat_bestpath);
+        Lattice bestpath;
 
-        fst::ConvertLattice(clat_bestpath, &bestpath);
+        ConvertLattice(clat_bestpath, &bestpath);
 
         std::vector<int32> words, tmpa;
-        kaldi::LatticeWeight tmpb;
+        LatticeWeight tmpb;
         if (!GetLinearSymbolSequence(bestpath, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
 
         std::string tmpstr = "";
@@ -301,7 +368,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         write_word(f, valint, 2);
     }
 
-    kaldi::SubVector<float> data(int_audio, mFramesPerBurst);
+    SubVector<float> data(int_audio, mFramesPerBurst);
 
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
     decoder->AdvanceDecoding();
@@ -309,11 +376,11 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     //LOGI("frames decoded %d", decoder->NumFramesDecoded());
     if ((callb_cnt + 1) % 3 == 0) {
 
-        kaldi::Lattice olat;
+        Lattice olat;
         decoder->GetBestPath(false, &olat);
 
         std::vector<int32> words, tmpa;
-        kaldi::LatticeWeight tmpb;
+        LatticeWeight tmpb;
         if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
 
         std::string tmpstr = "";
@@ -350,15 +417,15 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
         using namespace kaldi;
         using namespace fst;
 
-        typedef kaldi::int32 int32;
-        typedef kaldi::int64 int64;
+        typedef int32 int32;
+        typedef int64 int64;
 
         BaseFloat chunk_length_secs = 0.18;
 
-        kaldi::LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25);
+        LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25, 4.0);
 
-        feature_pipeline = new kaldi::OnlineNnet2FeaturePipeline(*feature_info);
-        decoder = new kaldi::SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
+        feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
+        decoder = new SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
 
         std::string wav_rspecifier = wavpath, ctm_wxfilename = ctm;
@@ -367,21 +434,21 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
         std::vector<std::vector<int32>> lexicon;
         {
             std::ifstream is(align_lex, std::ifstream::in);
-            kaldi::ReadLexiconForWordAlign(is, &lexicon);
+            ReadLexiconForWordAlign(is, &lexicon);
         }
-        kaldi::WordAlignLatticeLexiconInfo lexicon_info(lexicon);
-        kaldi::WordAlignLatticeLexiconOpts opts;
+        WordAlignLatticeLexiconInfo lexicon_info(lexicon);
+        WordAlignLatticeLexiconOpts opts;
 
         Output ko(ctm_wxfilename, false);
         ko.Stream() << std::fixed;
         ko.Stream().precision(2);
         BaseFloat frame_shift = 0.03;
 
-        kaldi::WaveHolder wavholder;
+        WaveHolder wavholder;
         std::ifstream wavis(wavpath, std::ios::binary);
         wavholder.Read(wavis);
-        const kaldi::WaveData &wave_data = wavholder.Value();
-        kaldi::SubVector<kaldi::BaseFloat> data(wave_data.Data(), 0);
+        const WaveData &wave_data = wavholder.Value();
+        SubVector<BaseFloat> data(wave_data.Data(), 0);
 
         BaseFloat samp_freq = wave_data.SampFreq();
         int32 chunk_length;
@@ -429,17 +496,17 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
     }
 }
 
-void write_ctm(kaldi::CompactLattice* clat_best, kaldi::TransitionModel* trans_model,
-               kaldi::WordAlignLatticeLexiconInfo* lexicon_info,
-               kaldi::BaseFloat frame_shift, fst::SymbolTable* word_syms, kaldi::Output* os_ctm) {
+void write_ctm(CompactLattice* clat_best, TransitionModel* trans_model,
+               WordAlignLatticeLexiconInfo* lexicon_info,
+               BaseFloat frame_shift, SymbolTable* word_syms, Output* os_ctm) {
 
-    kaldi::WordAlignLatticeLexiconOpts opts;
+    WordAlignLatticeLexiconOpts opts;
 
-    kaldi::CompactLattice aligned_clat;
+    CompactLattice aligned_clat;
     WordAlignLatticeLexicon(*clat_best, *trans_model, *lexicon_info, opts, &aligned_clat);
 
     std::vector<int32> words, times, lengths;
-    kaldi::CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
+    CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
     for(size_t j=0; j < words.size(); j++) {
         if(words[j] == 0)

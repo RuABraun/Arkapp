@@ -24,6 +24,15 @@ public class FileRepository {
         return files;
     }
 
+    int getNumFiles() {
+        List<AFile> lst = files.getValue();
+        if (lst == null) {
+            return 0;
+        } else {
+            return lst.size();
+        }
+    }
+
     public void insert(AFile afile) {
         new insertAsyncTask(afileDao).execute(afile);
     }

@@ -3,69 +3,63 @@ package ark.ark;
 
 import android.util.Log;
 
-class CreateRecEngRunnable implements Runnable {
-    String mdir;
-    CreateRecEngRunnable(String mdir) {
-        this.mdir = mdir;
-    }
+import java.util.concurrent.Semaphore;
 
-    @Override
-    public void run() {
-        if (Base.available.tryAcquire()) {
-            RecEngine.create(this.mdir);
-            RecEngine.isready = true;
-            Base.available.release();
-        }
-    }
-}
 
 public class RecEngine {
 
+    private static RecEngine instance;
+    private static boolean doing_creation = false;
+    public static Semaphore available = new Semaphore(1);
+
     static long mEngineHandle = 0;
-    static long cnt_start = 0;
     static boolean isready = false;
 
-    static {
-        System.loadLibrary("rec-engine");
-    }
-
-    static long create(String modeldir){
-        cnt_start++;
-        if (mEngineHandle == 0){
-            mEngineHandle = native_createEngine(modeldir);
-        }
-        return mEngineHandle;
-    }
-
-    static void delete(){
-        cnt_start--;
-        Log.d("APP RecEng", "DEL START " + String.valueOf(isready));
-
-        if (mEngineHandle != 0 && cnt_start == 0) {
-            Log.d("APP RecEng", "WILL DEL");
-            native_deleteEngine(mEngineHandle);
-            Log.d("APP RecEng", "DONE DEL");
-            mEngineHandle = 0;
-            isready = false;
+    private RecEngine(final String modeldir) {
+        if (!doing_creation) {
+            doing_creation = true;
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Log.i("APP", "Creating engine");
+                    mEngineHandle = native_createEngine(modeldir);
+                    isready = true;
+                    doing_creation = false;
+                }
+            });
+            t.setPriority(10);
+            t.start();
         }
     }
 
-    static void transcribe_stream(String wavpath) {
+    public static RecEngine getInstance(String modeldir) {
+
+        if (instance == null) {
+            instance = new RecEngine(modeldir);
+        }
+        return instance;
+    }
+
+    public void delete() {
+        if (mEngineHandle != 0 && isready == true)
+        native_deleteEngine(mEngineHandle);
+        isready = false;
+        mEngineHandle = 0;
+    }
+
+    public void transcribe_stream(String wavpath) {
         Log.i("APP", String.format("Using %d", mEngineHandle));
         if (mEngineHandle != 0) {
             native_transcribe_stream(mEngineHandle, wavpath);
         }
     }
 
-    static long stop_trans_stream() {
+    public long stop_trans_stream() {
         return native_stop_trans_stream(mEngineHandle);
     }
 
-    static void transcribe_file(String wavpath, String ctm, String modeldir) {
-        native_transcribe_file(mEngineHandle, wavpath, ctm);
-    }
 
-    static String get_text() {
+    public String get_text() {
         if (mEngineHandle != 0) {
             return native_getText(mEngineHandle);
         } else {
@@ -73,7 +67,7 @@ public class RecEngine {
         }
     }
 
-    static void setAudioDeviceId(int deviceId){
+    public void setAudioDeviceId(int deviceId){
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
 

@@ -51,7 +51,6 @@ JNIEXPORT jlong JNICALL
 Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jobject, jstring jmodeldir) {
     const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
     std::string modeldir = std::string(cstrb);
-
     RecEngine* engine = new (std::nothrow) RecEngine(modeldir);
     return (jlong) engine;
 }

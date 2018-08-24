@@ -11,7 +11,7 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-fexceptions"
+                cppFlags "-fexceptions -pthread"
                 arguments "-DANDROID_STL=c++_shared "
             }
         }
@@ -28,7 +28,7 @@ android {
         }
     }
     aaptOptions {
-        noCompress 'fst', 'txt', 'int', 'mdl'
+        noCompress 'fst', 'txt', 'int', 'mdl', 'raw', 'csl', 'mat', 'conf', 'bin'
     }
     splits {
         abi {

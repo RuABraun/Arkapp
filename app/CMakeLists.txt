@@ -44,7 +44,8 @@ find_library( # Sets the name of the path variable.
               log )
 
 # kaldi
-include_directories(/home/seni/androidkaldi/kaldi-android/src)
+set (KALDIPATH "/home/seni/androidkaldi/kaldi/src")
+include_directories(${KALDIPATH})
 
 link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
 # Specifies libraries CMake should link to your target library. You
@@ -54,13 +55,13 @@ link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi
 
 target_link_libraries( # Specifies the target library.
                        rec-engine android oboe
-                       /home/seni/androidkaldi/kaldi-android/src/online2/kaldi-online2.a /home/seni/androidkaldi/kaldi-android/src/base/kaldi-base.a /home/seni/androidkaldi/kaldi-android/src/util/kaldi-util.a
-                       /home/seni/androidkaldi/kaldi-android/src/lat/kaldi-lat.a /home/seni/androidkaldi/kaldi-android/src/decoder/kaldi-decoder.a /home/seni/androidkaldi/kaldi-android/src/matrix/kaldi-matrix.a
-                       /home/seni/androidkaldi/kaldi-android/src/hmm/kaldi-hmm.a /home/seni/androidkaldi/kaldi-android/src/base/kaldi-base.a /home/seni/androidkaldi/kaldi-android/tools/openfst-1.6.5/lib/libfst.a
-                       /home/seni/androidkaldi/kaldi-android/src/nnet3/kaldi-nnet3.a /home/seni/androidkaldi/kaldi-android/src/cudamatrix/kaldi-cudamatrix.a /home/seni/androidkaldi/kaldi-android/src/fstext/kaldi-fstext.a
-                       /home/seni/androidkaldi/kaldi-android/src/gmm/kaldi-gmm.a /home/seni/androidkaldi/kaldi-android/src/tree/kaldi-tree.a /home/seni/androidkaldi/kaldi-android/src/ivector/kaldi-ivector.a
-                       /home/seni/androidkaldi/kaldi-android/src/feat/kaldi-feat.a /home/seni/androidkaldi/kaldi-android/src/online2/kaldi-online2.a /home/seni/androidkaldi/kaldi-android/src/transform/kaldi-transform.a
-
+                       ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/util/kaldi-util.a
+                       ${KALDIPATH}/lat/kaldi-lat.a ${KALDIPATH}/decoder/kaldi-decoder.a ${KALDIPATH}/matrix/kaldi-matrix.a
+                       ${KALDIPATH}/hmm/kaldi-hmm.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/../tools/openfst/lib/libfst.a
+                       ${KALDIPATH}/nnet3/kaldi-nnet3.a ${KALDIPATH}/cudamatrix/kaldi-cudamatrix.a ${KALDIPATH}/fstext/kaldi-fstext.a
+                       ${KALDIPATH}/gmm/kaldi-gmm.a ${KALDIPATH}/tree/kaldi-tree.a ${KALDIPATH}/ivector/kaldi-ivector.a
+                       ${KALDIPATH}/feat/kaldi-feat.a ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/transform/kaldi-transform.a
+                       ${KALDIPATH}/rnnlm/kaldi-rnnlm.a
 
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a

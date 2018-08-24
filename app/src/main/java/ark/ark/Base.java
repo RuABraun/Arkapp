@@ -8,15 +8,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import java.util.concurrent.Semaphore;
-
 public class Base extends AppCompatActivity {
 
     public static AssetManager mgr;
     public static String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Ark/";
     public static String filesdir = rootdir + "files/";
     public static String rmodeldir = rootdir + "model/";
-    public static Semaphore available = new Semaphore(1);
     private long time_lastclick = 0;
 
     public native void native_load(AssetManager mgr, String rmodeldir);
@@ -54,11 +51,6 @@ public class Base extends AppCompatActivity {
         }
     }
 
-    public void createRecEng(String modeldir) {
-        Thread t = new Thread(new CreateRecEngRunnable(modeldir));
-        t.setPriority(10);
-        t.start();
-    }
 
     public boolean is_spamclick() {
         if (SystemClock.elapsedRealtime() - time_lastclick < 500) {

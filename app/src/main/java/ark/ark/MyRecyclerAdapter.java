@@ -41,7 +41,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             holder.tv_fname.setText("No files present.");
         }
         AFile elem = getItem(pos);
-        holder.tv_fname.setText(elem.fname);
+        holder.tv_fname.setText(elem.title);
         holder.tv_date.setText(elem.date);
 
         int len_s = elem.len_s;
@@ -105,7 +105,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                 case R.id.Delete:
                                     f_repo.delete(afile_to_use);
                                     data_.remove(curr_pos);
-                                    Toast.makeText(context, "File " + afile_to_use.fname + " deleted.", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(context, "File " + afile_to_use.title + " deleted.", Toast.LENGTH_SHORT).show();
                                     break;
                             }
                             return false;

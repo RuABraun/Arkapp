@@ -3,7 +3,7 @@
     <string name="button_recstart">Record</string>
     <string name="button_recstop">Stop</string>
     <string name="Contact">contact@ark.com</string>
-    <string name="HelloMsg">"Start transcribing by clicking the record button!"</string>
+    <string name="HelloMsg">"Ready!"</string>
     <string name="LoadingMsg">"...starting up..."</string>
     <string name="ManButtonPlay">Play</string>
     <string name="ManButtonTrans">Transcribe</string>
