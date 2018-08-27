@@ -110,8 +110,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 40, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
-    start_logger();
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -168,6 +167,7 @@ const char* RecEngine::get_text(){
 }
 
 void RecEngine::transcribe_stream(std::string fpath){
+//    start_logger();
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -226,8 +226,6 @@ void RecEngine::transcribe_stream(std::string fpath){
         decoder = new SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
 
-        lm_to_add_orig->Clear();
-
         // Text output
         std::string ctmpath = fpath + ".ctm";
         os_ctm = fopen(ctmpath.c_str(), "wt");
@@ -235,7 +233,6 @@ void RecEngine::transcribe_stream(std::string fpath){
         os_txt = fopen(txtpath.c_str(), "wt");
 
         // ---------------- Done
-
         callb_cnt = 0;
         result = mRecStream->requestStart();
         if (result != oboe::Result::OK) {
@@ -257,7 +254,6 @@ int RecEngine::stop_trans_stream() {
         }
 
         result = mRecStream->close();
-        LOGI("CLOSED");
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
         }
@@ -328,9 +324,9 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
     decoder->AdvanceDecoding();
-    //LOGI("frames ready %d", feature_pipeline->NumFramesReady());
-    //LOGI("frames decoded %d", decoder->NumFramesDecoded());
-    if ((callb_cnt + 1) % 2 == 0) {
+//    LOGI("frames ready %d", feature_pipeline->NumFramesReady());
+//    LOGI("frames decoded %d", decoder->NumFramesDecoded());
+    if ((callb_cnt + 1) % 3 == 0) {
 
         if (decoder->isPruneTime() == true) {
             CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;

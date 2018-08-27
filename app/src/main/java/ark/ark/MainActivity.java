@@ -39,6 +39,7 @@ public class MainActivity extends Base {
     private RecEngine recEngine;
     private ImageButton bt_pause;
     private ImageButton bt_rec;
+    private EditText ed_transtext;
 
     static {
         System.loadLibrary("rec-engine");
@@ -106,7 +107,14 @@ public class MainActivity extends Base {
             t.setPriority(10);
             t.start();
         } else {
-            recEngine = RecEngine.getInstance(rmodeldir);
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    recEngine = RecEngine.getInstance(rmodeldir);
+                }
+            });
+            t.setPriority(10);
+            t.start();
         }
     }
 
@@ -134,6 +142,8 @@ public class MainActivity extends Base {
         bt_pause.setVisibility(View.INVISIBLE);
 
         bt_rec = findViewById(R.id.button_rec);
+
+        ed_transtext = findViewById(R.id.transText);
     }
 
     @Override
@@ -148,6 +158,7 @@ public class MainActivity extends Base {
         Log.i("APP", "isrecording: " + String.valueOf(is_recording));
         if (!is_recording ) {
             if (!RecEngine.isready) return;
+            ed_transtext.setText("", TextView.BufferType.EDITABLE);
             String fpath= filesdir + "tmpfile";
             recEngine.transcribe_stream(fpath);
             is_recording = true;
@@ -203,8 +214,7 @@ public class MainActivity extends Base {
 
     public void update_text() {
         String str = recEngine.get_text();
-        EditText ed = findViewById(R.id.transText);
-        ed.setText(str, TextView.BufferType.EDITABLE);
+        ed_transtext.setText(str, TextView.BufferType.EDITABLE);
     }
 
     @Override

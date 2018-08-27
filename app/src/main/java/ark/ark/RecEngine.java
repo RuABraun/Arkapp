@@ -16,26 +16,16 @@ public class RecEngine {
     static boolean isready = false;
 
     private RecEngine(final String modeldir) {
-        if (!doing_creation) {
-            doing_creation = true;
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    Log.i("APP", "Creating engine");
-                    mEngineHandle = native_createEngine(modeldir);
-                    Log.i("APP", "engine " + Long.toString(mEngineHandle));
-                    isready = true;
-                    doing_creation = false;
-                }
-            });
-            t.setPriority(10);
-            t.start();
-        }
+        doing_creation = true;
+        Log.i("APP", "Creating engine");
+        mEngineHandle = native_createEngine(modeldir);
+        isready = true;
+        doing_creation = false;
     }
 
     public static RecEngine getInstance(String modeldir) {
 
-        if (instance == null) {
+        if (instance == null && !doing_creation) {
             instance = new RecEngine(modeldir);
         }
         return instance;
