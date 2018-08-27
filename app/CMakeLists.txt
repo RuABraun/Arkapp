@@ -61,7 +61,7 @@ target_link_libraries( # Specifies the target library.
                        ${KALDIPATH}/nnet3/kaldi-nnet3.a ${KALDIPATH}/cudamatrix/kaldi-cudamatrix.a ${KALDIPATH}/fstext/kaldi-fstext.a
                        ${KALDIPATH}/gmm/kaldi-gmm.a ${KALDIPATH}/tree/kaldi-tree.a ${KALDIPATH}/ivector/kaldi-ivector.a
                        ${KALDIPATH}/feat/kaldi-feat.a ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/transform/kaldi-transform.a
-                       ${KALDIPATH}/rnnlm/kaldi-rnnlm.a
+                       ${KALDIPATH}/rnnlm/kaldi-rnnlm.a ${KALDIPATH}/lm/kaldi-lm.a
 
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a

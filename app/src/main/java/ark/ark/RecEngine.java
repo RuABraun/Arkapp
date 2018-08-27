@@ -23,6 +23,7 @@ public class RecEngine {
                 public void run() {
                     Log.i("APP", "Creating engine");
                     mEngineHandle = native_createEngine(modeldir);
+                    Log.i("APP", "engine " + Long.toString(mEngineHandle));
                     isready = true;
                     doing_creation = false;
                 }
@@ -48,7 +49,7 @@ public class RecEngine {
     }
 
     public void transcribe_stream(String wavpath) {
-        Log.i("APP", String.format("Using %d", mEngineHandle));
+        Log.i("APP", String.format("Using EngineHandle: %d", mEngineHandle));
         if (mEngineHandle != 0) {
             native_transcribe_stream(mEngineHandle, wavpath);
         }

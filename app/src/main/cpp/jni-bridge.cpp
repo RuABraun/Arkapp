@@ -52,6 +52,7 @@ Java_ark_ark_RecEngine_native_1createEngine(JNIEnv *env, jobject, jstring jmodel
     const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
     std::string modeldir = std::string(cstrb);
     RecEngine* engine = new (std::nothrow) RecEngine(modeldir);
+    LOGI("JNI engine %d", engine);
     return (jlong) engine;
 }
 

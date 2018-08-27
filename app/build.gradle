@@ -28,7 +28,7 @@ android {
         }
     }
     aaptOptions {
-        noCompress 'fst', 'txt', 'int', 'mdl', 'raw', 'csl', 'mat', 'conf', 'bin'
+        noCompress 'fst', 'txt', 'int', 'mdl', 'raw', 'csl', 'mat', 'conf', 'bin', 'carpa'
     }
     splits {
         abi {

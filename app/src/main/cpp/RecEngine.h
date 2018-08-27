@@ -19,6 +19,7 @@
 #include "lat/compose-lattice-pruned.h"
 #include "rnnlm/rnnlm-lattice-rescoring.h"
 #include "rnnlm/rnnlm-utils.h"
+#include "lm/const-arpa-lm.h"
 #include "nnet3/nnet-utils.h"
 #include <thread>
 
@@ -29,9 +30,9 @@ public:
 
     ~RecEngine();
 
-    void readObj(std::string wsyms, std::string align_lex);
+    void setupLex(std::string wsyms, std::string align_lex);
 
-    void readFst(std::string fst_rxfilename);
+    void setupRnnlm(std::string modeldir);
 
     void setDeviceId(int32_t deviceId);
 
@@ -64,8 +65,8 @@ private:
     float_t* fp_audio;
     float_t* int_audio; // is in int16 range
 
-    kaldi::Output* os_ctm;
-    kaldi::Output* os_txt;
+    FILE* os_ctm;
+    FILE* os_txt;
 
     // ASR vars
     std::string model_dir;
@@ -82,21 +83,28 @@ private:
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
     kaldi::WordAlignLatticeLexiconInfo* lexicon_info;
+    kaldi::WordAlignLatticeLexiconOpts opts;
     int32 left_context;
     int32 right_context;
-    float_t frame_shift = 0.03;
+    kaldi::BaseFloat frame_shift = 0.03;
 
     // RNN vars
+    int32 max_ngram_order = 4;
     kaldi::CuMatrix<kaldi::BaseFloat> feat_emb_mat;
     kaldi::CuSparseMatrix<kaldi::BaseFloat> word_feat;
     kaldi::CuMatrix<kaldi::BaseFloat>* word_emb_mat = NULL;
+    kaldi::ConstArpaLm* const_arpa = NULL;
+    fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_to_subtract_fst = NULL;
     fst::ScaleDeterministicOnDemandFst* lm_to_subtract_det_scale = NULL;
-    fst::BackoffDeterministicOnDemandFst<fst::StdArc>* lm_to_subtract_det_backoff = NULL;
-    fst::VectorFst<fst::StdArc>* lm_to_subtract_fst = NULL;
     kaldi::nnet3::Nnet rnnlm;
     kaldi::rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig;
     fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
-    fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
+    const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
+    const kaldi::ComposeLatticePrunedOptions* compose_opts;
+    std::thread t_rnnlm;
+    bool rnn_ready;
+
+    void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
 };
 
 #endif //ARK_RECENGINE_H

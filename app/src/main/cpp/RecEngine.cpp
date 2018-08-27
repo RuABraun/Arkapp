@@ -6,7 +6,7 @@
 #include <fstream>
 #include "logging_macros.h"
 #include "RecEngine.h"
-#include<sstream>
+#include <stdio.h>
 
 using namespace kaldi;
 using namespace fst;
@@ -57,23 +57,58 @@ int start_logger()
     return 0;
 }
 
-void write_ctm(CompactLattice* clat_best, TransitionModel* trans_model,
-               WordAlignLatticeLexiconInfo* lexicon_info,
-               BaseFloat frame_shift, SymbolTable* word_syms, Output* os_ctm);
 
-void RecEngine::readObj(std::string wsyms, std::string align_lex) {
+void RecEngine::setupLex(std::string wsyms, std::string align_lex) {
     word_syms = SymbolTable::ReadText(wsyms);
     std::vector<std::vector<int32>> lexicon;
-    {
-        std::ifstream is(align_lex, std::ifstream::in);
-        ReadLexiconForWordAlign(is, &lexicon);
-    }
+    ReadLexiconForWordAlignBin(align_lex, &lexicon);
     lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
 }
 
-void RecEngine::readFst(std::string fst_rxfilename) {
+void RecEngine::setupRnnlm(std::string modeldir) {
+    rnn_ready = false;
+    std::string lm_to_subtract_fname = modeldir + "o3_1M.carpa",
+            word_feat_fname = modeldir + "word_feats.bin",
+            feat_emb_fname = modeldir + "feat_embedding.final.mat",
+            rnnlm_raw_fname = modeldir + "final.raw";
 
+    ReadKaldiObject(feat_emb_fname, &feat_emb_mat);
+
+    //  Input input(word_feat_fname);
+    int32 rnn_featdim = feat_emb_mat.NumRows();
+    SparseMatrix<BaseFloat> cpu_word_feat;
+    rnnlm::ReadSparseWordFeaturesBinary(word_feat_fname, rnn_featdim,
+                                        &cpu_word_feat);
+    word_feat.Swap(&cpu_word_feat);
+
+    word_emb_mat = new CuMatrix<BaseFloat>(word_feat.NumRows(), feat_emb_mat.NumCols());
+    word_emb_mat->AddSmatMat(1.0, word_feat, kNoTrans, feat_emb_mat, 0.0);
+
+    BaseFloat rnn_scale = 0.9f;
+
+    const_arpa = new ConstArpaLm();
+    ReadKaldiObject(lm_to_subtract_fname, const_arpa);
+    carpa_lm_to_subtract_fst = new ConstArpaLmDeterministicFst(*const_arpa);
+    lm_to_subtract_det_scale = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
+                                                                      carpa_lm_to_subtract_fst);
+
+    ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
+
+    rnnlm::RnnlmComputeStateComputationOptions rnn_opts(word_syms->Find("<sb>"),
+                                                        word_syms->Find("<sb>"),
+                                                        word_syms->Find("<brk>"));
+
+    const rnnlm::RnnlmComputeStateInfo rnn_info(rnn_opts, rnnlm, (*word_emb_mat));
+    rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig =
+            new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, rnn_info);
+
+    DeterministicOnDemandFst<StdArc>* lm_to_add =
+            new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
+
+    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
+    rnn_ready = true;
 }
+
 
 RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 40, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
     start_logger();
@@ -86,24 +121,14 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 40, 3), feature_
             align_lex = modeldir + "align_lexicon.bin",
             wsyms = modeldir + "words.txt";
 
-//    std::thread t(&RecEngine::readObj, this, wsyms, align_lex);
-//    std::thread t2(&RecEngine::readFst, this, fst_rxfilename);
-    word_syms = SymbolTable::ReadText(wsyms);
-    LOGI("A");
-    std::vector<std::vector<int32>> lexicon;
-    {
-//        std::ifstream is(align_lex, std::ifstream::in);
-        ReadLexiconForWordAlignBin(align_lex, &lexicon);
-    }
-    LOGI("B");
-    lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
-    LOGI("C");
+    std::thread t(&RecEngine::setupLex, this, wsyms, align_lex);
+    std::thread t_rnnlm(&RecEngine::setupRnnlm, this, modeldir);
+    t_rnnlm.detach();
+
     decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
-    LOGI("D");
     {
         bool binary;
         Input ki(nnet3_rxfilename, &binary);
-        LOGI("halfway a");
         trans_model.Read(ki.Stream(), binary);
         am_nnet.Read(ki.Stream(), binary);
 
@@ -117,60 +142,12 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 40, 3), feature_
 
     decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);
-    LOGI("halfway B");
 
     // ! -- AM setup end, doing RNN setup
 
-    std::string lm_to_subtract_fname = modeldir + "G.fst",
-            word_feat_fname = modeldir + "word_feats.bin",
-            feat_emb_fname = modeldir + "feat_embedding.final.mat",
-            rnnlm_raw_fname = modeldir + "final.raw";
+    compose_opts = new ComposeLatticePrunedOptions(2.0, 300, 1.25, 75);
 
-    BaseFloat rnn_scale = 0.9f;
-    int32 max_ngram_order = 4;
-
-    ReadKaldiObject(feat_emb_fname, &feat_emb_mat);
-    LOGI("b");
-    {
-        //  Input input(word_feat_fname);
-        int32 rnn_featdim = feat_emb_mat.NumRows();
-        SparseMatrix<BaseFloat> cpu_word_feat;
-        rnnlm::ReadSparseWordFeaturesBinary(word_feat_fname, rnn_featdim,
-                               &cpu_word_feat);
-        word_feat.Swap(&cpu_word_feat);
-    }
-    LOGI("c");
-    word_emb_mat = new CuMatrix<BaseFloat>(word_feat.NumRows(), feat_emb_mat.NumCols());
-    word_emb_mat->AddSmatMat(1.0, word_feat, kNoTrans, feat_emb_mat, 0.0);
-    LOGI("d");
-    lm_to_subtract_fst = ReadAndPrepareLmFst(lm_to_subtract_fname);
-    LOGI("e");
-    lm_to_subtract_det_backoff = new BackoffDeterministicOnDemandFst<StdArc>(*lm_to_subtract_fst);
-    lm_to_subtract_det_scale = new ScaleDeterministicOnDemandFst(-rnn_scale, lm_to_subtract_det_backoff);
-
-//    t.join();
-//    t2.join();
-    LOGI("reading rnnlm");
-    ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
-    LOGI("reading rnnlm done");
-
-    rnnlm::RnnlmComputeStateComputationOptions rnn_opts(word_syms->Find("<sb>"),
-                                                               word_syms->Find("<sb>"),
-                                                               word_syms->Find("<brk>"));
-    LOGI("coopb");
-    ComposeLatticePrunedOptions compose_opts(2.0, 300, 1.25, 75);
-    LOGI("eoopa");
-    const rnnlm::RnnlmComputeStateInfo rnn_info(rnn_opts, rnnlm, (*word_emb_mat));
-    LOGI("eoopb");
-    rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig =
-            new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, rnn_info);
-    LOGI("eoopc");
-    DeterministicOnDemandFst<StdArc>* lm_to_add =
-            new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
-
-    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
-    LOGI("foop");
-
+    t.join();
     LOGI("Finished constructing rec");
 }
 
@@ -253,9 +230,9 @@ void RecEngine::transcribe_stream(std::string fpath){
 
         // Text output
         std::string ctmpath = fpath + ".ctm";
-        os_ctm = new Output(ctmpath, false);
+        os_ctm = fopen(ctmpath.c_str(), "wt");
         std::string txtpath = fpath + ".txt";
-        os_txt = new Output(txtpath, false);
+        os_txt = fopen(txtpath.c_str(), "wt");
 
         // ---------------- Done
 
@@ -291,29 +268,9 @@ int RecEngine::stop_trans_stream() {
 
         CompactLattice olat;
         decoder->GetLattice(true, &olat);
-        CompactLattice clat_bestpath;
 
-        CompactLatticeShortestPath(olat, &clat_bestpath);
-        Lattice bestpath;
-
-        ConvertLattice(clat_bestpath, &bestpath);
-
-        std::vector<int32> words, tmpa;
-        LatticeWeight tmpb;
-        if (!GetLinearSymbolSequence(bestpath, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
-
-        std::string tmpstr = "";
-        for (size_t j = 0; j < words.size(); j++) {
-            std::string word = word_syms->Find(words[j]) + " ";
-            tmpstr += word;
-            os_txt->Stream() << word;
-            if (word == "<sb>") {
-                os_txt->Stream() << std::endl;
-            }
-        }
-        os_txt->Close();
-        outtext = tmpstr;
-        write_ctm(&clat_bestpath, &trans_model, lexicon_info, frame_shift, word_syms, os_ctm);
+        int32 num_out_frames = decoder->NumFramesDecoded();
+        finish_segment(&olat, num_out_frames);
 
         // Finishing wav write
         size_t file_length = f.tellp();
@@ -323,7 +280,6 @@ int RecEngine::stop_trans_stream() {
         write_word(f, file_length - 8, 4);
         f.close();
 
-        int32 num_out_frames = decoder->NumFramesDecoded();
         return num_out_frames;
     }
     return 0;
@@ -360,7 +316,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             fp_audio[i] = (val / cnt_channel_fp);
         }
     }
-    for (int i = left_context; i < numFrames; i++) {
+    for (int i = left_context; i < numFrames; i++) {  // why = left context ???
         val = fp_audio[i];
         val *= mul;
         int_audio[i] = val;
@@ -374,7 +330,22 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     decoder->AdvanceDecoding();
     //LOGI("frames ready %d", feature_pipeline->NumFramesReady());
     //LOGI("frames decoded %d", decoder->NumFramesDecoded());
-    if ((callb_cnt + 1) % 3 == 0) {
+    if ((callb_cnt + 1) % 2 == 0) {
+
+        if (decoder->isPruneTime() == true) {
+            CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;
+            decoder->GetLattice(false, &clat_to_rescore);
+            TopSortCompactLatticeIfNeeded(&clat_to_rescore);
+
+            t_rnnlm.join();
+            ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
+                                         const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                         &clat_rescored, max_ngram_order);
+
+            CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
+            decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
+            decoder->StrictPrune();
+        }
 
         Lattice olat;
         decoder->GetBestPath(false, &olat);
@@ -394,7 +365,6 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     //int32_t underrunCount = audioStream->getXRunCount();
 
     //LOGI("numFrames %d, Underruns %d, buffer size %d", mFramesPerBurst, underrunCount, bufferSize);
-
 
     if (numFrames < mFramesPerBurst) {
         for(int i = 0; i < mFramesPerBurst; i++) {
@@ -442,7 +412,6 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
         Output ko(ctm_wxfilename, false);
         ko.Stream() << std::fixed;
         ko.Stream().precision(2);
-        BaseFloat frame_shift = 0.03;
 
         WaveHolder wavholder;
         std::ifstream wavis(wavpath, std::ios::binary);
@@ -496,23 +465,55 @@ void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
     }
 }
 
-void write_ctm(CompactLattice* clat_best, TransitionModel* trans_model,
-               WordAlignLatticeLexiconInfo* lexicon_info,
-               BaseFloat frame_shift, SymbolTable* word_syms, Output* os_ctm) {
+void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
-    WordAlignLatticeLexiconOpts opts;
+    TopSortCompactLatticeIfNeeded(clat);
+
+    CompactLattice best_path;
+    if (num_out_frames > 150) {
+        t_rnnlm.join();
+        CompactLattice clat_rescored;
+        ComposeCompactLatticePrunedB(*compose_opts, *clat,
+                                     const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                     &clat_rescored, max_ngram_order);
+        CompactLatticeShortestPath(clat_rescored, &best_path);
+    } else {
+        CompactLatticeShortestPath(*clat, &best_path);
+    }
 
     CompactLattice aligned_clat;
-    WordAlignLatticeLexicon(*clat_best, *trans_model, *lexicon_info, opts, &aligned_clat);
+    WordAlignLatticeLexicon(best_path, trans_model, *lexicon_info, opts, &aligned_clat);
 
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
+//    std::vector<int32> wordseq;
+    std::string text = "";
     for(size_t j=0; j < words.size(); j++) {
-        if(words[j] == 0)
-            continue;
-        std::string word = word_syms->Find(words[j]);
-        os_ctm->Stream() << word << ' ' << (frame_shift * times[j]) << ' '
-                    << (frame_shift * lengths[j]) << std::endl;
+        int32 w = words[j];
+        if(w == 0) continue;
+//        wordseq.push_back(w);
+        std::string word = word_syms->Find(w);
+        char endc = ' ';
+        if (word == "<sb>") endc = '\n';
+        text += word + endc;
+        const char* cword = word.c_str();
+
+        fwrite(cword, 1, sizeof(word), os_txt);
+        fwrite(&endc, 1, 1, os_txt);
+
+        fwrite(cword, 1, sizeof(word), os_ctm);
+        fwrite(" ", 1, sizeof(word), os_ctm);
+
+        std::string wtime = std::to_string(frame_shift * times[j]);
+        std::string wdur = std::to_string(frame_shift * lengths[j]);
+        fwrite(wtime.c_str(), 1, sizeof(word), os_ctm);
+        fwrite(" ", 1, sizeof(word), os_ctm);
+        fwrite(wdur.c_str(), 1, sizeof(word), os_ctm);
+        fwrite("\n", 1, sizeof(word), os_ctm);
+
     }
+    outtext = text;
+    lm_to_add_orig->Clear();  // TODO: check why ClearToContinue is worse
+
 }
