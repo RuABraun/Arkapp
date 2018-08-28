@@ -70,12 +70,13 @@
         android:layout_marginTop="8dp"
         android:adjustViewBounds="true"
         android:background="@android:color/transparent"
+        android:padding="50dp"
         android:scaleType="centerCrop"
+        android:visibility="invisible"
         app:layout_constraintBottom_toBottomOf="@+id/transText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/transText"
-        app:srcCompat="@drawable/pause"
-        android:padding="50dp"/>
+        app:srcCompat="@drawable/pause" />
 
 </android.support.constraint.ConstraintLayout>

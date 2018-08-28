@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends Base {
 
@@ -43,6 +44,7 @@ public class MainActivity extends Base {
     private ImageButton bt_rec;
     private EditText ed_transtext;
     final String PREFS_NAME = "MyPrefsFile";
+    Thread t_del;
 
     static {
         System.loadLibrary("rec-engine");
@@ -56,7 +58,6 @@ public class MainActivity extends Base {
                 for(int i=0; i < grantResults.length; i++) {
                     if(grantResults[i] != PackageManager.PERMISSION_GRANTED) {
                         Toast.makeText(this, "Required permissions not granted, app closing.", Toast.LENGTH_LONG).show();
-
                         finish();
                         break;
                     }
@@ -64,6 +65,26 @@ public class MainActivity extends Base {
                 break;
         }
         perm_granted = true;
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        if (settings.getBoolean("is_first_time", true)) {
+            Log.i("APP", "Running for the first time.");
+            t_del = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    String[] dirs = {rmodeldir, filesdir};
+                    for(String dir: dirs) {
+                        File d = new File(dir);
+                        for(File fobj: d.listFiles()) {
+                            fobj.delete();
+                        }
+                        d.delete();
+                    }
+                }
+            });
+            settings.edit().putBoolean("is_first_time", false).apply();
+            t_del.setPriority(10);
+            t_del.start();
+        }
         onStart();
     }
 
@@ -90,35 +111,16 @@ public class MainActivity extends Base {
 
         f_repo = new FileRepository(getApplication());
 
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        if (settings.getBoolean("is_first_time", true)) {
-            Log.i("APP", "Running for the first time.");
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    String[] dirs = {rmodeldir, filesdir};
-                    for(String dir: dirs) {
-                        File d = new File(dir);
-                        for(String f: d.list()) {
-                            File fobj = new File(d.getPath(), f);
-                            fobj.delete();
-                        }
-                        d.delete();
-                    }
-                }
-            });
-            settings.edit().putBoolean("is_first_time", false).apply();
-            try {
-                t.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
     }
 
     private void do_setup() {
-
+        try {
+            if (t_del != null) {
+                t_del.join();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         Log.i("STORAGE", rootdir);
         File f = new File(rmodeldir);
         if (!f.exists()) f.mkdirs();
@@ -239,8 +241,24 @@ public class MainActivity extends Base {
     }
 
     public String getDefaultFileTitle() {
-        int fcount = f_repo.getNumFiles();
-        String name = "Conversation #" + Integer.toString(fcount + 1);
+        Log.i("APP", "Getting file title");
+        final AtomicInteger fcount = new AtomicInteger();
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int num = f_repo.getNumFiles();
+                fcount.set(num);
+            }
+        });
+        t.setPriority(10);
+        t.start();
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        String name = "Conversation #" + Integer.toString(fcount.get() + 1);
         return name;
     }
 
