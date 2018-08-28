@@ -2,6 +2,7 @@ package ark.ark;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -32,6 +33,7 @@ public class MainActivity extends Base {
                                      Manifest.permission.READ_EXTERNAL_STORAGE,
                                      Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
+    private static boolean perm_granted = false;
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.int");
     Handler h = new Handler(Looper.getMainLooper());
     Runnable runnable;
@@ -40,6 +42,7 @@ public class MainActivity extends Base {
     private ImageButton bt_pause;
     private ImageButton bt_rec;
     private EditText ed_transtext;
+    final String PREFS_NAME = "MyPrefsFile";
 
     static {
         System.loadLibrary("rec-engine");
@@ -53,12 +56,15 @@ public class MainActivity extends Base {
                 for(int i=0; i < grantResults.length; i++) {
                     if(grantResults[i] != PackageManager.PERMISSION_GRANTED) {
                         Toast.makeText(this, "Required permissions not granted, app closing.", Toast.LENGTH_LONG).show();
+
                         finish();
                         break;
                     }
                 }
                 break;
         }
+        perm_granted = true;
+        onStart();
     }
 
     @Override
@@ -78,9 +84,37 @@ public class MainActivity extends Base {
             ActivityCompat.requestPermissions(this,
                     need_permissions.toArray(new String[need_permissions.size()]),
                     REQUEST_PERMISSIONS_CODE);
+        } else {
+            perm_granted = true;
         }
 
         f_repo = new FileRepository(getApplication());
+
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        if (settings.getBoolean("is_first_time", true)) {
+            Log.i("APP", "Running for the first time.");
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    String[] dirs = {rmodeldir, filesdir};
+                    for(String dir: dirs) {
+                        File d = new File(dir);
+                        for(String f: d.list()) {
+                            File fobj = new File(d.getPath(), f);
+                            fobj.delete();
+                        }
+                        d.delete();
+                    }
+                }
+            });
+            settings.edit().putBoolean("is_first_time", false).apply();
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     private void do_setup() {
@@ -125,6 +159,9 @@ public class MainActivity extends Base {
 
         TextView tv = findViewById(R.id.rec_help_text);
         tv.setText(R.string.LoadingMsg);
+        if (!perm_granted) {
+            return;
+        }
         do_setup();
         h.postDelayed(new Runnable() {
             public void run() {
@@ -174,12 +211,14 @@ public class MainActivity extends Base {
 
             bt_pause.setVisibility(View.VISIBLE);
         } else {
+            Log.i("APP", "in");
             bt_pause.setVisibility(View.INVISIBLE);
             is_recording = false;
             bt_rec.setImageResource(R.drawable.mic);
             h.removeCallbacks(runnable);
-
+            Log.i("APP", "stopping");
             long num_out_frames = recEngine.stop_trans_stream();
+            Log.i("APP", "stopping done");
 
             String title = getDefaultFileTitle();
             String date = getFileDate();
