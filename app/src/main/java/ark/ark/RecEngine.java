@@ -17,8 +17,11 @@ public class RecEngine {
 
     private RecEngine(final String modeldir) {
         doing_creation = true;
-        Log.i("APP", "Creating engine");
-        mEngineHandle = native_createEngine(modeldir);
+        Log.i("APP", "Creating engine " + Long.toString(mEngineHandle));
+        if (mEngineHandle == 0) {
+            mEngineHandle = native_createEngine(modeldir);
+            Log.i("APP", "New engine handle " + Long.toString(mEngineHandle));
+        }
         isready = true;
         doing_creation = false;
     }

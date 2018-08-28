@@ -62,7 +62,7 @@ public class FileRepository {
         protected Void doInBackground(final AFile... params) {
             AFile af = params[0];
             aSyncTaskaFileDao.delete(af.getId());
-            String[] suffixes = {".txt", ".ctm", ".wav"};
+            String[] suffixes = {".txt", "_timed.txt", ".wav"};
             String fname = af.fname;
             for (int i = 0; i < suffixes.length; i++) {
                 File f = new File(filesdir + fname + suffixes[i]);

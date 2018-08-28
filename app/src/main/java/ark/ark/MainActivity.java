@@ -44,7 +44,7 @@ public class MainActivity extends Base {
     private ImageButton bt_rec;
     private EditText ed_transtext;
     final String PREFS_NAME = "MyPrefsFile";
-    Thread t_del;
+    Thread t_del, t_stoptrans;
 
     static {
         System.loadLibrary("rec-engine");
@@ -82,7 +82,7 @@ public class MainActivity extends Base {
                 }
             });
             settings.edit().putBoolean("is_first_time", false).apply();
-            t_del.setPriority(10);
+            t_del.setPriority(6);
             t_del.start();
         }
         onStart();
@@ -140,7 +140,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(10);
+            t.setPriority(6);
             t.start();
         } else {
             Thread t = new Thread(new Runnable() {
@@ -149,7 +149,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(10);
+            t.setPriority(6);
             t.start();
         }
     }
@@ -187,8 +187,30 @@ public class MainActivity extends Base {
 
     @Override
     protected void onDestroy() {
+        Log.i("APP", "Destroying");
         recEngine.delete();
         super.onDestroy();
+    }
+
+    public void stop_transcribe() {
+        long num_out_frames = recEngine.stop_trans_stream();
+        h.removeCallbacks(runnable);
+
+        String title = getDefaultFileTitle();
+        String date = getFileDate();
+        String fname = title.replace(' ', '_').replace("#", "");
+
+        String[] suffixes = {".txt", "_timed.txt", ".wav"};
+        File from, to;
+        for (int i = 0; i < suffixes.length; i++) {
+            from = new File(filesdir + "tmpfile" + suffixes[i]);
+            to = new File(filesdir + fname + suffixes[i]);
+            from.renameTo(to);
+        }
+
+        int duration_s = (int) (3 * num_out_frames) / 100;
+        AFile afile = new AFile(title, fname, duration_s, date);
+        f_repo.insert(afile);
     }
 
     public void record_switch(View view) {
@@ -197,6 +219,11 @@ public class MainActivity extends Base {
         Log.i("APP", "isrecording: " + String.valueOf(is_recording));
         if (!is_recording ) {
             if (!RecEngine.isready) return;
+            try {
+                if (t_stoptrans != null) t_stoptrans.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             ed_transtext.setText("", TextView.BufferType.EDITABLE);
             String fpath= filesdir + "tmpfile";
             recEngine.transcribe_stream(fpath);
@@ -213,30 +240,17 @@ public class MainActivity extends Base {
 
             bt_pause.setVisibility(View.VISIBLE);
         } else {
-            Log.i("APP", "in");
             bt_pause.setVisibility(View.INVISIBLE);
             is_recording = false;
             bt_rec.setImageResource(R.drawable.mic);
-            h.removeCallbacks(runnable);
-            Log.i("APP", "stopping");
-            long num_out_frames = recEngine.stop_trans_stream();
-            Log.i("APP", "stopping done");
-
-            String title = getDefaultFileTitle();
-            String date = getFileDate();
-            String fname = title.replace(' ', '_').replace("#", "");
-
-            String[] suffixes = {".txt", ".ctm", ".wav"};
-            File from, to;
-            for (int i = 0; i < suffixes.length; i++) {
-                from = new File(filesdir + "tmpfile" + suffixes[i]);
-                to = new File(filesdir + fname + suffixes[i]);
-                from.renameTo(to);
-            }
-
-            int duration_s = (int) (3 * num_out_frames) / 100;
-            AFile afile = new AFile(title, fname, duration_s, date);
-            f_repo.insert(afile);
+            t_stoptrans = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    stop_transcribe();
+                }
+            });
+            t_stoptrans.setPriority(6);
+            t_stoptrans.start();
         }
     }
 
