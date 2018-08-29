@@ -196,9 +196,9 @@ public class MainActivity extends Base {
         long num_out_frames = recEngine.stop_trans_stream();
         h.removeCallbacks(runnable);
 
-        String title = getDefaultFileTitle();
+        String fname = getDefaultFileName();
         String date = getFileDate();
-        String fname = title.replace(' ', '_').replace("#", "");
+        String title = "Conversation";
 
         String[] suffixes = {".txt", "_timed.txt", ".wav"};
         File from, to;
@@ -254,7 +254,7 @@ public class MainActivity extends Base {
         }
     }
 
-    public String getDefaultFileTitle() {
+    public String getDefaultFileName() {
         Log.i("APP", "Getting file title");
         final AtomicInteger fcount = new AtomicInteger();
         Thread t = new Thread(new Runnable() {
@@ -272,8 +272,15 @@ public class MainActivity extends Base {
             e.printStackTrace();
         }
 
-        String name = "Conversation #" + Integer.toString(fcount.get() + 1);
-        return name;
+        int cnt = fcount.get() + 1;
+        String fname = "Conversation_" + Integer.toString(cnt);
+        String wavpath = fname + ".wav";
+        while (new File(wavpath).exists()) {
+            cnt++;
+            fname = "Conversation_" + Integer.toString(cnt);
+            wavpath = fname + ".wav";
+        }
+        return fname;
     }
 
     public String getFileDate() {

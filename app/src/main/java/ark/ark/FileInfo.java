@@ -4,11 +4,13 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
@@ -41,7 +43,8 @@ public class FileInfo extends Base {
     @Override
     public void onStart() {
         super.onStart();
-        mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));
+        File file = new File(filesdir + afile.fname + ".wav");
+        mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));  
         mSeekBar.setMax(mPlayer.getDuration());
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override

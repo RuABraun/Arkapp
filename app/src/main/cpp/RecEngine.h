@@ -2,7 +2,7 @@
 #define ARK_RECENGINE_H
 
 
-#include<oboe/Oboe.h>
+#include <oboe/Oboe.h>
 #include <thread>
 #include <array>
 #include <fstream>
@@ -22,6 +22,7 @@
 #include "lm/const-arpa-lm.h"
 #include "nnet3/nnet-utils.h"
 #include <thread>
+#include "base/timer.h"
 
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -48,18 +49,19 @@ public:
     void transcribe_file(std::string wavpath, std::string ctm);
 
 private:
+    kaldi::Timer timer;
     std::string outtext;
     int callb_cnt;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
     int32_t mFramesPerBurst;
-    int32_t num_frames_ext;  // with previous left frames
     unsigned mChannelCount;
     bool mIsfloat;
     oboe::AudioStream *mRecStream;
-
+    
     size_t data_chunk_pos;
+    size_t fact_chunk_pos;
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
     float_t* fp_audio;
@@ -67,6 +69,8 @@ private:
 
     FILE* os_ctm;
     FILE* os_txt;
+
+    std::thread t_wavwrite;
 
     // ASR vars
     std::string model_dir;
@@ -97,6 +101,8 @@ private:
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_to_subtract_fst = NULL;
     fst::ScaleDeterministicOnDemandFst* lm_to_subtract_det_scale = NULL;
     kaldi::nnet3::Nnet rnnlm;
+    kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts;
+    kaldi::rnnlm::RnnlmComputeStateInfo* rnn_info;
     kaldi::rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig;
     fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
     const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
@@ -105,6 +111,8 @@ private:
     bool rnn_ready;
 
     void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
+
+    void write_to_wav(int32 num_frames);
 };
 
 #endif //ARK_RECENGINE_H
