@@ -44,7 +44,7 @@ public class FileInfo extends Base {
     public void onStart() {
         super.onStart();
         File file = new File(filesdir + afile.fname + ".wav");
-        mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));  
+        mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));
         mSeekBar.setMax(mPlayer.getDuration());
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override

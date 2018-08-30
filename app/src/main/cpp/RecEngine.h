@@ -51,7 +51,7 @@ public:
 private:
     kaldi::Timer timer;
     std::string outtext;
-    int callb_cnt;
+    int tot_num_frames = 0;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
@@ -70,7 +70,10 @@ private:
     FILE* os_ctm;
     FILE* os_txt;
 
-    std::thread t_wavwrite;
+    std::atomic<bool> recognition_on;
+    std::atomic<bool> do_recognition;
+    std::thread t_recognition;
+    std::thread t_rnnlm;
 
     // ASR vars
     std::string model_dir;
@@ -107,12 +110,13 @@ private:
     fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
     const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
     const kaldi::ComposeLatticePrunedOptions* compose_opts;
-    std::thread t_rnnlm;
     bool rnn_ready;
 
     void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
 
     void write_to_wav(int32 num_frames);
+
+    void recognition_loop();
 };
 
 #endif //ARK_RECENGINE_H

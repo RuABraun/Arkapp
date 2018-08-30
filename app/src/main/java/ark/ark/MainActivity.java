@@ -140,7 +140,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(6);
+            t.setPriority(8);
             t.start();
         } else {
             Thread t = new Thread(new Runnable() {
@@ -149,7 +149,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(6);
+            t.setPriority(8);
             t.start();
         }
     }
@@ -194,7 +194,6 @@ public class MainActivity extends Base {
 
     public void stop_transcribe() {
         long num_out_frames = recEngine.stop_trans_stream();
-        h.removeCallbacks(runnable);
 
         String fname = getDefaultFileName();
         String date = getFileDate();
@@ -247,9 +246,10 @@ public class MainActivity extends Base {
                 @Override
                 public void run() {
                     stop_transcribe();
+                    h.removeCallbacks(runnable);
                 }
             });
-            t_stoptrans.setPriority(6);
+            t_stoptrans.setPriority(7);
             t_stoptrans.start();
         }
     }

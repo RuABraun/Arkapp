@@ -105,7 +105,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                 case R.id.Delete:
                                     f_repo.delete(afile_to_use);
                                     data_.remove(curr_pos);
-                                    Toast.makeText(context, "File " + afile_to_use.title + " deleted.", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(context, afile_to_use.title + " deleted.", Toast.LENGTH_SHORT).show();
                                     break;
                             }
                             return false;

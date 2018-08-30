@@ -7,6 +7,7 @@
 #include "logging_macros.h"
 #include "RecEngine.h"
 #include <stdio.h>
+#include <chrono>
 
 using namespace kaldi;
 using namespace fst;
@@ -124,8 +125,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
             wsyms = modeldir + "words.txt";
 
     std::thread t(&RecEngine::setupLex, this, wsyms, align_lex);
-    std::thread t_rnnlm(&RecEngine::setupRnnlm, this, modeldir);
-    t_rnnlm.detach();
+    t_rnnlm = std::thread(&RecEngine::setupRnnlm, this, modeldir);
 
     decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
     {
@@ -149,11 +149,21 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
 
     compose_opts = new ComposeLatticePrunedOptions(2.0, 300, 1.25, 75);
 
+    oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
+
+    fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
+    int_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
+
+    recognition_on = false;
+    do_recognition = false;
+
     t.join();
     LOGI("Finished constructing rec");
 }
 
 RecEngine::~RecEngine() {
+    free(fp_audio);
+    free(int_audio);
     delete word_syms;
     delete decode_fst;
     delete feature_pipeline;
@@ -176,7 +186,7 @@ void RecEngine::transcribe_stream(std::string fpath){
     builder.setPerformanceMode(oboe::PerformanceMode::PowerSaving);
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
-    builder.setFramesPerCallback(mFramesPerBurst);
+//    builder.setFramesPerCallback(mFramesPerBurst);
     builder.setSampleRate(fin_sample_rate);
 
     oboe::Result result = builder.openStream(&mRecStream);
@@ -198,9 +208,6 @@ void RecEngine::transcribe_stream(std::string fpath){
         } else {
             mIsfloat = false;
         }
-
-        fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-        int_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
 
         const int16_t num_filechannels = 1;
 
@@ -248,9 +255,10 @@ void RecEngine::transcribe_stream(std::string fpath){
         os_txt = fopen(txtpath.c_str(), "wt");
 
         // ---------------- Done
-        callb_cnt = 0;
 
         result = mRecStream->requestStart();
+        recognition_on = true;
+        t_recognition = std::thread(&RecEngine::recognition_loop, this);
         if (result != oboe::Result::OK) {
             LOGE("Error starting stream. %s", oboe::convertToText(result));
         }
@@ -258,9 +266,13 @@ void RecEngine::transcribe_stream(std::string fpath){
     } else {
         LOGE("Failed to create stream. Error: %s", oboe::convertToText(result));
     }
+    timer.Reset();
 }
 
 int RecEngine::stop_trans_stream() {
+    float tt = (float) timer.Elapsed();
+    LOGI("Time taken %f", tt);
+    LOGI("Tot numframes %d", tot_num_frames);
     if (mRecStream != nullptr) {
         KALDI_LOG << "IN STOP TRANS";
 
@@ -274,6 +286,8 @@ int RecEngine::stop_trans_stream() {
         if (result != oboe::Result::OK) {
             LOGE("Error closing output stream. %s", oboe::convertToText(result));
         }
+        recognition_on = false;
+        t_recognition.join();
 
         feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
@@ -281,12 +295,12 @@ int RecEngine::stop_trans_stream() {
 
         CompactLattice olat;
         decoder->GetLattice(true, &olat);
-        KALDI_LOG << "about to write";
+
         int32 num_out_frames = decoder->NumFramesDecoded();
         finish_segment(&olat, num_out_frames);
         fclose(os_txt);
         fclose(os_ctm);
-        KALDI_LOG << "done write";
+
         // Finishing wav write
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
@@ -300,7 +314,6 @@ int RecEngine::stop_trans_stream() {
         f.seekp(4);
         write_word(f, file_length - 8, 4);
         f.close();
-
         return num_out_frames;
     }
     return 0;
@@ -310,20 +323,65 @@ void RecEngine::write_to_wav(int32 num_frames) {
     f.write((char*) &fp_audio[0], num_frames * 4);
 }
 
+void RecEngine::recognition_loop() {
+    while(recognition_on) {
+        bool did_rnn = false;
+        if (do_recognition) {
+
+            decoder->AdvanceDecoding();
+
+            /*if (decoder->isPruneTime() == true) {
+                did_rnn = true;
+                CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;
+                decoder->GetLattice(false, &clat_to_rescore);
+                TopSortCompactLatticeIfNeeded(&clat_to_rescore);
+
+                t_rnnlm.join();
+                ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
+                                             const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                             &clat_rescored, max_ngram_order);
+
+                CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
+                decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
+                decoder->StrictPrune();
+            }*/
+            if (decoder->NumFramesDecoded() > 0) {
+                Lattice olat;
+                decoder->GetBestPath(false, &olat);
+
+                std::vector<int32> words;
+
+                if (!GetLinearWordSequence(olat, &words))
+                    LOGE("Failed get linear seq");
+
+                std::string tmpstr = "";
+                for (size_t j = 0; j < words.size(); j++) {
+                    tmpstr += (word_syms->Find(words[j]) + " ");
+                }
+                outtext = tmpstr;
+            }
+
+            do_recognition = false;
+        }
+        if (!did_rnn) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+}
+
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
 
-    //if (callb_cnt == 2) start_logger();
     const float mul = 32768.0f;
     const float cnt_channel_fp = static_cast<float>(mChannelCount);
     float val;
     int32_t num_samples_in = numFrames * mChannelCount;
-    KALDI_LOG << "in";
+    tot_num_frames += numFrames;
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
         int k = 0;
         for (int i = 0; i < num_samples_in ; i += mChannelCount) {
             val = 0.0f;
-            for (int j = 0; j < 1; j++) {
+            for (int j = 0; j < mChannelCount; j++) {
                 val += audio_data[i + j];
             }
 
@@ -346,62 +404,26 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     for (int i = 0; i < numFrames; i++) {
         val = fp_audio[i];
-        val *= mul;
-        int_audio[i] = val;
+        int_audio[i] = val * mul;
     }
-    if (t_wavwrite.joinable()) t_wavwrite.join();
-    t_wavwrite = std::thread(&RecEngine::write_to_wav, this, numFrames);
 
     SubVector<float> data(int_audio, numFrames);
-
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
-    decoder->AdvanceDecoding();
-//    LOGI("frames ready %d", feature_pipeline->NumFramesReady());
-//    LOGI("frames decoded %d", decoder->NumFramesDecoded());
-    if ((callb_cnt + 1) % 3 == 0) {
+    do_recognition = true;
 
-        /*if (decoder->isPruneTime() == true) {
-            CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;
-            decoder->GetLattice(false, &clat_to_rescore);
-            TopSortCompactLatticeIfNeeded(&clat_to_rescore);
+    f.write((char*) &fp_audio[0], numFrames * 4);
 
-            t_rnnlm.join();
-            ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
-                                         const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                         &clat_rescored, max_ngram_order);
+//    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
+//    auto underrunCount = audioStream->getXRunCount();
 
-            CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
-            decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
-            decoder->StrictPrune();
-        }*/
-
-        Lattice olat;
-        decoder->GetBestPath(false, &olat);
-
-        std::vector<int32> words, tmpa;
-        LatticeWeight tmpb;
-        if (!GetLinearSymbolSequence(olat, &tmpa, &words, &tmpb)) LOGE("Failed get linear seq");
-
-        std::string tmpstr = "";
-        for (size_t j = 0; j < words.size(); j++) {
-            tmpstr += (word_syms->Find(words[j]) + " ");
-        }
-        outtext = tmpstr;
-    }
-
-    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-    auto underrunCount = audioStream->getXRunCount();
-
-    LOGI("numFrames %d, actual numF %d, Underruns %d, buffer size %d", mFramesPerBurst, numFrames, underrunCount, bufferSize);
+//    LOGI("numFrames %d, actual numF %d, Underruns %d, buffer size %d", mFramesPerBurst, numFrames, underrunCount, bufferSize);
 
     if (numFrames < mFramesPerBurst) {
         for(int i = 0; i < mFramesPerBurst; i++) {
             int_audio[i] = 0.0;
         }
     }
-    //memset(resamp_int, 0, num);
-    callb_cnt++;
-    LOGI("cnt %d", callb_cnt);
+
     return oboe::DataCallbackResult::Continue;
 }
 
@@ -499,8 +521,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     TopSortCompactLatticeIfNeeded(clat);
 
     CompactLattice best_path;
-    KALDI_LOG << "about to do rescore";
-    if (num_out_frames > 1000) {
+    if (num_out_frames > 150) {
         t_rnnlm.join();
         CompactLattice clat_rescored;
         ComposeCompactLatticePrunedB(*compose_opts, *clat,
@@ -510,13 +531,13 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     } else {
         CompactLatticeShortestPath(*clat, &best_path);
     }
-    KALDI_LOG << "done rescore";
+
     CompactLattice aligned_clat;
     WordAlignLatticeLexicon(best_path, trans_model, *lexicon_info, opts, &aligned_clat);
-    KALDI_LOG << "done align";
+
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
-    KALDI_LOG << "got words";
+
 
     std::string text = "";
     for(size_t j=0; j < words.size(); j++) {
@@ -541,12 +562,10 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
         fwrite("\n", 1, 1, os_ctm);
 
     }
-    KALDI_LOG << "D";
     outtext = text;
     if (rnn_ready) {
-        KALDI_LOG << "clear";
         lm_to_add_orig->Clear();
     }  // TODO: check why ClearToContinue is worse
-    KALDI_LOG << "E";
+
 
 }
