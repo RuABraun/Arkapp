@@ -3,7 +3,10 @@ package ark.ark;
 import android.app.FragmentManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -12,6 +15,7 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -100,13 +104,16 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                     intent.putExtra("file_obj", afile_to_use);
                                     context.startActivity(intent);
                                     break;
-                                case R.id.Export:
+                                case R.id.Share:
+                                    ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
+                                    dialog.show(((AppCompatActivity) context).getSupportFragmentManager(), "ShareDialog");
                                     break;
                                 case R.id.Delete:
                                     f_repo.delete(afile_to_use);
                                     data_.remove(curr_pos);
                                     Toast.makeText(context, afile_to_use.title + " deleted.", Toast.LENGTH_SHORT).show();
                                     break;
+
                             }
                             return false;
                         }

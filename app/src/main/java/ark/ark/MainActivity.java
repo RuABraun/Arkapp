@@ -1,7 +1,10 @@
 package ark.ark;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -9,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.DialogFragment;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -43,8 +47,10 @@ public class MainActivity extends Base {
     private ImageButton bt_pause;
     private ImageButton bt_rec;
     private EditText ed_transtext;
+    private String conv_name;  // conversation
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans;
+    private long num_out_frames = -1;
 
     static {
         System.loadLibrary("rec-engine");
@@ -193,23 +199,7 @@ public class MainActivity extends Base {
     }
 
     public void stop_transcribe() {
-        long num_out_frames = recEngine.stop_trans_stream();
-
-        String fname = getDefaultFileName();
-        String date = getFileDate();
-        String title = "Conversation";
-
-        String[] suffixes = {".txt", "_timed.txt", ".wav"};
-        File from, to;
-        for (int i = 0; i < suffixes.length; i++) {
-            from = new File(filesdir + "tmpfile" + suffixes[i]);
-            to = new File(filesdir + fname + suffixes[i]);
-            from.renameTo(to);
-        }
-
-        int duration_s = (int) (3 * num_out_frames) / 100;
-        AFile afile = new AFile(title, fname, duration_s, date);
-        f_repo.insert(afile);
+        num_out_frames = recEngine.stop_trans_stream();
     }
 
     public void record_switch(View view) {
@@ -252,10 +242,13 @@ public class MainActivity extends Base {
             });
             t_stoptrans.setPriority(7);
             t_stoptrans.start();
+            NameConvDialogFragment dialog = new NameConvDialogFragment();
+            dialog.show(getSupportFragmentManager(), "Dialog");
+
         }
     }
 
-    public String getDefaultFileName() {
+    public String getFileName(String cname) {
         final AtomicInteger fcount = new AtomicInteger();
         Thread t = new Thread(new Runnable() {
             @Override
@@ -273,11 +266,12 @@ public class MainActivity extends Base {
         }
 
         int cnt = fcount.get() + 1;
-        String fname = "Conversation_" + Integer.toString(cnt);
+        cname = cname.replace(' ', '_') + "_";
+        String fname = cname + Integer.toString(cnt);
         String wavpath = fname + ".wav";
         while (new File(wavpath).exists()) {
             cnt++;
-            fname = "Conversation_" + Integer.toString(cnt);
+            fname = cname + Integer.toString(cnt);
             wavpath = fname + ".wav";
         }
         return fname;
@@ -318,4 +312,28 @@ public class MainActivity extends Base {
         return ret;
     }
 
+    public void onConvNameSelection(String cname) {
+
+        String date = getFileDate();
+        String title = cname;
+        String fname = getFileName(cname);
+
+        File from, to;
+        for (int i = 0; i < file_suffixes.size(); i++) {
+            String suffix = file_suffixes.get(i);
+            from = new File(filesdir + "tmpfile" + suffix);
+            to = new File(filesdir + fname + suffix);
+            from.renameTo(to);
+        }
+        try {
+            t_stoptrans.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        int duration_s = (int) (3 * num_out_frames) / 100;
+        AFile afile = new AFile(title, fname, duration_s, date);
+        f_repo.insert(afile);
+    }
 }
+
+

@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
     <item android:id="@+id/View"
         android:title="View" />
-    <item android:id="@+id/Export"
-        android:title="Export" />
+    <item android:id="@+id/Share"
+        android:title="Share"
+        app:actionProviderClass="android.widget.ShareActionProvider"/>
     <item android:id="@+id/Delete"
         android:title="Delete" />
+
 </menu>

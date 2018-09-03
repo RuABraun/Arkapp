@@ -7,6 +7,7 @@ import android.os.AsyncTask;
 import java.io.File;
 import java.util.List;
 
+import static ark.ark.Base.file_suffixes;
 import static ark.ark.Base.filesdir;
 
 public class FileRepository {
@@ -62,10 +63,9 @@ public class FileRepository {
         protected Void doInBackground(final AFile... params) {
             AFile af = params[0];
             aSyncTaskaFileDao.delete(af.getId());
-            String[] suffixes = {".txt", "_timed.txt", ".wav"};
             String fname = af.fname;
-            for (int i = 0; i < suffixes.length; i++) {
-                File f = new File(filesdir + fname + suffixes[i]);
+            for (int i = 0; i < file_suffixes.size(); i++) {
+                File f = new File(filesdir + fname + file_suffixes.get(i));
                 if (f.exists()) {
                     f.delete();
                 }

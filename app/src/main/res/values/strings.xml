@@ -10,4 +10,6 @@
     <string name="ManButtonDel">Delete</string>
     <string name="CloseX">X</string>
     <string name="title_activity_file_info">FileInfo</string>
+    <string name="default_convname">A Conversation</string>
+    <string name="name_call2action">Name the conversation</string>
 </resources>

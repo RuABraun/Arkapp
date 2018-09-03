@@ -8,12 +8,16 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 public class Base extends AppCompatActivity {
 
     public static AssetManager mgr;
     public static String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Ark/";
     public static String filesdir = rootdir + "files/";
     public static String rmodeldir = rootdir + "model/";
+    public static ArrayList<String> file_suffixes = new ArrayList<String>(Arrays.asList(".txt", ".wav", "_timed.txt"));
     private long time_lastclick = 0;
 
     public native void native_load(AssetManager mgr, String rmodeldir);

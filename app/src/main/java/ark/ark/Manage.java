@@ -3,11 +3,16 @@ package ark.ark;
 import android.app.FragmentManager;
 import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -41,5 +46,22 @@ public class Manage extends Base {
             }
         });
 
+    }
+
+    public void share(String fname, ArrayList checked) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        shareIntent.setType("message/rfc822");
+        ArrayList<Uri> files = new ArrayList<>();
+        int num = Base.file_suffixes.size();
+
+        for(int i = 0; i < num; i++) {
+            if (!checked.contains(i)) continue;
+            String suffix = Base.file_suffixes.get(i);
+            File f = new File(Base.filesdir, fname + suffix);
+            files.add(Uri.fromFile(f));
+        }
+        shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
     }
 }
