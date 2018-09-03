@@ -330,13 +330,14 @@ void RecEngine::recognition_loop() {
 
             decoder->AdvanceDecoding();
 
-            /*if (decoder->isPruneTime() == true) {
+            if (decoder->isPruneTime()) {
                 did_rnn = true;
                 CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;
                 decoder->GetLattice(false, &clat_to_rescore);
                 TopSortCompactLatticeIfNeeded(&clat_to_rescore);
 
-                t_rnnlm.join();
+                if (t_rnnlm.joinable()) t_rnnlm.join();
+
                 ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
                                              const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
                                              &clat_rescored, max_ngram_order);
@@ -344,7 +345,7 @@ void RecEngine::recognition_loop() {
                 CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
                 decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
                 decoder->StrictPrune();
-            }*/
+            }
             if (decoder->NumFramesDecoded() > 0) {
                 Lattice olat;
                 decoder->GetBestPath(false, &olat);
@@ -369,6 +370,7 @@ void RecEngine::recognition_loop() {
     }
 }
 
+
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
 
     const float mul = 32768.0f;
@@ -376,6 +378,10 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     float val;
     int32_t num_samples_in = numFrames * mChannelCount;
     tot_num_frames += numFrames;
+    bool damp_shock = false;
+    bool damp_cnt = 0;
+    int32 damp_cnt_max = -1;
+    BaseFloat ampl_adj = 25.0f;
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
         int k = 0;
@@ -384,8 +390,40 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             for (int j = 0; j < mChannelCount; j++) {
                 val += audio_data[i + j];
             }
+            val = val / cnt_channel_fp;
+            if (k > 1) {
+                BaseFloat diff = val - fp_audio[k - 1];
+                BaseFloat diffabs = std::abs(diff);
+                if(damp_shock) {
+                    damp_cnt++;
+                    val = val / (ampl_adj * pow(2.0f, -0.001f * damp_cnt));
+                }
+                BaseFloat difftwo = diff + fp_audio[k-1] - fp_audio[k-2];
+                BaseFloat difftwoabs = abs(difftwo);
+                BaseFloat max_change = 10.0f * amplitude_delta_avg;
 
-            fp_audio[k] = (val / cnt_channel_fp);
+                if (diffabs > max_change && !damp_shock && diffabs > 0.1f) {
+                    val = fp_audio[k - 1] + diff / ampl_adj;
+                    damp_shock = true;
+                    damp_cnt_max = 2000 * (int) diffabs;
+                    damp_cnt++;
+//                    LOGI("CLIPPING val %f, diff %f, maxdiff %f", val, diff, max_change);
+                } else if (difftwoabs > max_change && !damp_shock && difftwoabs > 0.1f) {
+                    BaseFloat lastval = fp_audio[k-1];
+                    fp_audio[k-1] = lastval / ampl_adj;
+                    val = lastval + diff / ampl_adj;
+                    damp_shock = true;
+                    damp_cnt_max = 2000 * (int) diffabs;
+                    damp_cnt++;
+//                    LOGI("CLIPPING val %f, diff %f, difftwo %f, maxdiff %f", val, diff, difftwo, max_change);
+                }
+                if (damp_cnt == damp_cnt_max) {
+                    damp_shock = false;
+                    damp_cnt = 0;
+                }
+                amplitude_delta_avg = 0.9f * amplitude_delta_avg + 0.1f * diffabs;
+            }
+            fp_audio[k] = val;
             k++;
         }
     } else {
@@ -406,7 +444,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         val = fp_audio[i];
         int_audio[i] = val * mul;
     }
-
+    do_recognition = false;  // this is to prevent recognition from starting while appending data
     SubVector<float> data(int_audio, numFrames);
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
     do_recognition = true;
@@ -522,7 +560,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
     CompactLattice best_path;
     if (num_out_frames > 150) {
-        t_rnnlm.join();
+        if (t_rnnlm.joinable()) t_rnnlm.join();
         CompactLattice clat_rescored;
         ComposeCompactLatticePrunedB(*compose_opts, *clat,
                                      const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),

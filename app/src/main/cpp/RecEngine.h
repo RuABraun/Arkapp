@@ -75,6 +75,8 @@ private:
     std::thread t_recognition;
     std::thread t_rnnlm;
 
+    kaldi::BaseFloat amplitude_delta_avg = 0.5;
+
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;

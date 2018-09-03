@@ -247,6 +247,7 @@ public class MainActivity extends Base {
                 public void run() {
                     stop_transcribe();
                     h.removeCallbacks(runnable);
+                    Log.i("APP", "Finished recording.");
                 }
             });
             t_stoptrans.setPriority(7);
@@ -255,7 +256,6 @@ public class MainActivity extends Base {
     }
 
     public String getDefaultFileName() {
-        Log.i("APP", "Getting file title");
         final AtomicInteger fcount = new AtomicInteger();
         Thread t = new Thread(new Runnable() {
             @Override
