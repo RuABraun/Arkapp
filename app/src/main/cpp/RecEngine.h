@@ -38,6 +38,7 @@ public:
     void setDeviceId(int32_t deviceId);
 
     const char* get_text();
+    void reset_text();
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
                                           int32_t numFrames);

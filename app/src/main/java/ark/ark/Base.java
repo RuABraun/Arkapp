@@ -1,13 +1,17 @@
 package ark.ark;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -55,13 +59,29 @@ public class Base extends AppCompatActivity {
         }
     }
 
-
     public boolean is_spamclick() {
         if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
             return true;
         }
         time_lastclick = SystemClock.elapsedRealtime();
         return false;
+    }
+
+    public void share(String fname, ArrayList checked) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        shareIntent.setType("message/rfc822");
+        ArrayList<Uri> files = new ArrayList<>();
+        int num = Base.file_suffixes.size();
+
+        for(int i = 0; i < num; i++) {
+            if (!checked.contains(i)) continue;
+            String suffix = Base.file_suffixes.get(i);
+            File f = new File(Base.filesdir, fname + suffix);
+            files.add(Uri.fromFile(f));
+        }
+        shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
     }
 }
 

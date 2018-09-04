@@ -1,7 +1,9 @@
 package ark.ark;
 
+import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
@@ -14,6 +16,8 @@ import android.view.ViewGroup;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.w3c.dom.Text;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -97,7 +101,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         @Override
                         public boolean onMenuItemClick(MenuItem item) {
-                            AFile afile_to_use = data_.get(curr_pos);
+                            final AFile afile_to_use = data_.get(curr_pos);
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     Intent intent = new Intent(context, FileInfo.class);
@@ -109,9 +113,24 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                     dialog.show(((AppCompatActivity) context).getSupportFragmentManager(), "ShareDialog");
                                     break;
                                 case R.id.Delete:
-                                    f_repo.delete(afile_to_use);
-                                    data_.remove(curr_pos);
-                                    Toast.makeText(context, afile_to_use.title + " deleted.", Toast.LENGTH_SHORT).show();
+                                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                                    builder.setTitle("Confirm")
+                                        .setMessage("Are you sure?")
+                                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                delete(afile_to_use, curr_pos);
+                                                dialog.dismiss();
+                                            }
+                                        }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            dialog.dismiss();
+                                        }
+                                    });
+                                    AlertDialog alert = builder.create();
+                                    alert.show();
+                                    TextView tv = (TextView) alert.findViewById(android.R.id.message);
+                                    tv.setTextSize(18);
                                     break;
 
                             }
@@ -123,6 +142,12 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             });
         }
 
+    }
+
+    void delete(AFile afile, int pos) {
+        f_repo.delete(afile);
+        data_.remove(pos);
+        Toast.makeText(context, afile.title + " deleted.", Toast.LENGTH_SHORT).show();
     }
 
     void setData(List<AFile> data) {

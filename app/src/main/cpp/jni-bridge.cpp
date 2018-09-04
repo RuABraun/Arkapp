@@ -74,6 +74,7 @@ Java_ark_ark_RecEngine_native_1transcribe_1stream(JNIEnv *env, jobject, jlong en
         LOGE("Engine handle is invalid");
         return;
     }
+
     engine->transcribe_stream(wavpath);
 }
 

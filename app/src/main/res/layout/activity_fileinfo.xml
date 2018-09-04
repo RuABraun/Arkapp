@@ -10,8 +10,11 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
+        android:fontFamily="@font/roboto"
         android:text="title"
+        android:textColor="@color/colorText"
         android:textSize="20sp"
+        android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -20,7 +23,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
+        android:fontFamily="@font/roboto_slab"
         android:text="date"
+        android:textColor="@color/colorTextMinor"
         android:textSize="14sp"
         app:layout_constraintStart_toStartOf="@+id/file_title"
         app:layout_constraintTop_toBottomOf="@+id/file_title" />
@@ -42,8 +47,10 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clickable="true"
+            android:fontFamily="@font/montserrat"
             android:onClick="TextViewClicked"
             android:text="bla"
+            android:textColor="@color/colorText"
             android:textSize="14sp" />
 
         <EditText

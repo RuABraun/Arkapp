@@ -179,8 +179,13 @@ const char* RecEngine::get_text(){
     return outtext.c_str();
 }
 
+void RecEngine::reset_text() {
+    outtext = "";
+}
+
 void RecEngine::transcribe_stream(std::string fpath){
 
+    reset_text();
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive);
     builder.setPerformanceMode(oboe::PerformanceMode::PowerSaving);

@@ -3,16 +3,21 @@ package ark.ark;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -47,7 +52,7 @@ public class MainActivity extends Base {
     private ImageButton bt_pause;
     private ImageButton bt_rec;
     private EditText ed_transtext;
-    private String conv_name;  // conversation
+    private String fname_prefix = "";  // conversation
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans;
     private long num_out_frames = -1;
@@ -223,9 +228,9 @@ public class MainActivity extends Base {
                 public void run() {
                     runnable=this;
                     update_text();
-                    h.postDelayed(runnable, 500);
+                    h.postDelayed(runnable, 100);
                 }
-            }, 500);
+            }, 100);
 
             bt_pause.setVisibility(View.VISIBLE);
         } else {
@@ -312,11 +317,37 @@ public class MainActivity extends Base {
         return ret;
     }
 
+    public boolean checkRecDone() {
+        if (fname_prefix == "") {
+            Toast.makeText(getApplicationContext(), "You have to transcribe something first!", Toast.LENGTH_SHORT).show();
+            return false;
+        } else return true;
+    }
+
+    public void onCopyClick(View view) {
+        if (!checkRecDone()) return;
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        String text = ed_transtext.getText().toString();
+        ClipData clip = ClipData.newPlainText("Transcript", text);
+        clipboard.setPrimaryClip(clip);
+    }
+
+    public void onShareClick(View view) {
+        if (!checkRecDone()) return;
+
+        ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(fname_prefix);
+        dialog.show(getSupportFragmentManager(), "ShareDialog");
+    }
+
     public void onConvNameSelection(String cname) {
+        if (cname == "") {
+            cname = getString(R.string.default_convname);
+        }
 
         String date = getFileDate();
         String title = cname;
         String fname = getFileName(cname);
+        fname_prefix = fname;
 
         File from, to;
         for (int i = 0; i < file_suffixes.size(); i++) {

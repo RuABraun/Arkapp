@@ -3,6 +3,7 @@
 <android.support.v7.widget.CardView
     xmlns:card_view="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_height="wrap_content"
     android:layout_width="match_parent"
     android:layout_margin="2dp"
@@ -21,11 +22,10 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_marginTop="8dp"
-            android:fontFamily="serif-monospace"
+            android:fontFamily="@font/roboto"
             android:text="Filename"
-            android:textSize="18sp"
-            android:textStyle="bold"
             android:textColor="@color/colorText"
+            android:textSize="18sp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -35,9 +35,9 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:layout_marginTop="4dp"
-            android:fontFamily="serif-monospace"
+            android:fontFamily="@font/roboto_slab"
             android:text="Audiolength"
-            android:textColor="@color/colorText"
+            android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="@+id/Row_Filename"
@@ -47,13 +47,13 @@
             android:id="@+id/Row_Date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="140dp"
-            android:fontFamily="serif-monospace"
+            android:layout_marginEnd="8dp"
+            android:fontFamily="@font/roboto_slab"
             android:text="Date"
+            android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
-            android:textColor="@color/colorText"
             app:layout_constraintBottom_toBottomOf="@+id/Row_Audiolength"
-            app:layout_constraintStart_toStartOf="@+id/Row_Audiolength" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
     </android.support.constraint.ConstraintLayout>
 </android.support.v7.widget.CardView>

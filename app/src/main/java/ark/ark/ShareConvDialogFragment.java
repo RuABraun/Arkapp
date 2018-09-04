@@ -1,5 +1,6 @@
 package ark.ark;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
@@ -24,7 +25,8 @@ public class ShareConvDialogFragment extends DialogFragment {
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         final String fname = getArguments().getString("fname");
-        boolean[] checked = {true, false, false};
+
+        final boolean[] checked = {true, false, false};
         mSelectedItems = new ArrayList<>(Arrays.asList(0));
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         builder.setTitle("Choose files to share").setMultiChoiceItems(files_to_share, checked ,
@@ -41,7 +43,7 @@ public class ShareConvDialogFragment extends DialogFragment {
                 .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        Manage act = (Manage) getActivity();
+                        Base act = (Base) getActivity();
                         act.share(fname, mSelectedItems);
                         dismiss();
                     }

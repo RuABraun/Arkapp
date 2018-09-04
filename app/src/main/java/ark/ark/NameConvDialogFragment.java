@@ -21,7 +21,7 @@ public class NameConvDialogFragment extends DialogFragment {
         View v = inflater.inflate(R.layout.dialog_namefile, null);
         builder.setTitle("Name the recording")
                 .setView(v)
-                .setNeutralButton("DONE", new DialogInterface.OnClickListener() {
+                .setPositiveButton("DONE", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         EditText ed = getDialog().findViewById(R.id.dialog_ed);
