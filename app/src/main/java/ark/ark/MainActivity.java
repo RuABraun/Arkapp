@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
@@ -26,6 +27,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ViewSwitcher;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -51,7 +53,9 @@ public class MainActivity extends Base {
     private RecEngine recEngine;
     private ImageButton bt_pause;
     private ImageButton bt_rec;
-    private EditText ed_transtext;
+    private TextView tv_transtext;
+    private ViewSwitcher vs_transtext;
+    private FloatingActionButton fab_edit;
     private String fname_prefix = "";  // conversation
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans;
@@ -193,7 +197,9 @@ public class MainActivity extends Base {
 
         bt_rec = findViewById(R.id.button_rec);
 
-        ed_transtext = findViewById(R.id.transText);
+        tv_transtext = findViewById(R.id.trans_text_view);
+        vs_transtext = findViewById(R.id.trans_switcher);
+        fab_edit = findViewById(R.id.button_edit);
     }
 
     @Override
@@ -218,7 +224,8 @@ public class MainActivity extends Base {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            ed_transtext.setText("", TextView.BufferType.EDITABLE);
+            fab_edit.setVisibility(View.INVISIBLE);
+            tv_transtext.setText("", TextView.BufferType.EDITABLE);
             String fpath= filesdir + "tmpfile";
             recEngine.transcribe_stream(fpath);
             is_recording = true;
@@ -235,6 +242,7 @@ public class MainActivity extends Base {
             bt_pause.setVisibility(View.VISIBLE);
         } else {
             bt_pause.setVisibility(View.INVISIBLE);
+            fab_edit.setVisibility(View.VISIBLE);
             is_recording = false;
             bt_rec.setImageResource(R.drawable.mic);
             t_stoptrans = new Thread(new Runnable() {
@@ -291,7 +299,7 @@ public class MainActivity extends Base {
 
     public void update_text() {
         String str = recEngine.get_text();
-        ed_transtext.setText(str, TextView.BufferType.EDITABLE);
+        tv_transtext.setText(str, TextView.BufferType.EDITABLE);
     }
 
     @Override
@@ -327,7 +335,7 @@ public class MainActivity extends Base {
     public void onCopyClick(View view) {
         if (!checkRecDone()) return;
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        String text = ed_transtext.getText().toString();
+        String text = tv_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", text);
         clipboard.setPrimaryClip(clip);
     }
@@ -337,6 +345,23 @@ public class MainActivity extends Base {
 
         ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(fname_prefix);
         dialog.show(getSupportFragmentManager(), "ShareDialog");
+    }
+
+    public void onEditClick(View view) {
+        TextView tv_last = (TextView) vs_transtext.getCurrentView();
+        String s = tv_last.getText().toString();
+        vs_transtext.showNext();
+        TextView tv = (TextView) vs_transtext.getCurrentView();
+        tv.setText(s);
+
+        if (vs_transtext.getCurrentView() instanceof EditText) {
+            tv.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+        } else {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(tv.getWindowToken(), 0);
+        }
     }
 
     public void onConvNameSelection(String cname) {
