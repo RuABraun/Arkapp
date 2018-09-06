@@ -140,7 +140,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
     }
     left_context = am_nnet.LeftContext();
     right_context = am_nnet.RightContext();
-    mFramesPerBurst = int32_t(0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
+    mFramesPerBurst = int32_t(1.5 * 0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
 
     decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);

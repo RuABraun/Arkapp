@@ -12,14 +12,24 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        android:theme="@style/AppTheme"
+        android:largeHeap="true">
+        <activity android:name=".MainActivity" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".Help" />
+        <activity android:name=".Base" />
+        <activity android:name=".Settings" />
+        <activity android:name=".Manage" />
+        <activity
+            android:name=".FileInfo"
+            android:theme="@style/AppTheme.NoActionBar"
+            android:label="@string/title_activity_file_info" >
+        </activity>
+
         <provider
             android:authorities="ark.ark"
             android:name="android.support.v4.content.FileProvider"
@@ -28,20 +38,6 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/filepaths" />
         </provider>
-
-        <activity android:name=".Help" />
-        <activity android:name=".Base" />
-        <activity android:name=".Settings" />
-        <activity android:name=".Manage" />
-        <activity
-            android:name=".FileInfo"
-            android:label="@string/title_activity_file_info"
-            android:parentActivityName=".Manage"
-            android:theme="@style/AppTheme.NoActionBar">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="ark.ark.Manage" />
-        </activity>
 
         <meta-data
             android:name="preloaded_fonts"

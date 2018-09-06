@@ -1,17 +1,34 @@
 package ark.ark;
 
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import org.w3c.dom.Text;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 
 public class FileInfo extends Base {
@@ -19,10 +36,15 @@ public class FileInfo extends Base {
     private ImageButton mediaButton;
     private MediaPlayer mPlayer;
     private Handler mHandler;
+    private Handler h_main = new Handler(Looper.getMainLooper());
+    private Runnable title_runnable;
     private Runnable mRunnable;
     private SeekBar mSeekBar;
     private AFile afile;
+    private EditText ed_transtext;
+    private EditText fileinfo_ed_title;
     private String text;
+    private FileRepository f_repo;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,7 +53,6 @@ public class FileInfo extends Base {
         setContentView(R.layout.activity_fileinfo);
 
         afile = getIntent().getParcelableExtra("file_obj");
-        setFileFields();
 
         mediaButton = findViewById(R.id.mediaButton);
         mHandler = new Handler();
@@ -64,12 +85,12 @@ public class FileInfo extends Base {
 
             }
         });
+
+        setFileFields();
     }
 
     public void setFileFields() {
-        TextView tv = findViewById(R.id.file_title);
-        tv.setText(afile.title);
-        tv = findViewById(R.id.file_date);
+        TextView tv = findViewById(R.id.file_date);
         tv.setText(afile.date);
         tv = findViewById(R.id.file_duration);
         tv.setText(String.valueOf(afile.len_s));
@@ -85,8 +106,42 @@ public class FileInfo extends Base {
         } catch(IOException ex) {
             text = "Text file not found!";
         }
-        tv = findViewById(R.id.clickable_text_view);
-        tv.setText(text);
+        ed_transtext = findViewById(R.id.ed_trans);
+        ed_transtext.setText(text);
+
+        fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
+        fileinfo_ed_title.setText(afile.title);
+        fileinfo_ed_title.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+                Log.i("APP", "In text change.");
+                final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                final String fname = MainActivity.getFileName(cname, f_repo);
+                h_main.removeCallbacks(title_runnable);
+
+                title_runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.i("APP", "fname " + fname + " cname " + cname);
+                        f_repo.rename(afile, cname, fname);
+                    }
+                };
+                h_main.postDelayed(title_runnable, 1000);
+
+            }
+        });
+
+        f_repo = new FileRepository(getApplication());
     }
 
     public void onMediaClick(View view) {
@@ -127,6 +182,71 @@ public class FileInfo extends Base {
         }
     }
 
+    public void onEditClick(View view) {
+        ed_transtext.setFocusable(true);
+        ed_transtext.setFocusableInTouchMode(true);
+
+        if (!ed_transtext.hasFocus()) {
+            ed_transtext.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
+            Toast t = Toast.makeText(this, "Press edit button again to finish.", Toast.LENGTH_SHORT);
+            t.setGravity(Gravity.TOP, 0,0);
+            t.show();
+        } else {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
+            text = ed_transtext.getText().toString();
+            try {
+                FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get(0)), false);
+                fw.write(text);
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            ed_transtext.clearFocus();
+        }
+        ed_transtext.setFocusableInTouchMode(false);
+    }
+
+    public void onCopyClick(View view) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        text = ed_transtext.getText().toString();
+        ClipData clip = ClipData.newPlainText("Transcript", text);
+        clipboard.setPrimaryClip(clip);
+    }
+
+    public void onShareClick(View view) {
+        ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
+        dialog.show(getSupportFragmentManager(), "ShareDialog");
+    }
+
+    public void onDeleteClick(View view) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getApplicationContext());
+        builder.setTitle("Confirm")
+                .setMessage("Are you sure?")
+                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        delete(afile);
+                    }
+                }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        AlertDialog alert = builder.create();
+        alert.show();
+        TextView tv = (TextView) alert.findViewById(android.R.id.message);
+        tv.setTextSize(18);
+    }
+
+    public void delete(AFile afile) {
+        f_repo.delete(afile);
+        finish();
+    }
+
     @Override
     protected void onStop() {
         super.onStop();
@@ -145,4 +265,10 @@ public class FileInfo extends Base {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        h_main.removeCallbacks(title_runnable);
+        title_runnable.run();
+    }
 }

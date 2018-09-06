@@ -1,6 +1,8 @@
 package ark.ark;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ClipData;
@@ -19,7 +21,10 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -30,11 +35,16 @@ import android.widget.Toast;
 import android.widget.ViewSwitcher;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends Base {
@@ -47,19 +57,23 @@ public class MainActivity extends Base {
     private static final int REQUEST_PERMISSIONS_CODE = 200;
     private static boolean perm_granted = false;
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.int");
-    Handler h = new Handler(Looper.getMainLooper());
+    Handler h_main = new Handler(Looper.getMainLooper());
+    Runnable title_runnable;
     Runnable runnable;
     private FileRepository f_repo;
     private RecEngine recEngine;
     private ImageButton bt_pause;
     private ImageButton bt_rec;
-    private TextView tv_transtext;
-    private ViewSwitcher vs_transtext;
+    private EditText ed_transtext;
     private FloatingActionButton fab_edit;
-    private String fname_prefix = "";  // conversation
+    private EditText ed_title;
+    private String fname_prefix = "";
+    private String curr_cname = "";
+    private boolean recognition_done = false;  // so we know if we have to modify a text file or rename files of conversation
+    private AFile curr_afile;
+    private String const_transcript = "";
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans;
-    private long num_out_frames = -1;
 
     static {
         System.loadLibrary("rec-engine");
@@ -155,7 +169,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(8);
+            t.setPriority(7);
             t.start();
         } else {
             Thread t = new Thread(new Runnable() {
@@ -164,7 +178,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(8);
+            t.setPriority(7);
             t.start();
         }
     }
@@ -180,15 +194,15 @@ public class MainActivity extends Base {
             return;
         }
         do_setup();
-        h.postDelayed(new Runnable() {
+        h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
                 if (recEngine.isready) {
                     TextView tv = findViewById(R.id.rec_help_text);
                     tv.setText(R.string.HelloMsg);
-                    h.removeCallbacks(runnable);
+                    h_main.removeCallbacks(runnable);
                 }
-                h.postDelayed(runnable, 200);
+                h_main.postDelayed(runnable, 200);
             }
         }, 200);
 
@@ -197,9 +211,52 @@ public class MainActivity extends Base {
 
         bt_rec = findViewById(R.id.button_rec);
 
-        tv_transtext = findViewById(R.id.trans_text_view);
-        vs_transtext = findViewById(R.id.trans_switcher);
+        ed_transtext = findViewById(R.id.trans_edit_view);
         fab_edit = findViewById(R.id.button_edit);
+        ed_title = findViewById(R.id.ed_title);
+        ed_title.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+                Log.i("APP", "In text change.");
+                curr_cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                if (curr_cname.equals("")) {
+                    curr_cname = getString(R.string.default_convname);
+                }
+                fname_prefix = getFileName(curr_cname, f_repo);
+                h_main.removeCallbacks(title_runnable);
+                if (recognition_done) {
+                    title_runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            Log.i("APP", "fname " + fname_prefix + " cname " + curr_cname);
+                            f_repo.rename(curr_afile, curr_cname, fname_prefix);
+                            Toast.makeText(getApplicationContext(), "Renamed to \"" + curr_cname + "\"", Toast.LENGTH_SHORT).show();
+                        }
+                    };
+                    h_main.postDelayed(title_runnable, 2500);
+                }
+            }
+        });
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        h_main.removeCallbacks(title_runnable);
+        title_runnable.run();
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
     }
 
     @Override
@@ -210,7 +267,25 @@ public class MainActivity extends Base {
     }
 
     public void stop_transcribe() {
-        num_out_frames = recEngine.stop_trans_stream();
+        long num_out_frames = recEngine.stop_trans_stream();
+        if (curr_cname.equals("")) {
+            curr_cname = getString(R.string.default_convname);
+        }
+
+        String date = getFileDate();
+        String title = curr_cname;
+        String fname = getFileName(curr_cname, f_repo);
+        fname_prefix = fname;
+
+        renameConv("tmpfile", fname);
+
+        int duration_s = (int) (3 * num_out_frames) / 100;
+        AFile afile = new AFile(title, fname, duration_s, date);
+        long id = f_repo.insert(afile);
+        curr_afile = f_repo.getById(id);  // has correct ID
+        Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
+        h_main.removeCallbacks(runnable);
+        recognition_done = true;
     }
 
     public void record_switch(View view) {
@@ -224,18 +299,26 @@ public class MainActivity extends Base {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+
+            if (recognition_done || curr_cname.equals("")) {
+                curr_cname = getString(R.string.default_convname);
+                ed_title.setText(curr_cname, TextView.BufferType.EDITABLE);
+            }
+            if (recognition_done) const_transcript = "";
+
+            recognition_done = false;
             fab_edit.setVisibility(View.INVISIBLE);
-            tv_transtext.setText("", TextView.BufferType.EDITABLE);
-            String fpath= filesdir + "tmpfile";
+            ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
+            String fpath = filesdir + "tmpfile";
             recEngine.transcribe_stream(fpath);
             is_recording = true;
             bt_rec.setImageResource(R.drawable.mic_off);
 
-            h.postDelayed(new Runnable() {
+            h_main.postDelayed(new Runnable() {
                 public void run() {
                     runnable=this;
                     update_text();
-                    h.postDelayed(runnable, 100);
+                    h_main.postDelayed(runnable, 100);
                 }
             }, 100);
 
@@ -245,28 +328,26 @@ public class MainActivity extends Base {
             fab_edit.setVisibility(View.VISIBLE);
             is_recording = false;
             bt_rec.setImageResource(R.drawable.mic);
+
             t_stoptrans = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     stop_transcribe();
-                    h.removeCallbacks(runnable);
                     Log.i("APP", "Finished recording.");
                 }
             });
             t_stoptrans.setPriority(7);
             t_stoptrans.start();
-            NameConvDialogFragment dialog = new NameConvDialogFragment();
-            dialog.show(getSupportFragmentManager(), "Dialog");
 
         }
     }
 
-    public String getFileName(String cname) {
+    public static String getFileName(String cname, final FileRepository f_repo_) {
         final AtomicInteger fcount = new AtomicInteger();
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
-                int num = f_repo.getNumFiles();
+                int num = f_repo_.getNumFiles();
                 fcount.set(num);
             }
         });
@@ -291,7 +372,7 @@ public class MainActivity extends Base {
     }
 
     public String getFileDate() {
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
         Date now = new Date();
         String date = sdf.format(now);
         return date;
@@ -299,7 +380,8 @@ public class MainActivity extends Base {
 
     public void update_text() {
         String str = recEngine.get_text();
-        tv_transtext.setText(str, TextView.BufferType.EDITABLE);
+        String all = const_transcript + " " + str;
+        ed_transtext.setText(all, TextView.BufferType.EDITABLE);
     }
 
     @Override
@@ -326,70 +408,67 @@ public class MainActivity extends Base {
     }
 
     public boolean checkRecDone() {
-        if (fname_prefix == "") {
+        if (!recognition_done) {
             Toast.makeText(getApplicationContext(), "You have to transcribe something first!", Toast.LENGTH_SHORT).show();
             return false;
         } else return true;
     }
 
     public void onCopyClick(View view) {
+        try {
+            if (t_stoptrans != null) t_stoptrans.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (!checkRecDone()) return;
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        String text = tv_transtext.getText().toString();
+        String text = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", text);
         clipboard.setPrimaryClip(clip);
     }
 
     public void onShareClick(View view) {
+        try {
+            if (t_stoptrans != null) t_stoptrans.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (!checkRecDone()) return;
-
         ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(fname_prefix);
         dialog.show(getSupportFragmentManager(), "ShareDialog");
     }
 
     public void onEditClick(View view) {
-        TextView tv_last = (TextView) vs_transtext.getCurrentView();
-        String s = tv_last.getText().toString();
-        vs_transtext.showNext();
-        TextView tv = (TextView) vs_transtext.getCurrentView();
-        tv.setText(s);
+        ed_transtext.setFocusable(true);
+        ed_transtext.setFocusableInTouchMode(true);
 
-        if (vs_transtext.getCurrentView() instanceof EditText) {
-            tv.requestFocus();
+        if (!ed_transtext.hasFocus()) {
+            ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+            imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
+            Toast t = Toast.makeText(this, "Press edit button to finish.", Toast.LENGTH_SHORT);
+            t.setGravity(Gravity.TOP, 0,0);
+            t.show();
         } else {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(tv.getWindowToken(), 0);
+            imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
+            String text = ed_transtext.getText().toString();
+            if (curr_afile == null) {
+                const_transcript = text;
+            } else {
+                try {
+                    FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get(0)), false);
+                    fw.write(text);
+                    fw.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            ed_transtext.clearFocus();
         }
+        ed_transtext.setFocusableInTouchMode(false);
     }
 
-    public void onConvNameSelection(String cname) {
-        if (cname == "") {
-            cname = getString(R.string.default_convname);
-        }
-
-        String date = getFileDate();
-        String title = cname;
-        String fname = getFileName(cname);
-        fname_prefix = fname;
-
-        File from, to;
-        for (int i = 0; i < file_suffixes.size(); i++) {
-            String suffix = file_suffixes.get(i);
-            from = new File(filesdir + "tmpfile" + suffix);
-            to = new File(filesdir + fname + suffix);
-            from.renameTo(to);
-        }
-        try {
-            t_stoptrans.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        int duration_s = (int) (3 * num_out_frames) / 100;
-        AFile afile = new AFile(title, fname, duration_s, date);
-        f_repo.insert(afile);
-    }
 }
 
 

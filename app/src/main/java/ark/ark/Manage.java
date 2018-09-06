@@ -29,6 +29,13 @@ public class Manage extends Base {
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
 
+
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
         fragManager = getFragmentManager();
 
         fviewmodel = ViewModelProviders.of(this).get(FileViewModel.class);
@@ -38,14 +45,12 @@ public class Manage extends Base {
         adapter = new MyRecyclerAdapter(this, f_repo, fragManager);
         recview.setAdapter(adapter);
 
-
         fviewmodel.getAllFiles().observe(this, new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
                 adapter.setData(aFiles);
             }
         });
-
     }
 
     public void share(String fname, ArrayList checked) {

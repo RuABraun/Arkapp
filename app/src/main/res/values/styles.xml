@@ -8,6 +8,7 @@
         <item name="colorAccent">@color/colorPrimary</item>
         <item name="android:windowBackground">@color/colBackground</item>
         <item name="buttonStyle">@style/btnstyle</item>
+        <item name="android:windowActionBar">true</item>
     </style>
 
     <style name="btnstyle" parent="@style/Widget.AppCompat.Button.Colored">

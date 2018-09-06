@@ -55,7 +55,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/button_rec"
         app:layout_constraintTop_toTopOf="@+id/button_rec"
-        app:srcCompat="@drawable/ic_baseline_share_24px" />
+        app:srcCompat="@drawable/share" />
 
     <TextView
         android:id="@+id/rec_help_text"
@@ -71,66 +71,19 @@
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <ViewSwitcher xmlns:android="http://schemas.android.com/apk/res/android"
-        android:id="@+id/trans_switcher"
-        android:layout_width="300dp"
-        android:layout_height="0dp"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="32dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/transtext"
-        android:paddingBottom="16dp"
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
-        android:paddingTop="48dp"
-        app:layout_constraintBottom_toTopOf="@+id/button_rec"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/trans_text_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fontFamily="@font/montserrat"
-            android:scrollbars="vertical"
-            android:textColor="@color/colorText"
-            android:textSize="16sp" />
-
-        <EditText
-            android:id="@+id/trans_edit_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fontFamily="@font/montserrat"
-            android:inputType="textMultiLine"
-            android:scrollbars="vertical"
-            android:textColor="@color/colorText"
-            android:textSize="16sp"
-            android:gravity="top"
-            android:background="@android:color/background_light"/>
-
-    </ViewSwitcher>
-
-
     <ImageButton
         android:id="@+id/button_pause"
         android:layout_width="150dp"
         android:layout_height="150dp"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
         android:adjustViewBounds="true"
         android:background="@android:color/transparent"
         android:padding="50dp"
         android:scaleType="centerCrop"
         android:visibility="invisible"
-        app:layout_constraintBottom_toBottomOf="@+id/trans_switcher"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.504"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/trans_switcher"
+        app:layout_constraintTop_toTopOf="@+id/imageView"
         app:srcCompat="@drawable/pause" />
 
     <TextView
@@ -166,7 +119,7 @@
         android:id="@+id/button_edit"
         android:layout_width="44dp"
         android:layout_height="44dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="8dp"
         android:layout_marginEnd="20dp"
         android:background="@drawable/border"
         android:backgroundTint="@color/colBackground"
@@ -175,10 +128,25 @@
         android:onClick="onEditClick"
         android:scaleType="center"
         app:borderWidth="1dp"
-        app:layout_constraintBottom_toBottomOf="@+id/trans_switcher"
-        app:layout_constraintEnd_toEndOf="parent"
         app:pressedTranslationZ="12dp"
-        app:srcCompat="@drawable/edit" />
+        app:srcCompat="@drawable/edit"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="parent"
+         />
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="300dp"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="28dp"
+        android:layout_marginStart="28dp"
+        android:layout_marginTop="8dp"
+        android:src="@drawable/transtext"
+        app:layout_constraintBottom_toTopOf="@+id/button_rec"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <EditText
         android:id="@+id/ed_title"
@@ -186,16 +154,51 @@
         android:layout_height="32dp"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="4dp"
-        android:background="@color/colBackground"
-        android:ems="10"
+        android:layout_marginTop="8dp"
+        android:background="@android:color/transparent"
+        android:cursorVisible="false"
+        android:textSize="20sp"
         android:fontFamily="@font/roboto"
         android:hint="Add a title"
-        android:inputType="textPersonName"
-        android:cursorVisible="false"
-        app:layout_constraintEnd_toEndOf="@+id/trans_switcher"
-        app:layout_constraintHorizontal_bias="0.545"
-        app:layout_constraintStart_toStartOf="@+id/trans_switcher"
-        app:layout_constraintTop_toTopOf="@+id/trans_switcher" />
+        android:inputType="textCapWords"
+        android:textColor="@color/colorText"
+        android:elevation="2dp"
+        android:imeOptions="actionDone"
+        android:focusable="true"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView" />
+
+    <EditText
+        android:id="@+id/trans_edit_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@android:color/transparent"
+        android:focusableInTouchMode="false"
+        android:fontFamily="@font/montserrat"
+        android:gravity="top"
+        android:inputType="textMultiLine"
+        android:scrollbars="vertical"
+        android:textColor="@color/colorText"
+        android:textSize="16sp"
+        android:cursorVisible="true"
+        android:elevation="2dp"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toBottomOf="@+id/ed_title" />
+
+    <View
+        android:layout_width="280dp"
+        android:layout_height="1dp"
+        android:background="@android:color/darker_gray"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toBottomOf="@+id/ed_title" />
 
 </android.support.constraint.ConstraintLayout>

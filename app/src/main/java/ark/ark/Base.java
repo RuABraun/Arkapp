@@ -83,6 +83,16 @@ public class Base extends AppCompatActivity {
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
     }
+
+    public static void renameConv(String fname_old, String fname) {
+        File from, to;
+        for (int i = 0; i < file_suffixes.size(); i++) {
+            String suffix = file_suffixes.get(i);
+            from = new File(filesdir + fname_old + suffix);
+            to = new File(filesdir + fname + suffix);
+            from.renameTo(to);
+        }
+    }
 }
 
 

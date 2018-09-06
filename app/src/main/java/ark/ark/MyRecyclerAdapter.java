@@ -50,7 +50,8 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
         }
         AFile elem = getItem(pos);
         holder.tv_fname.setText(elem.title);
-        holder.tv_date.setText(elem.date);
+        String date = elem.date.substring(4);
+        holder.tv_date.setText(date);
 
         int len_s = elem.len_s;
         ArrayList rests = new ArrayList();
@@ -104,6 +105,13 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                             final AFile afile_to_use = data_.get(curr_pos);
                             switch (item.getItemId()) {
                                 case R.id.View:
+                                    File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
+                                    if (!f.exists()) {
+                                        Log.i("APP", "File does not exist, title: " +
+                                                afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
+                                        Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
+                                        break;
+                                    }
                                     Intent intent = new Intent(context, FileInfo.class);
                                     intent.putExtra("file_obj", afile_to_use);
                                     context.startActivity(intent);
