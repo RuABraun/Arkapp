@@ -66,6 +66,7 @@ int start_logger()
 
 void RecEngine::setupLex(std::string wsyms, std::string align_lex) {
     word_syms = SymbolTable::ReadText(wsyms);
+    idx_sb = (int32) word_syms->Find("<sb>");
     std::vector<std::vector<int32>> lexicon;
     ReadLexiconForWordAlignBin(align_lex, &lexicon);
     lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
@@ -330,6 +331,8 @@ void RecEngine::write_to_wav(int32 num_frames) {
 }
 
 void RecEngine::recognition_loop() {
+    std::vector<std::string> dummy;
+
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
@@ -360,10 +363,8 @@ void RecEngine::recognition_loop() {
 
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
 
-                std::string tmpstr = "";
-                for (size_t j = 0; j < words.size(); j++) {
-                    tmpstr += (word_syms->Find(words[j]) + " ");
-                }
+                std::string tmpstr = prettify_text(words, dummy, false);
+
                 outtext = tmpstr;
             }
 
@@ -384,7 +385,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     int32_t num_samples_in = numFrames * mChannelCount;
     tot_num_frames += numFrames;
     bool damp_shock = false;
-    bool damp_cnt = 0;
+    int32 damp_cnt = 0;
     int32 damp_cnt_max = -1;
     BaseFloat ampl_adj = 25.0f;
     if(mIsfloat) {
@@ -581,39 +582,69 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
-    std::string text = "";
-    bool printtime = false;
-    for(size_t j=0; j < words.size(); j++) {
-        int32 w = words[j];
-        if (w == 0) continue;
+    std::vector<std::string> words_split;
+    std::string text = prettify_text(words, words_split, true);
 
+    outtext = text;
+    const char* ctext = text.c_str();
+    fwrite(ctext, 1, sizeof(ctext) - 1, os_txt);
+
+    int32 num_words = words_split.size();
+    bool printtime = false;
+    for(size_t j = 0; j < num_words; j++) {
         if (printtime) {
+            printtime = false;
             std::string wtime = std::to_string(frame_shift * times[j]);
             size_t pos = wtime.find('.') + 2;
             wtime = '\n' + wtime.substr(0, pos) + '\n';
             fwrite(wtime.c_str(), 1, sizeof(wtime) - 1, os_ctm);
-            printtime = false;
         }
-
-        std::string word = word_syms->Find(w);
-        char endc = ' ';
-        if (word == "<sb>") {
-            endc = '\n';
+        std::string word = words_split[j];
+        fwrite(word.c_str(), 1, sizeof(word) - 1, os_ctm);
+        if (word[word.length()-1] == '.') {
             printtime = true;
         }
-        std::string wplus = word + endc;
-        text += wplus;
-        const char *cword = wplus.c_str();
-
-        fwrite(cword, 1, sizeof(wplus) - 1, os_txt);
-
-        fwrite(cword, 1, sizeof(wplus) - 1, os_ctm);
-
     }
-    outtext = text;
+
     if (rnn_ready) {
         lm_to_add_orig->Clear();
     }  // TODO: check why ClearToContinue is worse
 
 
+}
+
+std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split, bool splitwords) {
+    std::string text = "";
+    bool doupper = false;
+    int32 num_words = words.size();
+    int32 wcnt = 0;
+    for(size_t j = 0; j < num_words; j++) {
+
+        int32 w = words[j];
+        if (w == 0) continue;
+
+        std::string word = word_syms->Find(w);
+
+        char endc = ' ';
+        if (j != num_words && words[j+1] == idx_sb) {
+            word += '.';
+            endc = '\n';
+        }
+
+        if (wcnt == 0 || doupper) {
+            word[0] = (char) toupper((int) word[0]);  // if this next if should be false
+            doupper = false;
+        }
+        wcnt++;
+
+        if (w == idx_sb) {
+            doupper = true;
+        } else {
+            std::string wplus = word + endc;
+            if (splitwords) words_split.push_back(wplus);
+            text += wplus;
+        }
+
+    }
+    return text;
 }

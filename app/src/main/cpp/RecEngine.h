@@ -49,6 +49,8 @@ public:
 
     void transcribe_file(std::string wavpath, std::string ctm);
 
+    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split, bool splitwords);
+
 private:
     kaldi::Timer timer;
     std::string outtext;
@@ -97,6 +99,7 @@ private:
     int32 left_context;
     int32 right_context;
     kaldi::BaseFloat frame_shift = 0.03;
+    int32 idx_sb;
 
     // RNN vars
     int32 max_ngram_order = 4;
