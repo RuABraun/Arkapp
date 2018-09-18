@@ -50,8 +50,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
         }
         AFile elem = getItem(pos);
         holder.tv_fname.setText(elem.title);
-        String date = elem.date.substring(4);
-        holder.tv_date.setText(date);
+        holder.tv_date.setText(elem.date);
 
         int len_s = elem.len_s;
         ArrayList rests = new ArrayList();

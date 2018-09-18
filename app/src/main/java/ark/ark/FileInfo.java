@@ -95,7 +95,7 @@ public class FileInfo extends Base {
         tv = findViewById(R.id.file_duration);
         tv.setText(String.valueOf(afile.len_s));
 
-        String fpath = filesdir + afile.fname + ".txt";
+        String fpath = filesdir + afile.fname + "_timed.txt";
         try {
             FileInputStream fis = new FileInputStream(fpath);
             int size = fis.available();
@@ -268,7 +268,9 @@ public class FileInfo extends Base {
     @Override
     protected void onPause() {
         super.onPause();
-        h_main.removeCallbacks(title_runnable);
-        title_runnable.run();
+        if (title_runnable != null) {
+            h_main.removeCallbacks(title_runnable);
+            title_runnable.run();
+        }
     }
 }

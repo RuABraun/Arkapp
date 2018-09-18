@@ -253,8 +253,10 @@ public class MainActivity extends Base {
     @Override
     protected void onPause() {
         super.onPause();
-        h_main.removeCallbacks(title_runnable);
-        title_runnable.run();
+        if (title_runnable != null) {
+            h_main.removeCallbacks(title_runnable);
+            title_runnable.run();
+        }
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
     }

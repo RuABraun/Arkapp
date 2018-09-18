@@ -100,7 +100,8 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
 
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(word_syms->Find("<sb>"), word_syms->Find("<sb>"), word_syms->Find("<brk>"));
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(word_syms->Find("<sb>"), word_syms->Find("<sb>"), word_syms->Find("<brk>"),
+        word_syms->Find("<unk>"), 100000);
 
     rnn_info = new rnnlm::RnnlmComputeStateInfo(*rnn_opts, rnnlm, (*word_emb_mat));
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, *rnn_info);
@@ -357,8 +358,7 @@ void RecEngine::recognition_loop() {
 
                 std::vector<int32> words;
 
-                if (!GetLinearWordSequence(olat, &words))
-                    LOGE("Failed get linear seq");
+                if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
 
                 std::string tmpstr = "";
                 for (size_t j = 0; j < words.size(); j++) {
@@ -581,28 +581,33 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
-
     std::string text = "";
+    bool printtime = false;
     for(size_t j=0; j < words.size(); j++) {
         int32 w = words[j];
-        if(w == 0) continue;
+        if (w == 0) continue;
+
+        if (printtime) {
+            std::string wtime = std::to_string(frame_shift * times[j]);
+            size_t pos = wtime.find('.') + 2;
+            wtime = '\n' + wtime.substr(0, pos) + '\n';
+            fwrite(wtime.c_str(), 1, sizeof(wtime) - 1, os_ctm);
+            printtime = false;
+        }
+
         std::string word = word_syms->Find(w);
         char endc = ' ';
-        if (word == "<sb>") endc = '\n';
-        text += word + endc;
-        const char* cword = word.c_str();
+        if (word == "<sb>") {
+            endc = '\n';
+            printtime = true;
+        }
+        std::string wplus = word + endc;
+        text += wplus;
+        const char *cword = wplus.c_str();
 
-        fwrite(cword, 1, sizeof(word) - 1, os_txt);
-        fwrite(&endc, 1, 1, os_txt);
+        fwrite(cword, 1, sizeof(wplus) - 1, os_txt);
 
-        fwrite(cword, 1, sizeof(word) - 1, os_ctm);
-        fwrite(" ", 1, 1, os_ctm);
-        std::string wtime = std::to_string(frame_shift * times[j]);
-        std::string wdur = std::to_string(frame_shift * lengths[j]);
-        fwrite(wtime.c_str(), 1, sizeof(word) -1 , os_ctm);
-        fwrite(" ", 1, 1, os_ctm);
-        fwrite(wdur.c_str(), 1, sizeof(word) - 1, os_ctm);
-        fwrite("\n", 1, 1, os_ctm);
+        fwrite(cword, 1, sizeof(wplus) - 1, os_ctm);
 
     }
     outtext = text;
