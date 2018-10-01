@@ -14,6 +14,8 @@ import android.view.MenuItem;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Base extends AppCompatActivity {
 
@@ -21,7 +23,13 @@ public class Base extends AppCompatActivity {
     public static String rootdir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/Ark/";
     public static String filesdir = rootdir + "files/";
     public static String rmodeldir = rootdir + "model/";
-    public static ArrayList<String> file_suffixes = new ArrayList<String>(Arrays.asList(".txt", ".wav", "_timed.txt"));
+    public static HashMap file_suffixes = new HashMap<String, String>() {
+        {
+            put("text", ".txt");
+            put("audio", ".wav");
+            put("timed", "_timed.txt");
+        }
+    };
     private long time_lastclick = 0;
 
     public native void native_load(AssetManager mgr, String rmodeldir);
@@ -73,11 +81,12 @@ public class Base extends AppCompatActivity {
         ArrayList<Uri> files = new ArrayList<>();
         int num = Base.file_suffixes.size();
 
-        for(int i = 0; i < num; i++) {
+        int i = 0;
+        for(Object suffix : file_suffixes.values()) {
             if (!checked.contains(i)) continue;
-            String suffix = Base.file_suffixes.get(i);
             File f = new File(Base.filesdir, fname + suffix);
             files.add(Uri.fromFile(f));
+            i++;
         }
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -86,8 +95,7 @@ public class Base extends AppCompatActivity {
 
     public static void renameConv(String fname_old, String fname) {
         File from, to;
-        for (int i = 0; i < file_suffixes.size(); i++) {
-            String suffix = file_suffixes.get(i);
+        for(Object suffix : file_suffixes.values()) {
             from = new File(filesdir + fname_old + suffix);
             to = new File(filesdir + fname + suffix);
             from.renameTo(to);

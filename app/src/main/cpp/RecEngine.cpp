@@ -116,7 +116,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
 
 RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
-    start_logger();
+//    start_logger();
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -332,6 +332,7 @@ void RecEngine::write_to_wav(int32 num_frames) {
 
 void RecEngine::recognition_loop() {
     std::vector<std::string> dummy;
+    std::vector<int32> dummyb;
 
     while(recognition_on) {
         bool did_rnn = false;
@@ -363,7 +364,7 @@ void RecEngine::recognition_loop() {
 
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
 
-                std::string tmpstr = prettify_text(words, dummy, false);
+                std::string tmpstr = prettify_text(words, dummy, dummyb, false);
 
                 outtext = tmpstr;
             }
@@ -397,7 +398,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
                 val += audio_data[i + j];
             }
             val = val / cnt_channel_fp;
-            if (k > 1) {
+            /*if (k > 1) {
                 BaseFloat diff = val - fp_audio[k - 1];
                 BaseFloat diffabs = std::abs(diff);
                 if(damp_shock) {
@@ -428,7 +429,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
                     damp_cnt = 0;
                 }
                 amplitude_delta_avg = 0.9f * amplitude_delta_avg + 0.1f * diffabs;
-            }
+            }*/
             fp_audio[k] = val;
             k++;
         }
@@ -583,25 +584,26 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
     std::vector<std::string> words_split;
-    std::string text = prettify_text(words, words_split, true);
+    std::vector<int32> kept;
+    std::string text = prettify_text(words, words_split, kept, true);
 
     outtext = text;
-    const char* ctext = text.c_str();
-    fwrite(ctext, 1, sizeof(ctext) - 1, os_txt);
+    fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
     bool printtime = false;
     for(size_t j = 0; j < num_words; j++) {
         if (printtime) {
             printtime = false;
-            std::string wtime = std::to_string(frame_shift * times[j]);
+            std::string wtime = std::to_string(frame_shift * times[kept[j]]);
             size_t pos = wtime.find('.') + 2;
-            wtime = '\n' + wtime.substr(0, pos) + '\n';
-            fwrite(wtime.c_str(), 1, sizeof(wtime) - 1, os_ctm);
+            wtime = "\n@" + wtime.substr(0, pos) + '\n';
+            fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
         }
         std::string word = words_split[j];
-        fwrite(word.c_str(), 1, sizeof(word) - 1, os_ctm);
-        if (word[word.length()-1] == '.') {
+        fwrite(word.c_str(), 1, word.size(), os_ctm);
+        LOGI("word %s", word.c_str());
+        if (word[word.length()-2] == '.') {
             printtime = true;
         }
     }
@@ -613,7 +615,11 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 }
 
-std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split, bool splitwords) {
+std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
+                                     std::vector<int32>& kept, bool splitwords) {
+    /*   Converts integer ids to words, adds . and replaces <unk>.
+     *
+     */
     std::string text = "";
     bool doupper = false;
     int32 num_words = words.size();
@@ -622,28 +628,34 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 
         int32 w = words[j];
         if (w == 0) continue;
-
-        std::string word = word_syms->Find(w);
-
-        char endc = ' ';
-        if (j != num_words && words[j+1] == idx_sb) {
-            word += '.';
-            endc = '\n';
+        if (w == idx_sb) {
+            LOGI("had sb");
+            doupper = true;
+            text.back() = '.';
+            text += '\n';
+            if (splitwords) {
+                std::string& lastw = words_split.back();
+                lastw.back() = '.';
+                lastw += '\n';
+            }
+            continue;
         }
+        std::string word = word_syms->Find(w);
+        LOGI("initial word %s", word.c_str());
+        if (word == "<unk>") word = "[unknown]";
 
         if (wcnt == 0 || doupper) {
             word[0] = (char) toupper((int) word[0]);  // if this next if should be false
             doupper = false;
         }
         wcnt++;
-
-        if (w == idx_sb) {
-            doupper = true;
-        } else {
-            std::string wplus = word + endc;
-            if (splitwords) words_split.push_back(wplus);
-            text += wplus;
+        std::string wplus = word + ' ';
+        //LOGI("pretty word %s END", wplus.c_str());
+        if (splitwords) {
+            words_split.push_back(wplus);
+            kept.push_back(j);
         }
+        text += wplus;
 
     }
     return text;

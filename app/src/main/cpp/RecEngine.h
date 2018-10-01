@@ -49,7 +49,8 @@ public:
 
     void transcribe_file(std::string wavpath, std::string ctm);
 
-    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split, bool splitwords);
+    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
+                              std::vector<int32>& kept, bool splitwords);
 
 private:
     kaldi::Timer timer;

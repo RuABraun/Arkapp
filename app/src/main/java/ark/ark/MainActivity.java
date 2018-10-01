@@ -240,10 +240,9 @@ public class MainActivity extends Base {
                         public void run() {
                             Log.i("APP", "fname " + fname_prefix + " cname " + curr_cname);
                             f_repo.rename(curr_afile, curr_cname, fname_prefix);
-                            Toast.makeText(getApplicationContext(), "Renamed to \"" + curr_cname + "\"", Toast.LENGTH_SHORT).show();
                         }
                     };
-                    h_main.postDelayed(title_runnable, 2500);
+                    h_main.postDelayed(title_runnable, 2000);
                 }
             }
         });
@@ -382,7 +381,7 @@ public class MainActivity extends Base {
 
     public void update_text() {
         String str = recEngine.get_text();
-        String all = const_transcript + " " + str;
+        String all = const_transcript + str;
         ed_transtext.setText(all, TextView.BufferType.EDITABLE);
     }
 
@@ -427,6 +426,7 @@ public class MainActivity extends Base {
         String text = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", text);
         clipboard.setPrimaryClip(clip);
+        Toast.makeText(getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
     }
 
     public void onShareClick(View view) {
@@ -454,17 +454,28 @@ public class MainActivity extends Base {
         } else {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
-            String text = ed_transtext.getText().toString();
+            final String text = const_transcript + ed_transtext.getText().toString();
             if (curr_afile == null) {
                 const_transcript = text;
             } else {
-                try {
-                    FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get(0)), false);
-                    fw.write(text);
-                    fw.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                Thread t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("timed")), false);
+                            fw.write(const_transcript);
+                            fw.close();
+                            String normaltext = text.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
+                            fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("text")), false);
+                            fw.write(normaltext);
+                            fw.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+                t.setPriority(8);
+                t.start();
             }
             ed_transtext.clearFocus();
         }

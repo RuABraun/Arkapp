@@ -1,6 +1,7 @@
 package ark.ark;
 
 import android.app.AlertDialog;
+import android.arch.lifecycle.ViewModelProviders;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -59,6 +60,7 @@ public class FileInfo extends Base {
 
         mSeekBar = findViewById(R.id.seekBar);
 
+        setFileFields();
     }
 
     @Override
@@ -86,7 +88,6 @@ public class FileInfo extends Base {
             }
         });
 
-        setFileFields();
     }
 
     public void setFileFields() {
@@ -95,7 +96,7 @@ public class FileInfo extends Base {
         tv = findViewById(R.id.file_duration);
         tv.setText(String.valueOf(afile.len_s));
 
-        String fpath = filesdir + afile.fname + "_timed.txt";
+        String fpath = filesdir + afile.fname + file_suffixes.get("timed");
         try {
             FileInputStream fis = new FileInputStream(fpath);
             int size = fis.available();
@@ -127,7 +128,7 @@ public class FileInfo extends Base {
                 Log.i("APP", "In text change.");
                 final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
                 final String fname = MainActivity.getFileName(cname, f_repo);
-                h_main.removeCallbacks(title_runnable);
+                mHandler.removeCallbacks(title_runnable);
 
                 title_runnable = new Runnable() {
                     @Override
@@ -136,7 +137,7 @@ public class FileInfo extends Base {
                         f_repo.rename(afile, cname, fname);
                     }
                 };
-                h_main.postDelayed(title_runnable, 1000);
+                mHandler.postDelayed(title_runnable, 2000);
 
             }
         });
@@ -197,14 +198,27 @@ public class FileInfo extends Base {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
             text = ed_transtext.getText().toString();
-            try {
-                FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get(0)), false);
-                fw.write(text);
-                fw.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
 
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("timed")), false);
+                        fw.write(text);
+                        fw.close();
+                        String normaltext = text.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
+                        fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("text")), false);
+                        fw.write(normaltext);
+                        fw.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+            t.setPriority(8);
+            t.start();
+
+            ed_transtext.setText(text);
             ed_transtext.clearFocus();
         }
         ed_transtext.setFocusableInTouchMode(false);
@@ -215,6 +229,7 @@ public class FileInfo extends Base {
         text = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", text);
         clipboard.setPrimaryClip(clip);
+        Toast.makeText(getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
     }
 
     public void onShareClick(View view) {
@@ -223,7 +238,7 @@ public class FileInfo extends Base {
     }
 
     public void onDeleteClick(View view) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getApplicationContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(FileInfo.this);
         builder.setTitle("Confirm")
                 .setMessage("Are you sure?")
                 .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
@@ -231,10 +246,10 @@ public class FileInfo extends Base {
                         delete(afile);
                     }
                 }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.dismiss();
-            }
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
         });
         AlertDialog alert = builder.create();
         alert.show();
@@ -269,7 +284,7 @@ public class FileInfo extends Base {
     protected void onPause() {
         super.onPause();
         if (title_runnable != null) {
-            h_main.removeCallbacks(title_runnable);
+            mHandler.removeCallbacks(title_runnable);
             title_runnable.run();
         }
     }

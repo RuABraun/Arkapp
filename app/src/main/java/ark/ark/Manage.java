@@ -57,13 +57,13 @@ public class Manage extends Base {
         Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
         shareIntent.setType("message/rfc822");
         ArrayList<Uri> files = new ArrayList<>();
-        int num = Base.file_suffixes.size();
 
-        for(int i = 0; i < num; i++) {
+        int i = 0;
+        for(Object suffix : file_suffixes.values()) {
             if (!checked.contains(i)) continue;
-            String suffix = Base.file_suffixes.get(i);
             File f = new File(Base.filesdir, fname + suffix);
             files.add(Uri.fromFile(f));
+            i++;
         }
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
