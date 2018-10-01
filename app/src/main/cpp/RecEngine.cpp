@@ -101,8 +101,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
 
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(word_syms->Find("<sb>"), word_syms->Find("<sb>"), word_syms->Find("<brk>"),
-        word_syms->Find("<unk>"), 100000);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(2, 2, -1, 15, 59999, 149889, modeldir);
 
     rnn_info = new rnnlm::RnnlmComputeStateInfo(*rnn_opts, rnnlm, (*word_emb_mat));
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, *rnn_info);
