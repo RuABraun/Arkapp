@@ -13,7 +13,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MenuItem;
@@ -31,6 +35,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class FileInfo extends Base {
 
@@ -39,12 +45,12 @@ public class FileInfo extends Base {
     private Handler mHandler;
     private Handler h_main = new Handler(Looper.getMainLooper());
     private Runnable title_runnable;
-    private Runnable mRunnable;
+    private Runnable seekbar_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
     private EditText ed_transtext;
     private EditText fileinfo_ed_title;
-    private String text;
+    private SpannableString text;
     private FileRepository f_repo;
 
     @Override
@@ -94,79 +100,84 @@ public class FileInfo extends Base {
         TextView tv = findViewById(R.id.file_date);
         tv.setText(afile.date);
         tv = findViewById(R.id.file_duration);
-        tv.setText(String.valueOf(afile.len_s));
+        int file_len_s = afile.len_s;
+        tv.setText(String.valueOf(file_len_s));
 
         String fpath = filesdir + afile.fname + file_suffixes.get("timed");
+        String simpletext;
         try {
             FileInputStream fis = new FileInputStream(fpath);
             int size = fis.available();
             byte[] buffer = new byte[size];
             fis.read(buffer);
             fis.close();
-            text = new String(buffer);
+            simpletext = new String(buffer);
         } catch(IOException ex) {
-            text = "Text file not found!";
+            simpletext = "Text file not found!";
         }
+        text = new SpannableString(simpletext);
+        Pattern pattern = Pattern.compile("@[\\d.]*:?[\\d.]+");
+        Matcher m = pattern.matcher(simpletext);
+        while(m.find()) {
+            int start = m.start();
+            int end = m.end();
+            String s = m.group().substring(1);  // get rid of @
+            String[] parts = s.split(":");
+            int sz = parts.length;
+            double tmp = 0.;
+            for(int i = 0; i < sz; i++) {
+                tmp += Float.parseFloat(parts[sz - i - 1]) * Math.pow(60., i) * 1000.;
+            }
+            final int num_ms = (int) tmp;
+            ClickableSpan span = new ClickableSpan() {
+                @Override
+                public void onClick(View widget) {
+                    mPlayer.seekTo(num_ms);
+                    playMediaPlayer();
+                }
+            };
+            text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+
         ed_transtext = findViewById(R.id.ed_trans);
         ed_transtext.setText(text);
+        ed_transtext.setMovementMethod(LinkMovementMethod.getInstance());
 
         fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
         fileinfo_ed_title.setText(afile.title);
-        fileinfo_ed_title.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-            }
-
-            @Override
-            public void afterTextChanged(final Editable s) {
-                Log.i("APP", "In text change.");
-                final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
-                final String fname = MainActivity.getFileName(cname, f_repo);
-                mHandler.removeCallbacks(title_runnable);
-
-                title_runnable = new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.i("APP", "fname " + fname + " cname " + cname);
-                        f_repo.rename(afile, cname, fname);
-                    }
-                };
-                mHandler.postDelayed(title_runnable, 2000);
-
-            }
-        });
 
         f_repo = new FileRepository(getApplication());
+    }
+
+    public void playMediaPlayer() {
+        mediaButton.setImageResource(R.drawable.pause);
+        if (seekbar_runnable != null) {
+            mHandler.removeCallbacks(seekbar_runnable);
+        }
+        seekbar_runnable = new Runnable() {
+            @Override
+            public void run() {
+                mSeekBar.setProgress(mPlayer.getCurrentPosition());
+                mHandler.postDelayed(this, 25);
+            }
+        };
+        mHandler.post(seekbar_runnable);
+        mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                mSeekBar.setProgress(0);
+                mediaButton.setImageResource(R.drawable.play);
+                mHandler.removeCallbacks(seekbar_runnable);
+            }
+        });
+        mPlayer.start();
     }
 
     public void onMediaClick(View view) {
         if (is_spamclick()) return;
 
         if (!mPlayer.isPlaying()) {
-            mediaButton.setImageResource(R.drawable.pause);
-            mRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    mSeekBar.setProgress(mPlayer.getCurrentPosition());
-                    mHandler.postDelayed(this, 100);
-                }
-            };
-            mHandler.post(mRunnable);
-            mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                @Override
-                public void onCompletion(MediaPlayer mp) {
-                    mSeekBar.setProgress(0);
-                    mediaButton.setImageResource(R.drawable.play);
-                    mHandler.removeCallbacks(mRunnable);
-                }
-            });
-            mPlayer.start();
+            playMediaPlayer();
         } else {
             mediaButton.setImageResource(R.drawable.play);
             pausePlaying();
@@ -178,7 +189,7 @@ public class FileInfo extends Base {
         if (mPlayer != null) {
             mPlayer.pause();
             if (mHandler != null) {
-                mHandler.removeCallbacks(mRunnable);
+                mHandler.removeCallbacks(seekbar_runnable);
             }
         }
     }
@@ -197,16 +208,16 @@ public class FileInfo extends Base {
         } else {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
-            text = ed_transtext.getText().toString();
+            final String simpletext = ed_transtext.getText().toString();
 
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("timed")), false);
-                        fw.write(text);
+                        fw.write(simpletext);
                         fw.close();
-                        String normaltext = text.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
+                        String normaltext = simpletext.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
                         fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("text")), false);
                         fw.write(normaltext);
                         fw.close();
@@ -218,7 +229,7 @@ public class FileInfo extends Base {
             t.setPriority(8);
             t.start();
 
-            ed_transtext.setText(text);
+//            ed_transtext.setText(text);
             ed_transtext.clearFocus();
         }
         ed_transtext.setFocusableInTouchMode(false);
@@ -226,8 +237,8 @@ public class FileInfo extends Base {
 
     public void onCopyClick(View view) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        text = ed_transtext.getText().toString();
-        ClipData clip = ClipData.newPlainText("Transcript", text);
+        String simpletext = ed_transtext.getText().toString();
+        ClipData clip = ClipData.newPlainText("Transcript", simpletext);
         clipboard.setPrimaryClip(clip);
         Toast.makeText(getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
     }
@@ -265,9 +276,6 @@ public class FileInfo extends Base {
     @Override
     protected void onStop() {
         super.onStop();
-        if (mHandler != null) {
-            mHandler.removeCallbacks(mRunnable);
-        }
         if (mSeekBar != null) {
             mSeekBar.setOnSeekBarChangeListener(null);
         }
@@ -281,8 +289,49 @@ public class FileInfo extends Base {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        fileinfo_ed_title.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+                Log.i("APP", "In text change.");
+                final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                final String fname = MainActivity.getFileName(cname, f_repo);
+                mHandler.removeCallbacks(title_runnable);
+
+                title_runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.i("APP", "fname " + fname + " cname " + cname);
+                        f_repo.rename(afile, cname, fname);
+                    }
+                };
+                mHandler.postDelayed(title_runnable, 2000);
+
+            }
+        });
+    }
+
+
+    @Override
     protected void onPause() {
         super.onPause();
+        if (mPlayer != null) {
+            mPlayer.pause();
+        }
+        if (seekbar_runnable != null) {
+            mHandler.removeCallbacks(seekbar_runnable);
+        }
         if (title_runnable != null) {
             mHandler.removeCallbacks(title_runnable);
             title_runnable.run();

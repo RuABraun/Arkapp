@@ -12,6 +12,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,9 +28,11 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewSwitcher;
@@ -56,10 +59,11 @@ public class MainActivity extends Base {
                                      Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
     private static boolean perm_granted = false;
-    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.int");
+    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin");
     Handler h_main = new Handler(Looper.getMainLooper());
     Runnable title_runnable;
     Runnable runnable;
+    Runnable trans_done_runnable;
     private FileRepository f_repo;
     private RecEngine recEngine;
     private ImageButton bt_pause;
@@ -72,8 +76,10 @@ public class MainActivity extends Base {
     private boolean recognition_done = false;  // so we know if we have to modify a text file or rename files of conversation
     private AFile curr_afile;
     private String const_transcript = "";
+    private ProgressBar spinner;
     final String PREFS_NAME = "MyPrefsFile";
-    Thread t_del, t_stoptrans;
+    Thread t_del, t_stoptrans, t_starttrans;
+    private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
 
     static {
         System.loadLibrary("rec-engine");
@@ -140,6 +146,35 @@ public class MainActivity extends Base {
 
         f_repo = new FileRepository(getApplication());
 
+        spinner = findViewById(R.id.progressBar);
+        ed_title = findViewById(R.id.ed_title);
+
+        final View activityRootView = findViewById(R.id.main_root_view);
+        activityRootView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                Rect r = new Rect();
+                activityRootView.getWindowVisibleDisplayFrame(r);
+                int height = activityRootView.getRootView().getHeight();
+                int heightDiff = height - (r.bottom - r.top);
+                if (heightDiff > height / 3.) {
+                    ed_title.setCursorVisible(true);
+                } else {
+                    ed_title.setCursorVisible(false);
+                }
+            }
+        });
+
+        bt_pause = findViewById(R.id.button_pause);
+        bt_pause.setVisibility(View.INVISIBLE);
+
+        bt_rec = findViewById(R.id.button_rec);
+
+        ed_transtext = findViewById(R.id.trans_edit_view);
+        fab_edit = findViewById(R.id.button_edit);
+
+        bt_rec.setVisibility(View.INVISIBLE);
+        spinner.setVisibility(View.VISIBLE);
     }
 
     private void do_setup() {
@@ -193,27 +228,26 @@ public class MainActivity extends Base {
         if (!perm_granted) {
             return;
         }
+
         do_setup();
         h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
-                if (recEngine.isready) {
+                h_main.postDelayed(runnable, 200);
+                if (RecEngine.isready) {
                     TextView tv = findViewById(R.id.rec_help_text);
                     tv.setText(R.string.HelloMsg);
+                    bt_rec.setVisibility(View.VISIBLE);
+                    spinner.setVisibility(View.INVISIBLE);
                     h_main.removeCallbacks(runnable);
                 }
-                h_main.postDelayed(runnable, 200);
             }
         }, 200);
+    }
 
-        bt_pause = findViewById(R.id.button_pause);
-        bt_pause.setVisibility(View.INVISIBLE);
-
-        bt_rec = findViewById(R.id.button_rec);
-
-        ed_transtext = findViewById(R.id.trans_edit_view);
-        fab_edit = findViewById(R.id.button_edit);
-        ed_title = findViewById(R.id.ed_title);
+    @Override
+    protected void onResume() {
+        super.onResume();
         ed_title.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -234,7 +268,7 @@ public class MainActivity extends Base {
                 }
                 fname_prefix = getFileName(curr_cname, f_repo);
                 h_main.removeCallbacks(title_runnable);
-                if (recognition_done) {
+                if (recognition_done && !edited_title) {
                     title_runnable = new Runnable() {
                         @Override
                         public void run() {
@@ -247,7 +281,6 @@ public class MainActivity extends Base {
             }
         });
     }
-
 
     @Override
     protected void onPause() {
@@ -286,6 +319,12 @@ public class MainActivity extends Base {
         curr_afile = f_repo.getById(id);  // has correct ID
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
         h_main.removeCallbacks(runnable);
+        h_main.post(new Runnable() {
+            @Override
+            public void run() {
+                update_text();
+            }
+        });
         recognition_done = true;
     }
 
@@ -303,15 +342,25 @@ public class MainActivity extends Base {
 
             if (recognition_done || curr_cname.equals("")) {
                 curr_cname = getString(R.string.default_convname);
+                edited_title = true;
                 ed_title.setText(curr_cname, TextView.BufferType.EDITABLE);
+                edited_title = false;
             }
             if (recognition_done) const_transcript = "";
 
             recognition_done = false;
             fab_edit.setVisibility(View.INVISIBLE);
             ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
-            String fpath = filesdir + "tmpfile";
-            recEngine.transcribe_stream(fpath);
+            final String fpath = filesdir + "tmpfile";
+            t_starttrans = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    recEngine.transcribe_stream(fpath);
+                }
+            });
+            t_starttrans.setPriority(7);
+            t_starttrans.start();
+
             is_recording = true;
             bt_rec.setImageResource(R.drawable.mic_off);
 
@@ -326,9 +375,23 @@ public class MainActivity extends Base {
             bt_pause.setVisibility(View.VISIBLE);
         } else {
             bt_pause.setVisibility(View.INVISIBLE);
-            fab_edit.setVisibility(View.VISIBLE);
+            bt_rec.setVisibility(View.INVISIBLE);
+            spinner.setVisibility(View.VISIBLE);
             is_recording = false;
-            bt_rec.setImageResource(R.drawable.mic);
+
+            h_main.postDelayed(new Runnable() {
+                public void run() {
+                    trans_done_runnable=this;
+                    h_main.postDelayed(trans_done_runnable, 100);
+                    if (recognition_done) {
+                        fab_edit.setVisibility(View.VISIBLE);
+                        bt_rec.setImageResource(R.drawable.mic);
+                        bt_rec.setVisibility(View.VISIBLE);
+                        spinner.setVisibility(View.INVISIBLE);
+                        h_main.removeCallbacks(trans_done_runnable);
+                    }
+                }
+            }, 100);
 
             t_stoptrans = new Thread(new Runnable() {
                 @Override
@@ -381,8 +444,10 @@ public class MainActivity extends Base {
 
     public void update_text() {
         String str = recEngine.get_text();
-        String all = const_transcript + str;
+        String conststr = recEngine.get_const_text();
+        String all = conststr + str;
         ed_transtext.setText(all, TextView.BufferType.EDITABLE);
+        ed_transtext.setSelection(all.length());
     }
 
     @Override

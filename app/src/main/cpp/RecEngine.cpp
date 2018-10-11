@@ -109,13 +109,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
 
     combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
-    KALDI_LOG << "done setuprnnlm";
+    LOGI("done setuprnnlm");
     rnn_ready = true;
 }
 
 
 RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
-//    start_logger();
+    start_logger();
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -146,9 +146,17 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
     decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
     feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);
 
+    {
+        std::ifstream is(modeldir + "silence.csl", std::ifstream::in);
+        if (!is.is_open()) KALDI_ERR << "No silence phones file";
+        while (std::getline(is, silence_phones)) {
+            break;
+        }
+    }
+
     // ! -- AM setup end, doing RNN setup
 
-    compose_opts = new ComposeLatticePrunedOptions(2.0, 300, 1.25, 75);
+    compose_opts = new ComposeLatticePrunedOptions(2.0, 150, 1.25, 75);
 
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
@@ -180,8 +188,13 @@ const char* RecEngine::get_text(){
     return outtext.c_str();
 }
 
+const char* RecEngine::get_const_text(){
+    return const_outtext.c_str();
+}
+
 void RecEngine::reset_text() {
     outtext = "";
+    const_outtext = "";
 }
 
 void RecEngine::transcribe_stream(std::string fpath){
@@ -278,7 +291,7 @@ void RecEngine::transcribe_stream(std::string fpath){
 int RecEngine::stop_trans_stream() {
     float tt = (float) timer.Elapsed();
     LOGI("Time taken %f", tt);
-    LOGI("Tot numframes %d", tot_num_frames);
+    LOGI("Tot num samples %d, time in s %d", tot_num_frames, tot_num_frames / 16000);
     if (mRecStream != nullptr) {
         KALDI_LOG << "IN STOP TRANS";
 
@@ -303,6 +316,8 @@ int RecEngine::stop_trans_stream() {
         decoder->GetLattice(true, &olat);
 
         int32 num_out_frames = decoder->NumFramesDecoded();
+
+        if (t_finishsegment.joinable()) t_finishsegment.join();
         finish_segment(&olat, num_out_frames);
         fclose(os_txt);
         fclose(os_ctm);
@@ -332,7 +347,7 @@ void RecEngine::write_to_wav(int32 num_frames) {
 void RecEngine::recognition_loop() {
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
-
+    Timer timer_rnn;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
@@ -346,15 +361,29 @@ void RecEngine::recognition_loop() {
                 TopSortCompactLatticeIfNeeded(&clat_to_rescore);
 
                 if (t_rnnlm.joinable()) t_rnnlm.join();
-
+                if (t_finishsegment.joinable()) t_finishsegment.join();
+                timer_rnn.Reset();
                 ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
                                              const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
                                              &clat_rescored, max_ngram_order);
-
+                double tt = timer_rnn.Elapsed();
+                KALDI_LOG << "RESCORE TIME TAKEN " << tt;
                 CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
                 decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
                 decoder->StrictPrune();
             }
+
+            if (decoder->isStopTime(silence_phones, trans_model, 3)) {
+                int32 num_frames_decoded = decoder->NumFramesDecoded();
+                LOGI("Stopped %d", num_frames_decoded);
+                if (t_finishsegment.joinable()) t_finishsegment.join();
+                decoder->GetLattice(false, &finish_seg_clat);
+
+                t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
+
+                decoder->InitDecoding(true);
+            }
+
             if (decoder->NumFramesDecoded() > 0) {
                 Lattice olat;
                 decoder->GetBestPath(false, &olat);
@@ -372,6 +401,7 @@ void RecEngine::recognition_loop() {
         }
         if (!did_rnn) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            did_rnn = false;
         }
     }
 }
@@ -586,25 +616,18 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::vector<int32> kept;
     std::string text = prettify_text(words, words_split, kept, true);
 
-    outtext = text;
+    outtext = "";
+    const_outtext = const_outtext + text;
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
-    bool printtime = false;
     for(size_t j = 0; j < num_words; j++) {
-        if (printtime) {
-            printtime = false;
-            std::string wtime = std::to_string(frame_shift * times[kept[j]]);
-            size_t pos = wtime.find('.') + 2;
-            wtime = "\n@" + wtime.substr(0, pos) + '\n';
-            fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
-        }
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
-        LOGI("word %s", word.c_str());
-        if (word[word.length()-2] == '.') {
-            printtime = true;
-        }
+        std::string wtime = std::to_string(frame_shift * times[kept[j]]);
+        size_t pos = wtime.find('.') + 2;
+        wtime = " " + wtime.substr(0, pos) + '\n';
+        fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
     }
 
     if (rnn_ready) {
@@ -628,7 +651,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         int32 w = words[j];
         if (w == 0) continue;
         if (w == idx_sb) {
-            LOGI("had sb");
+//            LOGI("had sb");
             doupper = true;
             text.back() = '.';
             text += '\n';
@@ -640,7 +663,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
             continue;
         }
         std::string word = word_syms->Find(w);
-        LOGI("initial word %s", word.c_str());
+//        LOGI("initial word %s", word.c_str());
         if (word == "<unk>") word = "[unknown]";
 
         if (wcnt == 0 || doupper) {

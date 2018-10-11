@@ -38,6 +38,7 @@ public:
     void setDeviceId(int32_t deviceId);
 
     const char* get_text();
+    const char* get_const_text();
     void reset_text();
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
@@ -49,12 +50,17 @@ public:
 
     void transcribe_file(std::string wavpath, std::string ctm);
 
+    void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
+
+    void recognition_loop();
+
     std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
                               std::vector<int32>& kept, bool splitwords);
 
 private:
     kaldi::Timer timer;
     std::string outtext;
+    std::string const_outtext;
     int tot_num_frames = 0;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
@@ -78,6 +84,7 @@ private:
     std::atomic<bool> do_recognition;
     std::thread t_recognition;
     std::thread t_rnnlm;
+    std::thread t_finishsegment;
 
     kaldi::BaseFloat amplitude_delta_avg = 0.5;
 
@@ -101,6 +108,8 @@ private:
     int32 right_context;
     kaldi::BaseFloat frame_shift = 0.03;
     int32 idx_sb;
+    std::string silence_phones;
+    kaldi::CompactLattice finish_seg_clat;
 
     // RNN vars
     int32 max_ngram_order = 4;
@@ -119,11 +128,8 @@ private:
     const kaldi::ComposeLatticePrunedOptions* compose_opts;
     bool rnn_ready;
 
-    void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
-
     void write_to_wav(int32 num_frames);
 
-    void recognition_loop();
 };
 
 #endif //ARK_RECENGINE_H

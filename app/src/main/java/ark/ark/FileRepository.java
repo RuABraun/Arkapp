@@ -77,8 +77,9 @@ public class FileRepository {
             AFile af = params[0];
             aSyncTaskaFileDao.delete(af.getId());
             String fname = af.fname;
-            for (int i = 0; i < file_suffixes.size(); i++) {
-                File f = new File(filesdir + fname + file_suffixes.get(i));
+            Log.i("APP", "Deleting " + fname);
+            for(Object suffix : file_suffixes.values()) {
+                File f = new File(filesdir + fname + suffix);
                 if (f.exists()) {
                     f.delete();
                 } else {

@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_root_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:focusable="false"
     android:focusableInTouchMode="true"
-    tools:context="ark.ark.MainActivity">
+    tools:context="ark.ark.MainActivity" >
 
     <ImageButton
 
@@ -80,6 +82,7 @@
         android:padding="50dp"
         android:scaleType="centerCrop"
         android:visibility="invisible"
+        android:elevation="4dp"
         app:layout_constraintBottom_toBottomOf="@+id/imageView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -156,7 +159,6 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="8dp"
         android:background="@android:color/transparent"
-        android:cursorVisible="false"
         android:textSize="20sp"
         android:fontFamily="@font/roboto"
         android:hint="Add a title"
@@ -164,7 +166,7 @@
         android:textColor="@color/colorText"
         android:elevation="2dp"
         android:imeOptions="actionDone"
-        android:focusable="true"
+        android:cursorVisible="false"
         app:layout_constraintEnd_toEndOf="@+id/imageView"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@+id/imageView"
@@ -200,5 +202,15 @@
         app:layout_constraintEnd_toEndOf="@+id/imageView"
         app:layout_constraintStart_toStartOf="@+id/imageView"
         app:layout_constraintTop_toBottomOf="@+id/ed_title" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        app:layout_constraintBottom_toBottomOf="@+id/button_rec"
+        app:layout_constraintDimensionRatio="w,1:1"
+        app:layout_constraintEnd_toEndOf="@+id/button_rec"
+        android:visibility="invisible"/>
 
 </android.support.constraint.ConstraintLayout>

@@ -61,6 +61,14 @@ public class RecEngine {
         }
     }
 
+    public String get_const_text() {
+        if (mEngineHandle != 0) {
+            return native_getConstText(mEngineHandle);
+        } else {
+            return "!ERROR";
+        }
+    }
+
     public void setAudioDeviceId(int deviceId){
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
@@ -69,6 +77,7 @@ public class RecEngine {
     public static native void native_deleteEngine(long engineHandle);
     public static native void native_setAudioDeviceId(long engineHandle, int deviceId);
     public static native String native_getText(long engineHandle);
+    public static native String native_getConstText(long engineHandle);
     public static native void native_transcribe_stream(long engineHandle, String wavpath);
     public static native long native_stop_trans_stream(long engineHandle);
     public static native void native_transcribe_file(long engineHandle, String wavpath, String ctm);

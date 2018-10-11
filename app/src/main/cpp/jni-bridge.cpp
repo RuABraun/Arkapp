@@ -113,6 +113,15 @@ JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jo
     return jstr;
 }
 
+JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getConstText(JNIEnv* env, jobject, jlong engineHandle) {
+    RecEngine *engine = (RecEngine*) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid, call createHandle() to create a new one");
+        return env->NewStringUTF("!ERROR");
+    }
+    jstring jstr = env->NewStringUTF(engine->get_const_text());
+    return jstr;
+}
 
 JNIEXPORT void JNICALL
 Java_ark_ark_RecEngine_native_1setAudioDeviceId(
