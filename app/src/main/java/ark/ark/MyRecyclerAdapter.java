@@ -53,6 +53,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
         holder.tv_date.setText(elem.date);
 
         int len_s = elem.len_s;
+        Log.i("APP", "length s " + len_s);
         ArrayList rests = new ArrayList();
         while (len_s % 60 != 0) {
             rests.add(len_s % 60);

@@ -29,7 +29,6 @@ public class Manage extends Base {
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
 
-
     }
 
     @Override

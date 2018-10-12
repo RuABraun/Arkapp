@@ -621,13 +621,21 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
+    bool printtime = false;
     for(size_t j = 0; j < num_words; j++) {
+        if (printtime) {
+            printtime = false;
+            std::string wtime = std::to_string(frame_shift * times[kept[j]]);
+            size_t pos = wtime.find('.') + 2;
+            wtime = "\n@" + wtime.substr(0, pos) + '\n';
+            fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
+        }
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
-        std::string wtime = std::to_string(frame_shift * times[kept[j]]);
-        size_t pos = wtime.find('.') + 2;
-        wtime = " " + wtime.substr(0, pos) + '\n';
-        fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
+//        if (word[word.length()-2] == '.') {
+        if ((j+1) % 10 == 0) {
+            printtime = true;
+        }
     }
 
     if (rnn_ready) {
