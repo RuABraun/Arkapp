@@ -13,6 +13,8 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,8 +25,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.ViewHolder> {
+public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.ViewHolder> implements Filterable {
     private List<AFile> data_;
+    private List<AFile> data_filtered_;
     private LayoutInflater mInflater;
     private Context context;
     private FileRepository f_repo;
@@ -45,9 +48,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int pos) {
-        if (data_ == null) {
-            holder.tv_fname.setText("No files present.");
-        }
         AFile elem = getItem(pos);
         holder.tv_fname.setText(elem.title);
         holder.tv_date.setText(elem.date);
@@ -72,8 +72,8 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
 
     @Override
     public int getItemCount() {
-        if (data_ != null) {
-            return data_.size();
+        if (data_filtered_ != null) {
+            return data_filtered_.size();
         } else {
             return 0;
         }
@@ -102,7 +102,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         @Override
                         public boolean onMenuItemClick(MenuItem item) {
-                            final AFile afile_to_use = data_.get(curr_pos);
+                            final AFile afile_to_use = data_filtered_.get(curr_pos);
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
@@ -154,16 +154,55 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
 
     void delete(AFile afile, int pos) {
         f_repo.delete(afile);
-        data_.remove(pos);
+        data_filtered_.remove(pos);
+        ArrayList<AFile> all_data = new ArrayList<>();
+        for (AFile a_afile : data_) {
+            if (!a_afile.fname.equals(afile)) {
+                all_data.add(a_afile);
+            }
+        }
+        data_ = all_data;
         Toast.makeText(context, afile.title + " deleted.", Toast.LENGTH_SHORT).show();
     }
 
     void setData(List<AFile> data) {
         data_ = data;
+        data_filtered_ = data;
         notifyDataSetChanged();
     }
 
     public AFile getItem(int pos) {
-        return data_.get(pos);
+        return data_filtered_.get(pos);
+    }
+
+    @Override
+    public Filter getFilter() {
+        return new Filter() {
+            @Override
+            protected FilterResults performFiltering(CharSequence char_seq) {
+                String cString = char_seq.toString();
+                if (cString.isEmpty()) {
+                    data_filtered_ = data_;
+                } else {
+                    ArrayList<AFile> filtered_list = new ArrayList<AFile>();
+                    for (AFile afile : data_) {
+                        if (afile.title.contains(cString)) {
+                            filtered_list.add(afile);
+                        }
+                    }
+                    data_filtered_ = filtered_list;
+                }
+
+                FilterResults filterResults = new FilterResults();
+                filterResults.values = data_filtered_;
+                return filterResults;
+            }
+
+            @Override
+            protected void publishResults(CharSequence char_seq, FilterResults filterResults) {
+                data_filtered_ = (ArrayList<AFile>) filterResults.values;
+                notifyDataSetChanged();
+            }
+        };
     }
 }

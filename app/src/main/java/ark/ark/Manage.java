@@ -7,9 +7,15 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.TextView;
 
 import java.io.File;
 import java.text.ParseException;
@@ -35,6 +41,30 @@ public class Manage extends Base {
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
 
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        getMenuInflater().inflate(R.menu.menu_manage, menu);
+
+        final MenuItem searchItem = menu.findItem(R.id.action_search);
+        final SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                adapter.getFilter().filter(query);
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                adapter.getFilter().filter(newText);
+                return false;
+            }
+        });
+        return true;
     }
 
     @Override
@@ -75,6 +105,14 @@ public class Manage extends Base {
                 adapter.setData(aFiles);
             }
         });
+        TextView tv = findViewById(R.id.empty_view);
+//        if (adapter.getItemCount() == 0) {
+//            Log.i("APP", "IN HERE");
+//            tv.setVisibility(View.VISIBLE);
+//        } else {
+//            Log.i("APP", "IN HERE B");
+        tv.setVisibility(View.GONE);
+
     }
 
     public void share(String fname, ArrayList checked) {
