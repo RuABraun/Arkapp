@@ -2,7 +2,6 @@ package ark.ark;
 
 import android.app.Application;
 import android.arch.lifecycle.LiveData;
-import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
 
@@ -22,6 +21,7 @@ public class FileRepository {
         AppDatabase db = AppDatabase.getDatabase(application);
         afileDao = db.afileDao();
         files = afileDao.getAllFiles();
+
     }
 
     LiveData<List<AFile>> getAllFiles() {

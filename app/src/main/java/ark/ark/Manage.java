@@ -12,8 +12,14 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 
 import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 
 public class Manage extends Base {
@@ -47,6 +53,25 @@ public class Manage extends Base {
         fviewmodel.getAllFiles().observe(this, new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
+                Collections.sort(aFiles, new Comparator<AFile>() {
+                    @Override
+                    public int compare(AFile lhs, AFile rhs) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
+                        Date left_date = null;
+                        try {
+                            left_date = sdf.parse(lhs.date);
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        Date right_date = null;
+                        try {
+                            right_date = sdf.parse(rhs.date);
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        return right_date.compareTo(left_date);
+                    }
+                });
                 adapter.setData(aFiles);
             }
         });
