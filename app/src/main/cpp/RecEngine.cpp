@@ -109,6 +109,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
 
     combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
+
     LOGI("done setuprnnlm");
     rnn_ready = true;
 }
@@ -260,7 +261,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 3.0, 25, 3.0);
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 3.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);

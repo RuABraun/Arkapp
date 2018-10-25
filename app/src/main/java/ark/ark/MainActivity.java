@@ -12,6 +12,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
@@ -36,18 +37,24 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewSwitcher;
+import org.tensorflow.lite.Interpreter;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends Base {
@@ -80,6 +87,7 @@ public class MainActivity extends Base {
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans, t_starttrans;
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
+    private Interpreter casemodel;
 
     static {
         System.loadLibrary("rec-engine");
@@ -216,6 +224,15 @@ public class MainActivity extends Base {
             t.setPriority(7);
             t.start();
         }
+
+        try {
+            casemodel = new Interpreter(loadModelFile());
+            if (casemodel == null) {
+                Log.e("APP", "MODEL WAS NOT LOADED");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -297,6 +314,7 @@ public class MainActivity extends Base {
     protected void onDestroy() {
         Log.i("APP", "Destroying");
         recEngine.delete();
+        casemodel.close();
         super.onDestroy();
     }
 
@@ -305,6 +323,8 @@ public class MainActivity extends Base {
         if (curr_cname.equals("")) {
             curr_cname = getString(R.string.default_convname);
         }
+
+        doInference();
 
         String date = getFileDate();
         String title = curr_cname;
@@ -545,6 +565,35 @@ public class MainActivity extends Base {
             ed_transtext.clearFocus();
         }
         ed_transtext.setFocusableInTouchMode(false);
+    }
+
+    public void doInference() {
+        int[] input = new int[1];
+        Arrays.fill(input, 1);
+        float[] state = new float[256];
+        Arrays.fill(state, 0f);
+
+        Map<Integer, Object> map_of_indices_to_outputs = new HashMap<>();
+        float[][] prob = new float[1][3];
+        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_prob"), prob);
+
+        float[][] newstate = new float[1][256];
+        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_state"), newstate);
+
+        Object[] inputs = {input, state};
+        casemodel.runForMultipleInputsOutputs(inputs, map_of_indices_to_outputs);
+        int idx = casemodel.getOutputIndex("output_prob");
+        float val = ((float[][]) map_of_indices_to_outputs.get(idx))[0][0];
+        Log.i("APP", "value: " + val);
+    }
+
+    private MappedByteBuffer loadModelFile() throws IOException {
+        AssetFileDescriptor fileDescriptor = this.getAssets().openFd("model/tf_model.tflite");
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
     }
 
 }

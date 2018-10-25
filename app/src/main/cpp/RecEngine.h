@@ -23,6 +23,8 @@
 #include "nnet3/nnet-utils.h"
 #include <thread>
 #include "base/timer.h"
+#include <memory>
+
 
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -127,6 +129,7 @@ private:
     const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
     const kaldi::ComposeLatticePrunedOptions* compose_opts;
     bool rnn_ready;
+
 
     void write_to_wav(int32 num_frames);
 
