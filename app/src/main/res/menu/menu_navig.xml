@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/Manage"
+        android:title="Files"
+        android:icon="@drawable/list" />
+    <item android:id="@+id/Transcribe"
+        android:title="Transcribe"
+        android:icon="@drawable/mic_full" />
+    <item android:id="@+id/Settings"
+        android:title="Settings"
+        android:icon="@drawable/settings"/>
+</menu>

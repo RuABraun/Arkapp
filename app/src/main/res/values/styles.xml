@@ -11,6 +11,10 @@
         <item name="android:windowActionBar">true</item>
     </style>
 
+    <style name="AppTheme.Launcher">
+        <item name="android:windowBackground">@drawable/launch_screen</item>
+    </style>
+
     <style name="btnstyle" parent="@style/Widget.AppCompat.Button.Colored">
         <item name="android:translationZ">0dp</item>
         <item name="android:backgroundTint">#ff1a1a</item>

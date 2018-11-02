@@ -112,7 +112,7 @@ public class FileInfo extends Base {
         int file_len_s = afile.len_s;
         tv.setText(String.valueOf(file_len_s));
 
-        String fpath = filesdir + afile.fname + file_suffixes.get("timed");
+        String fpath = filesdir + afile.fname + file_suffixes.get("text");
         String normal_text;
         try {
             FileInputStream fis = new FileInputStream(fpath);
@@ -120,27 +120,8 @@ public class FileInfo extends Base {
             byte[] buffer = new byte[size];
             fis.read(buffer);
             fis.close();
-            String timed_text = new String(buffer);
-            Pattern pattern = Pattern.compile("\n@[\\d.]*:?[\\d.]+");
-            Matcher m = pattern.matcher(timed_text);
-            int cnt_removed = 0;
-            while(m.find()) {
-                int start = m.start();
-                int idx = start - cnt_removed;
-                text_idx_times.add(idx);
-                String s = m.group().substring(2);
-                cnt_removed += s.length() + 3;
-                String[] parts = s.split(":");
-                int sz = parts.length;
-                double tmp = 0.;
-                for(int i = 0; i < sz; i++) {
-                    tmp += Float.parseFloat(parts[sz - i - 1]) * Math.pow(60., i) * 1000.;
-                }
-                int num_ms = (int) tmp;
-                times.add(num_ms);
-            }
+            normal_text = new String(buffer);
 
-            normal_text = timed_text.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
 
         } catch(IOException ex) {
             normal_text = "Text file not found!";

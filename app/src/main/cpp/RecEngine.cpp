@@ -140,6 +140,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
         nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
+
     left_context = am_nnet.LeftContext();
     right_context = am_nnet.RightContext();
     mFramesPerBurst = int32_t(1.5 * 0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
@@ -166,6 +167,16 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
 
     recognition_on = false;
     do_recognition = false;
+
+    std::string casemodel_path = modeldir + "tf_model.lite";
+//    fb_model =
+
+    /*std::unique_ptr<tflite::FlatBufferModel> model;
+    model = tflite::FlatBufferModel::BuildFromFile(casemodel_path.c_str());
+    std::unique_ptr<tflite::Interpreter> interpreter;
+    tflite::ops::builtin::BuiltinOpResolver resolver;
+    tflite::InterpreterBuilder(*model, resolver)(&interpreter);*/
+
 
     t.join();
     LOGI("Finished constructing rec");
@@ -346,9 +357,8 @@ void RecEngine::write_to_wav(int32 num_frames) {
 }
 
 void RecEngine::recognition_loop() {
-    std::vector<std::string> dummy;
-    std::vector<int32> dummyb;
     Timer timer_rnn;
+    std::vector<std::string> dummy;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
@@ -393,7 +403,7 @@ void RecEngine::recognition_loop() {
 
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
 
-                std::string tmpstr = prettify_text(words, dummy, dummyb, false);
+                std::string tmpstr = prettify_text(words, dummy);
 
                 outtext = tmpstr;
             }
@@ -596,7 +606,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     TopSortCompactLatticeIfNeeded(clat);
 
     CompactLattice best_path;
-    if (num_out_frames > 150) {
+    if (num_out_frames > 100) {
         if (t_rnnlm.joinable()) t_rnnlm.join();
         CompactLattice clat_rescored;
         ComposeCompactLatticePrunedB(*compose_opts, *clat,
@@ -614,29 +624,20 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
     std::vector<std::string> words_split;
-    std::vector<int32> kept;
-    std::string text = prettify_text(words, words_split, kept, true);
+    std::string text = prettify_text(words, words_split);
 
     outtext = "";
     const_outtext = const_outtext + text;
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
-    bool printtime = false;
     for(size_t j = 0; j < num_words; j++) {
-        if (printtime) {
-            printtime = false;
-            std::string wtime = std::to_string(frame_shift * times[kept[j]]);
-            size_t pos = wtime.find('.') + 2;
-            wtime = "\n@" + wtime.substr(0, pos) + '\n';
-            fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
-        }
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
-//        if (word[word.length()-2] == '.') {
-        if ((j+1) % 10 == 0) {
-            printtime = true;
-        }
+        fwrite(" ", 1, 1, os_ctm);
+        std::string wtime = std::to_string(frame_shift * times[j]);
+        fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
+        fwrite("\n", 1, 1, os_ctm);
     }
 
     if (rnn_ready) {
@@ -646,8 +647,22 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 }
 
-std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
-                                     std::vector<int32>& kept, bool splitwords) {
+//void RecEngine::run_casing() {
+//
+//    int* in = casemodel.get()->typed_input_tensor<int>(0);
+//    in[0] = 1;
+//
+//    float* instate = casemodel.get()->typed_input_tensor<float>(1);
+//    for(int i = 0; i < 256; i++) instate[i] = 0.f;
+//
+//    casemodel.get()->Invoke();
+//
+//    float** probs =  casemodel.get()->typed_input_tensor<float*>(0);
+//
+//    KALDI_LOG << "pro/bs: " << probs[0][0] << " " << probs[0][1] << " " << probs[0][2];
+//}
+
+std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split) {
     /*   Converts integer ids to words, adds . and replaces <unk>.
      *
      */
@@ -659,20 +674,9 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 
         int32 w = words[j];
         if (w == 0) continue;
-        if (w == idx_sb) {
-//            LOGI("had sb");
-            doupper = true;
-            text.back() = '.';
-            text += '\n';
-            if (splitwords) {
-                std::string& lastw = words_split.back();
-                lastw.back() = '.';
-                lastw += '\n';
-            }
-            continue;
-        }
+
         std::string word = word_syms->Find(w);
-//        LOGI("initial word %s", word.c_str());
+
         if (word == "<unk>") word = "[unknown]";
 
         if (wcnt == 0 || doupper) {
@@ -681,11 +685,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         }
         wcnt++;
         std::string wplus = word + ' ';
-        //LOGI("pretty word %s END", wplus.c_str());
-        if (splitwords) {
-            words_split.push_back(wplus);
-            kept.push_back(j);
-        }
+        words_split.push_back(word);
         text += wplus;
 
     }

@@ -1,6 +1,7 @@
 package ark.ark;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
@@ -17,23 +18,32 @@ import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.constraint.ConstraintLayout;
+import android.support.design.internal.BottomNavigationMenuView;
+import android.support.design.widget.BottomNavigationView;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewSwitcher;
@@ -68,15 +78,19 @@ public class MainActivity extends Base {
     private static boolean perm_granted = false;
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin");
     Handler h_main = new Handler(Looper.getMainLooper());
+    HandlerThread handlerThread;
+    Handler h_background;
     Runnable title_runnable;
     Runnable runnable;
     Runnable trans_done_runnable;
+    Runnable trans_edit_runnable;
     private FileRepository f_repo;
     private RecEngine recEngine;
-    private ImageButton bt_pause;
-    private ImageButton bt_rec;
     private EditText ed_transtext;
+    private FloatingActionButton fab_rec;
     private FloatingActionButton fab_edit;
+    private FloatingActionButton fab_copy;
+    private FloatingActionButton fab_share;
     private EditText ed_title;
     private String fname_prefix = "";
     private String curr_cname = "";
@@ -88,6 +102,9 @@ public class MainActivity extends Base {
     Thread t_del, t_stoptrans, t_starttrans;
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
     private Interpreter casemodel;
+    private BottomNavigationView bottomNavigationView;
+    private float ed_trans_to_edit_button_distance;
+    private boolean just_closed = false;
 
     static {
         System.loadLibrary("rec-engine");
@@ -133,6 +150,7 @@ public class MainActivity extends Base {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(R.style.AppTheme);
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
@@ -173,16 +191,54 @@ public class MainActivity extends Base {
             }
         });
 
-        bt_pause = findViewById(R.id.button_pause);
-        bt_pause.setVisibility(View.INVISIBLE);
-
-        bt_rec = findViewById(R.id.button_rec);
+        fab_rec = findViewById(R.id.button_rec);
 
         ed_transtext = findViewById(R.id.trans_edit_view);
-        fab_edit = findViewById(R.id.button_edit);
 
-        bt_rec.setVisibility(View.INVISIBLE);
+        fab_rec.setVisibility(View.INVISIBLE);
         spinner.setVisibility(View.VISIBLE);
+
+        fab_edit = findViewById(R.id.button_edit);
+        fab_edit.setTranslationX(128f);
+
+        fab_copy = findViewById(R.id.button_copy);
+        fab_share = findViewById(R.id.button_share);
+        fab_copy.setTranslationX(128f);
+        fab_share.setTranslationX(128f);
+
+        bottomNavigationView = findViewById(R.id.botNavig);
+        bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int item_id = item.getItemId();
+                Intent intent;
+                if (item_id == R.id.Manage) {
+                    intent = new Intent(getApplicationContext(), Manage.class);
+                    startActivity(intent);
+                    return true;
+                }
+                if (item_id == R.id.Transcribe) {
+                    return true;
+                }
+                if (item_id == R.id.Settings) {
+                    intent = new Intent(getApplicationContext(), Settings.class);
+                    startActivity(intent);
+                    return true;
+                }
+                return true;
+            }
+        });
+        BottomNavigationView bottomNavigationView = (BottomNavigationView) findViewById(R.id.botNavig);
+        BottomNavigationMenuView menuView = (BottomNavigationMenuView) bottomNavigationView.getChildAt(0);
+        for (int i = 0; i < menuView.getChildCount(); i++) {
+            final View iconView = menuView.getChildAt(i).findViewById(android.support.design.R.id.icon);
+            final ViewGroup.LayoutParams layoutParams = iconView.getLayoutParams();
+            final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+            layoutParams.height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
+            layoutParams.width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
+            iconView.setLayoutParams(layoutParams);
+        }
+
     }
 
     private void do_setup() {
@@ -212,7 +268,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(7);
+            t.setPriority(6);
             t.start();
         } else {
             Thread t = new Thread(new Runnable() {
@@ -221,18 +277,18 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(7);
+            t.setPriority(6);
             t.start();
         }
 
-        try {
+        /*try {
             casemodel = new Interpreter(loadModelFile());
             if (casemodel == null) {
                 Log.e("APP", "MODEL WAS NOT LOADED");
             }
         } catch (IOException e) {
             e.printStackTrace();
-        }
+        }*/
     }
 
 
@@ -240,8 +296,6 @@ public class MainActivity extends Base {
     public void onStart() {
         super.onStart();
 
-        TextView tv = findViewById(R.id.rec_help_text);
-        tv.setText(R.string.LoadingMsg);
         if (!perm_granted) {
             return;
         }
@@ -250,21 +304,25 @@ public class MainActivity extends Base {
         h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
-                h_main.postDelayed(runnable, 200);
+                h_main.postDelayed(runnable, 100);
                 if (RecEngine.isready) {
-                    TextView tv = findViewById(R.id.rec_help_text);
-                    tv.setText(R.string.HelloMsg);
-                    bt_rec.setVisibility(View.VISIBLE);
+                    fab_rec.setVisibility(View.VISIBLE);
                     spinner.setVisibility(View.INVISIBLE);
                     h_main.removeCallbacks(runnable);
                 }
             }
-        }, 200);
+        }, 100);
+
     }
+
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        handlerThread = new HandlerThread("BackgroundHandlerThread");
+        handlerThread.start();
+        h_background = new Handler(handlerThread.getLooper());
         ed_title.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -278,7 +336,6 @@ public class MainActivity extends Base {
 
             @Override
             public void afterTextChanged(final Editable s) {
-                Log.i("APP", "In text change.");
                 curr_cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
                 if (curr_cname.equals("")) {
                     curr_cname = getString(R.string.default_convname);
@@ -293,7 +350,7 @@ public class MainActivity extends Base {
                             f_repo.rename(curr_afile, curr_cname, fname_prefix);
                         }
                     };
-                    h_main.postDelayed(title_runnable, 2000);
+                    h_main.postDelayed(title_runnable, 500);
                 }
             }
         });
@@ -306,6 +363,11 @@ public class MainActivity extends Base {
             h_main.removeCallbacks(title_runnable);
             title_runnable.run();
         }
+        if (trans_edit_runnable != null) {
+            h_background.removeCallbacks(trans_edit_runnable);
+            trans_edit_runnable.run();
+        }
+        handlerThread.quit();
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
     }
@@ -314,7 +376,7 @@ public class MainActivity extends Base {
     protected void onDestroy() {
         Log.i("APP", "Destroying");
         recEngine.delete();
-        casemodel.close();
+//        casemodel.close();
         super.onDestroy();
     }
 
@@ -324,7 +386,7 @@ public class MainActivity extends Base {
             curr_cname = getString(R.string.default_convname);
         }
 
-        doInference();
+//        doInference();
 
         String date = getFileDate();
         String title = curr_cname;
@@ -343,6 +405,40 @@ public class MainActivity extends Base {
             @Override
             public void run() {
                 update_text();
+                fab_edit.animate().translationX(0f);
+                fab_copy.animate().translationX(0f);
+                fab_share.animate().translationX(0f);
+                ed_transtext.addTextChangedListener(new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+                    }
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                    }
+
+                    @Override
+                    public void afterTextChanged(final Editable s) {
+                        final String text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+
+                        h_background.removeCallbacks(trans_edit_runnable);
+                        trans_edit_runnable = new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("text")), false);
+                                    fw.write(text);
+                                    fw.close();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        };
+                        h_background.postDelayed(trans_edit_runnable, 500);
+                    }
+                });
             }
         });
         recognition_done = true;
@@ -368,8 +464,20 @@ public class MainActivity extends Base {
             }
             if (recognition_done) const_transcript = "";
 
+            if (trans_edit_runnable != null) {
+                h_background.removeCallbacks(trans_edit_runnable);
+                h_background.post(trans_edit_runnable);
+            }
+
             recognition_done = false;
-            fab_edit.setVisibility(View.INVISIBLE);
+//            fab_edit.setVisibility(View.INVISIBLE);
+            fab_edit.animate().translationX(128f);
+            fab_copy.animate().translationX(128f);
+            fab_share.animate().translationX(128f);
+            float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
+            fab_rec.animate().translationX(offset);
+            fab_rec.setImageResource(R.drawable.stop);
+
             ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
             final String fpath = filesdir + "tmpfile";
             t_starttrans = new Thread(new Runnable() {
@@ -382,20 +490,16 @@ public class MainActivity extends Base {
             t_starttrans.start();
 
             is_recording = true;
-            bt_rec.setImageResource(R.drawable.mic_off);
 
             h_main.postDelayed(new Runnable() {
                 public void run() {
                     runnable=this;
                     update_text();
-                    h_main.postDelayed(runnable, 100);
+                    h_main.postDelayed(runnable, 25);
                 }
-            }, 100);
+            }, 25);
 
-            bt_pause.setVisibility(View.VISIBLE);
         } else {
-            bt_pause.setVisibility(View.INVISIBLE);
-            bt_rec.setVisibility(View.INVISIBLE);
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
 
@@ -404,9 +508,8 @@ public class MainActivity extends Base {
                     trans_done_runnable=this;
                     h_main.postDelayed(trans_done_runnable, 100);
                     if (recognition_done) {
-                        fab_edit.setVisibility(View.VISIBLE);
-                        bt_rec.setImageResource(R.drawable.mic);
-                        bt_rec.setVisibility(View.VISIBLE);
+                        fab_rec.animate().translationX(0f);
+                        fab_rec.setImageResource(R.drawable.mic_full_inv);
                         spinner.setVisibility(View.INVISIBLE);
                         h_main.removeCallbacks(trans_done_runnable);
                     }
@@ -485,9 +588,15 @@ public class MainActivity extends Base {
 
             //Log.d("Activity", "Touch event "+event.getRawX()+","+event.getRawY()+" "+x+","+y+" rect "+w.getLeft()+","+w.getTop()+","+w.getRight()+","+w.getBottom()+" coords "+scrcoords[0]+","+scrcoords[1]);
             if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) ) {
-
                 InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
                 imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
+                fab_edit.setImageResource(R.drawable.edit);
+                fab_edit.animate().translationY(0.f);
+                fab_share.setVisibility(View.VISIBLE);
+                fab_copy.setVisibility(View.VISIBLE);
+                ed_transtext.clearFocus();
+                ed_transtext.setFocusableInTouchMode(false);
+                just_closed = true;
             }
         }
         return ret;
@@ -529,43 +638,23 @@ public class MainActivity extends Base {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
-        if (!ed_transtext.hasFocus()) {
+        if (!ed_transtext.hasFocus() && !just_closed) {
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
-            Toast t = Toast.makeText(this, "Press edit button to finish.", Toast.LENGTH_SHORT);
-            t.setGravity(Gravity.TOP, 0,0);
-            t.show();
+            fab_edit.setImageResource(R.drawable.done);
+            ed_trans_to_edit_button_distance = fab_edit.getTop() - ed_transtext.getTop() + 10;
+            Log.i("APP", "IN TRANSEDIT EDIT PRESS " + ed_trans_to_edit_button_distance);
+            fab_edit.animate().translationY(-ed_trans_to_edit_button_distance);
+            fab_share.setVisibility(View.INVISIBLE);
+            fab_copy.setVisibility(View.INVISIBLE);
         } else {
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
-            final String text = const_transcript + ed_transtext.getText().toString();
-            if (curr_afile == null) {
-                const_transcript = text;
-            } else {
-                Thread t = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("timed")), false);
-                            fw.write(const_transcript);
-                            fw.close();
-                            String normaltext = text.replaceAll("\n@[\\d.]*:?[\\d.]+\n", "");
-                            fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("text")), false);
-                            fw.write(normaltext);
-                            fw.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                t.setPriority(8);
-                t.start();
-            }
-            ed_transtext.clearFocus();
+            just_closed = false;
+            // everything already done in dispatchTouchEvent
         }
         ed_transtext.setFocusableInTouchMode(false);
     }
+
 
     public void doInference() {
         int[] input = new int[1];

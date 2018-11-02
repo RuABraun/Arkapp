@@ -6,15 +6,21 @@ import android.arch.lifecycle.ViewModelProviders;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.design.internal.BottomNavigationMenuView;
+import android.support.design.widget.BottomNavigationView;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.TextView;
 
 import java.io.File;
@@ -34,12 +40,47 @@ public class Manage extends Base {
     private FileViewModel fviewmodel;
     private FileRepository f_repo;
     private FragmentManager fragManager;
+    private BottomNavigationView bottomNavigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right);
         setContentView(R.layout.activity_manage);
         this.setTitle("Ark - Files");
+
+        bottomNavigationView = findViewById(R.id.botNavigB);
+        bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int item_id = item.getItemId();
+                Intent intent;
+                if (item_id == R.id.Manage) {
+                    return true;
+                }
+                if (item_id == R.id.Transcribe) {
+                    intent = new Intent(getApplicationContext(), MainActivity.class);
+                    startActivity(intent);
+                    return true;
+                }
+                if (item_id == R.id.Settings) {
+                    intent = new Intent(getApplicationContext(), Settings.class);
+                    startActivity(intent);
+                    return true;
+                }
+                return true;
+            }
+        });
+        BottomNavigationView bottomNavigationView = (BottomNavigationView) findViewById(R.id.botNavigB);
+        BottomNavigationMenuView menuView = (BottomNavigationMenuView) bottomNavigationView.getChildAt(0);
+        for (int i = 0; i < menuView.getChildCount(); i++) {
+            final View iconView = menuView.getChildAt(i).findViewById(android.support.design.R.id.icon);
+            final ViewGroup.LayoutParams layoutParams = iconView.getLayoutParams();
+            final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+            layoutParams.height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
+            layoutParams.width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
+            iconView.setLayoutParams(layoutParams);
+        }
 
     }
 
@@ -105,13 +146,11 @@ public class Manage extends Base {
                 adapter.setData(aFiles);
             }
         });
-        TextView tv = findViewById(R.id.empty_view);
 //        if (adapter.getItemCount() == 0) {
 //            Log.i("APP", "IN HERE");
 //            tv.setVisibility(View.VISIBLE);
 //        } else {
 //            Log.i("APP", "IN HERE B");
-        tv.setVisibility(View.GONE);
 
     }
 

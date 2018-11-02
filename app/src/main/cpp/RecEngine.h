@@ -24,7 +24,11 @@
 #include <thread>
 #include "base/timer.h"
 #include <memory>
-
+#include "tensorflow/contrib/lite/model.h"
+#include "tensorflow/contrib/lite/interpreter.h"
+#include "tensorflow/contrib/lite/kernels/register.h"
+#include "tensorflow/contrib/lite/string_util.h"
+#include "tensorflow/contrib/lite/optional_debug_tools.h"
 
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -56,10 +60,10 @@ public:
 
     void recognition_loop();
 
-    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
-                              std::vector<int32>& kept, bool splitwords);
+    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split);
 
 private:
+
     kaldi::Timer timer;
     std::string outtext;
     std::string const_outtext;
@@ -93,8 +97,8 @@ private:
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;
-    kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
     kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
+    kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
     fst::Fst<fst::StdArc>* decode_fst;
     kaldi::OnlineNnet2FeaturePipelineInfo* feature_info = NULL;
     kaldi::nnet3::DecodableNnetSimpleLoopedInfo* decodable_info = NULL;
@@ -130,6 +134,16 @@ private:
     const kaldi::ComposeLatticePrunedOptions* compose_opts;
     bool rnn_ready;
 
+    // case model
+//    std::unique_ptr<tflite::FlatBufferModel> fb_model;
+//    tflite::ops::builtin::BuiltinOpResolver resolver;
+//    std::unique_ptr<tflite::Interpreter> casemodel;
+    int input[1] = {1};
+    float instate[256];
+    float prob[1][3];
+    float outstate[1][256];
+
+    void run_casing();
 
     void write_to_wav(int32 num_frames);
 
