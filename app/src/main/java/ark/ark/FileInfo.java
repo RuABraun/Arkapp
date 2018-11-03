@@ -11,17 +11,21 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
+import android.support.design.widget.FloatingActionButton;
 import android.text.Editable;
 import android.text.Layout;
 import android.text.SpannableString;
 import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextWatcher;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -30,13 +34,16 @@ import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ViewSwitcher;
 
 import org.w3c.dom.Text;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,20 +52,23 @@ public class FileInfo extends Base {
 
     private ImageButton mediaButton;
     private MediaPlayer mPlayer;
-    private Handler mHandler;
+    private HandlerThread handlerThread;
+    private Handler h_background;
     private Handler h_main = new Handler(Looper.getMainLooper());
-    private Runnable title_runnable;
-    private Runnable seekbar_runnable;
+    private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
     private EditText ed_transtext;
     private EditText fileinfo_ed_title;
+    private TextView tv_transtext;
     private String text;
+    private SpannableString text_timed;
     private FileRepository f_repo;
-    private ImageButton button_play_start;
-    private int time_start;
-    private ArrayList times = new ArrayList<Integer>();
-    private ArrayList text_idx_times = new ArrayList<Integer>();
+    private FloatingActionButton editButton;
+    private ViewSwitcher viewSwitcher;
+    private ArrayList word_times_ms = new ArrayList<Integer>();
+    private ArrayList original_words = new ArrayList<String>();
+    private boolean just_closed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,13 +79,14 @@ public class FileInfo extends Base {
         afile = getIntent().getParcelableExtra("file_obj");
 
         mediaButton = findViewById(R.id.mediaButton);
-        button_play_start = findViewById(R.id.button_play_start);
-        time_start = 0;
-        mHandler = new Handler();
+        editButton = findViewById(R.id.fileinfo_edit_button);
+        viewSwitcher = findViewById(R.id.trans_view_switch);
 
         mSeekBar = findViewById(R.id.seekBar);
 
-        setFileFields();
+        ed_transtext = findViewById(R.id.ed_trans);
+        tv_transtext = findViewById(R.id.tv_trans);
+        fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
     }
 
     @Override
@@ -103,6 +114,10 @@ public class FileInfo extends Base {
             }
         });
 
+        if (text == null) {
+            setFileFields();
+        }
+
     }
 
     public void setFileFields() {
@@ -121,43 +136,59 @@ public class FileInfo extends Base {
             fis.read(buffer);
             fis.close();
             normal_text = new String(buffer);
-
-
         } catch(IOException ex) {
             normal_text = "Text file not found!";
         }
         text = normal_text;
-
-        ed_transtext = findViewById(R.id.ed_trans);
         ed_transtext.setText(text);
-        ed_transtext.setOnScrollChangeListener(new View.OnScrollChangeListener() {
-            @Override
-            public void onScrollChange(View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
-                Layout layout = ed_transtext.getLayout();
-                int first_char_idx = layout.getLineStart(layout.getLineForVertical(scrollY));
-                int sz = text_idx_times.size();
-                int time = 0;
-                int lastt = 0;
-//                Log.i("APP", "text " + text.substring(first_char_idx, first_char_idx + 10));
-//                Log.i("APP", "sz " + text.length());
-                for(int i = 0; i < sz; i++) {
-                    int t = (int) text_idx_times.get(i);
-//                    Log.i("APP", "char " + first_char_idx + " t " +t + " "+text.substring(t, t + 10));
-                    if (first_char_idx < t && i == 0) break;
 
-                    if (first_char_idx > lastt && first_char_idx < t) {
-//                        Log.i("APP", "time " + times.get(i));
-                        time = (int) times.get(i);
-                        break;
-                    }
-                    lastt = t;
+        text_timed = new SpannableString(normal_text);
+        fpath = filesdir + afile.fname + file_suffixes.get("timed");
+        String text_timed_str;
+        try {
+            FileInputStream fis = new FileInputStream(fpath);
+            int size = fis.available();
+            byte[] buffer = new byte[size];
+            fis.read(buffer);
+            fis.close();
+            text_timed_str = new String(buffer);
+        } catch(IOException ex) {
+            text_timed_str = "Text file not found!";
+        }
+        StringReader reader = new StringReader(text_timed_str);
+        BufferedReader br = new BufferedReader(reader);
+        String line = "";
+        try {
+            line = br.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        int idx = -1;
+        while (line != null) {
+            String[] line_split = line.split(" ");
+            String word = line_split[0];  // word and space
+            original_words.add(word);
+            final int word_time_ms = (int) (Float.parseFloat(line_split[1]) * 1000.0f);
+            word_times_ms.add(word_time_ms);
+            idx = normal_text.indexOf(word, idx + 1);
+            ClickableSpanPlain span = new ClickableSpanPlain() {
+                @Override
+                public void onClick(View widget) {
+                    mPlayer.seekTo(word_time_ms);
+                    playMediaPlayer();
                 }
-
-                time_start = time;
+            };
+            int idx_end = idx + word.length();
+            text_timed.setSpan(span, idx, idx_end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            try {
+                line = br.readLine();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        });
+        }
+        tv_transtext.setText(text_timed);
+        tv_transtext.setMovementMethod(LinkMovementMethod.getInstance());
 
-        fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
         fileinfo_ed_title.setText(afile.title);
 
         f_repo = new FileRepository(getApplication());
@@ -166,22 +197,22 @@ public class FileInfo extends Base {
     public void playMediaPlayer() {
         mediaButton.setImageResource(R.drawable.pause);
         if (seekbar_runnable != null) {
-            mHandler.removeCallbacks(seekbar_runnable);
+            h_main.removeCallbacks(seekbar_runnable);
         }
         seekbar_runnable = new Runnable() {
             @Override
             public void run() {
                 mSeekBar.setProgress(mPlayer.getCurrentPosition());
-                mHandler.postDelayed(this, 25);
+                h_main.postDelayed(this, 25);
             }
         };
-        mHandler.post(seekbar_runnable);
+        h_main.post(seekbar_runnable);
         mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
                 mSeekBar.setProgress(0);
                 mediaButton.setImageResource(R.drawable.play);
-                mHandler.removeCallbacks(seekbar_runnable);
+                h_main.removeCallbacks(seekbar_runnable);
             }
         });
         mPlayer.start();
@@ -193,68 +224,123 @@ public class FileInfo extends Base {
         if (!mPlayer.isPlaying()) {
             playMediaPlayer();
         } else {
-            mediaButton.setImageResource(R.drawable.play);
             pausePlaying();
         }
     }
 
-    public void onPlayStartClick(View view) {
-        if (is_spamclick()) return;
-
-        pausePlaying();
-        mPlayer.seekTo(time_start);
-        playMediaPlayer();
-
-    }
 
     public void pausePlaying() {
+        mediaButton.setImageResource(R.drawable.play);
         if (mPlayer != null) {
             if (mPlayer.isPlaying()) {
                 mPlayer.pause();
-                if (mHandler != null) {
-                    mHandler.removeCallbacks(seekbar_runnable);
+                if (h_main != null) {
+                    h_main.removeCallbacks(seekbar_runnable);
                 }
             }
         }
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        View v = getCurrentFocus();
+        boolean ret = super.dispatchTouchEvent(event);
+        if (v instanceof EditText) {
+            View w = getCurrentFocus();
+            int scrcoords[] = new int[2];
+            w.getLocationOnScreen(scrcoords);
+            float x = event.getRawX() + w.getLeft() - scrcoords[0];
+            float y = event.getRawY() + w.getTop() - scrcoords[1];
+
+            //Log.d("Activity", "Touch event "+event.getRawX()+","+event.getRawY()+" "+x+","+y+" rect "+w.getLeft()+","+w.getTop()+","+w.getRight()+","+w.getBottom()+" coords "+scrcoords[0]+","+scrcoords[1]);
+            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) ) {
+                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
+
+                ed_transtext.clearFocus();
+                ed_transtext.setFocusableInTouchMode(false);
+                just_closed = true;
+            }
+        }
+        return ret;
     }
 
     public void onEditClick(View view) {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
-        if (!ed_transtext.hasFocus()) {
+        if (!ed_transtext.hasFocus() && !just_closed) {
+            viewSwitcher.showNext();
+
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
-            Toast t = Toast.makeText(this, "Press edit button again to finish.", Toast.LENGTH_SHORT);
-            t.setGravity(Gravity.TOP, 0,0);
-            t.show();
-        } else {
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
-            final String simpletext = ed_transtext.getText().toString();
+            editButton.setImageResource(R.drawable.done);
 
-            Thread t = new Thread(new Runnable() {
+            ed_transtext.addTextChangedListener(new TextWatcher() {
                 @Override
-                public void run() {
-                    try {
-                        FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("timed")), false);
-                        fw.write(simpletext);
-                        fw.close();
-                        String normaltext = simpletext.replaceAll("\n[\\d.]*:?[\\d.]+\n", "");
-                        fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("text")), false);
-                        fw.write(normaltext);
-                        fw.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    final String new_text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                    h_background.removeCallbacks(ed_trans_runnable);
+                    ed_trans_runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("text")), false);
+                                fw.write(new_text);
+                                fw.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+                    h_background.postDelayed(ed_trans_runnable, 500);
                 }
             });
-            t.setPriority(8);
-            t.start();
+        } else {
+            just_closed = false;
 
-//            ed_transtext.setText(text);
-            ed_transtext.clearFocus();
+            if (ed_trans_runnable != null) {
+                h_background.removeCallbacks(ed_trans_runnable);
+                ed_trans_runnable.run();
+            }
+
+            final String new_text = ed_transtext.getText().toString();
+            SpannableString new_text_timed = new SpannableString(new_text);
+            int idx = -1;
+            int len = new_text.length();
+            int i = 0;
+            while(idx < len) {
+                String word = (String) original_words.get(i);
+                idx = new_text.indexOf(word, idx + 1);
+                if (idx == -1) break;
+                final int time_ms = (int) word_times_ms.get(i);
+                ClickableSpanPlain span = new ClickableSpanPlain() {
+                    @Override
+                    public void onClick(View widget) {
+                        mPlayer.seekTo(time_ms);
+                        playMediaPlayer();
+                    }
+                };
+                int idx_end = idx + word.length();
+                new_text_timed.setSpan(span, idx, idx_end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                i++;
+            }
+            tv_transtext.setText(new_text_timed);
+            tv_transtext.setMovementMethod(LinkMovementMethod.getInstance());
+
+            editButton.setImageResource(R.drawable.edit);
+            viewSwitcher.showNext();
         }
         ed_transtext.setFocusableInTouchMode(false);
     }
@@ -315,6 +401,10 @@ public class FileInfo extends Base {
     @Override
     protected void onResume() {
         super.onResume();
+        handlerThread = new HandlerThread("BackgroundHandlerThread");
+        handlerThread.start();
+        h_background = new Handler(handlerThread.getLooper());
+
         fileinfo_ed_title.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -331,7 +421,7 @@ public class FileInfo extends Base {
                 Log.i("APP", "In text change.");
                 final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
                 final String fname = MainActivity.getFileName(cname, f_repo);
-                mHandler.removeCallbacks(title_runnable);
+                h_background.removeCallbacks(title_runnable);
 
                 title_runnable = new Runnable() {
                     @Override
@@ -340,20 +430,30 @@ public class FileInfo extends Base {
                         f_repo.rename(afile, cname, fname);
                     }
                 };
-                mHandler.postDelayed(title_runnable, 2000);
+                h_background.postDelayed(title_runnable, 500);
 
             }
         });
     }
-
 
     @Override
     protected void onPause() {
         super.onPause();
         pausePlaying();
         if (title_runnable != null) {
-            mHandler.removeCallbacks(title_runnable);
+            h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
+        if (ed_trans_runnable != null) {
+            h_background.removeCallbacks(ed_trans_runnable);
+            ed_trans_runnable.run();
+        }
+        handlerThread.quit();
+    }
+}
+
+abstract class ClickableSpanPlain extends ClickableSpan {
+    public void updateDrawState(TextPaint ds) {
+        ds.setUnderlineText(false);
     }
 }

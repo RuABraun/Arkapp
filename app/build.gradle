@@ -15,7 +15,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared"
             }
             ndkBuild {
-                arguments '-j4'
+                arguments '-j8'
             }
         }
     }
@@ -52,6 +52,7 @@ dependencies {
     implementation 'android.arch.persistence.room:runtime:1.1.1'
     implementation 'com.android.support:design:27.1.1'
     implementation 'org.tensorflow:tensorflow-lite:+'
+    implementation 'com.android.support:design:27.1.1'
     annotationProcessor 'android.arch.persistence.room:compiler:1.1.1'
     implementation "android.arch.lifecycle:extensions:1.1.1"
     annotationProcessor "android.arch.lifecycle:compiler:1.1.1"

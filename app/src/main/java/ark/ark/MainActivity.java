@@ -575,10 +575,8 @@ public class MainActivity extends Base {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-
         View v = getCurrentFocus();
         boolean ret = super.dispatchTouchEvent(event);
-
         if (v instanceof EditText) {
             View w = getCurrentFocus();
             int scrcoords[] = new int[2];

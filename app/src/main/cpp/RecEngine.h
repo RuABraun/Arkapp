@@ -60,7 +60,8 @@ public:
 
     void recognition_loop();
 
-    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split);
+    std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
+                              std::vector<int32>& indcs_kept, bool split);
 
 private:
 

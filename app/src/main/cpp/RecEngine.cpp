@@ -359,6 +359,7 @@ void RecEngine::write_to_wav(int32 num_frames) {
 void RecEngine::recognition_loop() {
     Timer timer_rnn;
     std::vector<std::string> dummy;
+    std::vector<int32> dummyb;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
@@ -403,7 +404,7 @@ void RecEngine::recognition_loop() {
 
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
 
-                std::string tmpstr = prettify_text(words, dummy);
+                std::string tmpstr = prettify_text(words, dummy, dummyb, false);
 
                 outtext = tmpstr;
             }
@@ -624,7 +625,8 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
     std::vector<std::string> words_split;
-    std::string text = prettify_text(words, words_split);
+    std::vector<int32> indcs_kept;
+    std::string text = prettify_text(words, words_split, indcs_kept, true);
 
     outtext = "";
     const_outtext = const_outtext + text;
@@ -635,8 +637,9 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
         fwrite(" ", 1, 1, os_ctm);
-        std::string wtime = std::to_string(frame_shift * times[j]);
-        fwrite(wtime.c_str(), 1, wtime.size(), os_ctm);
+        std::string wtime = std::to_string(frame_shift * times[indcs_kept[j]]);
+        size_t sz = wtime.find('.') + 2;
+        fwrite(wtime.c_str(), 1, sz, os_ctm);
         fwrite("\n", 1, 1, os_ctm);
     }
 
@@ -662,7 +665,8 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 //    KALDI_LOG << "pro/bs: " << probs[0][0] << " " << probs[0][1] << " " << probs[0][2];
 //}
 
-std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split) {
+std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
+                                     std::vector<int32>& indcs_kept, bool split) {
     /*   Converts integer ids to words, adds . and replaces <unk>.
      *
      */
@@ -685,7 +689,10 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         }
         wcnt++;
         std::string wplus = word + ' ';
-        words_split.push_back(word);
+        if (split) {
+            words_split.push_back(word);
+            indcs_kept.push_back(j);
+        }
         text += wplus;
 
     }
