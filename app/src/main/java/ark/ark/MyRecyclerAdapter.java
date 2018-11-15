@@ -5,16 +5,21 @@ import android.app.FragmentManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Rect;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Filter;
 import android.widget.Filterable;
+import android.widget.ImageButton;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,6 +29,9 @@ import org.w3c.dom.Text;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import ark.ark.Base;
+
+import static ark.ark.Base.rmodeldir;
 
 public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.ViewHolder> implements Filterable {
     private List<AFile> data_;
@@ -32,6 +40,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
     private Context context;
     private FileRepository f_repo;
     private FragmentManager fragmentManager;
+    private Thread t;
 
     MyRecyclerAdapter(Context ctx, FileRepository f_repo, FragmentManager fragmentManager) {
         this.context = ctx;
@@ -52,22 +61,16 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
         holder.tv_fname.setText(elem.title);
         holder.tv_date.setText(elem.date);
 
-        int len_s = elem.len_s;
-        Log.i("APP", "length s " + len_s);
-        ArrayList rests = new ArrayList();
-        while (len_s % 60 != 0) {
-            rests.add(len_s % 60);
-            len_s /= 60;
-        }
-        String[] times = {"h ", "m ", "s"};
-        int start_idx = 3 - rests.size();
-        String duration = "";
-        for (int i = start_idx; i < 3; i++) {
-            duration += String.valueOf(rests.get(2-i)) + times[i];  // -i to reverse
-        }
+        String duration = Base.sec_to_timestr(elem.len_s);
         holder.tv_flen.setText(duration);
         holder.curr_pos = pos;
 
+        File txt_file = new File(Base.filesdir + elem.fname + Base.file_suffixes.get("text"));
+        if (txt_file.exists()) {
+            holder.button_trans.setImageResource(R.drawable.textfile);
+        } else {
+            holder.button_trans.setImageResource(R.drawable.mic_full);
+        }
     }
 
     @Override
@@ -81,6 +84,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         TextView tv_fname, tv_flen, tv_date;
+        ImageButton button_opts, button_trans, button_img;
         public View itemView;
         public int curr_pos;
 
@@ -89,16 +93,55 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             tv_fname = v.findViewById(R.id.Row_Filename);
             tv_flen = v.findViewById(R.id.Row_Audiolength);
             tv_date = v.findViewById(R.id.Row_Date);
+            button_opts = v.findViewById(R.id.Row_ViewOpts);
+            button_trans = v.findViewById(R.id.Row_TransBut);
 
-            itemView = v;
-            itemView.setOnClickListener(new View.OnClickListener() {
+            button_trans.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
 
+                    final AFile afile_to_use = data_filtered_.get(curr_pos);
+                    String fname = afile_to_use.fname;
+                    final String fpath = Base.filesdir + fname;
+                    final String wavpath = Base.filesdir + fname + ".wav";
+                    MediaPlayer mPlayer = MediaPlayer.create(context, Uri.parse(wavpath));
+                    int dur = (int) ((float)mPlayer.getDuration() / 4000.0f);
+                    String est_time = Base.sec_to_timestr(dur);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                    builder.setTitle("Transcribe audio file")
+                            .setMessage("This is estimated to take: " + est_time + "\n\nThis will run in the background so" +
+                                    " you can switch to other apps while it runs, but your phone will run slower than normal.")
+                            .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    final RecEngine recEngine = RecEngine.getInstance(rmodeldir);  // RISKY!! what if it was GCed and needs to be recreated?
+                                    t = new Thread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            recEngine.transcribe_file(wavpath, fpath);
+                                        }
+                                    });
+                                    t.setPriority(6);
+                                    t.start();
+                                    dialog.dismiss();
+                                }
+                            }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                    });
+                    AlertDialog alert = builder.create();
+                    alert.show();
+                    TextView tv = (TextView) alert.findViewById(android.R.id.message);
+                    tv.setTextSize(18);
+                }
+            });
+
+            button_opts.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
                     PopupMenu popup = new PopupMenu(context, v);
-
                     popup.inflate(R.menu.menu_file);
-
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         @Override
                         public boolean onMenuItemClick(MenuItem item) {
@@ -123,13 +166,13 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                 case R.id.Delete:
                                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
                                     builder.setTitle("Confirm")
-                                        .setMessage("Are you sure?")
-                                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                                            public void onClick(DialogInterface dialog, int which) {
-                                                delete(afile_to_use, curr_pos);
-                                                dialog.dismiss();
-                                            }
-                                        }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                                            .setMessage("Are you sure?")
+                                            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    delete(afile_to_use, curr_pos);
+                                                    dialog.dismiss();
+                                                }
+                                            }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
                                             dialog.dismiss();
@@ -146,6 +189,25 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                         }
                     });
                     popup.show();
+
+                }
+            });
+
+            itemView = v;
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final AFile afile_to_use = data_filtered_.get(curr_pos);
+                    File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
+                    if (!f.exists()) {
+                        Log.i("APP", "File does not exist, title: " +
+                                afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
+                        Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Intent intent = new Intent(context, FileInfo.class);
+                    intent.putExtra("file_obj", afile_to_use);
+                    context.startActivity(intent);
                 }
             });
         }

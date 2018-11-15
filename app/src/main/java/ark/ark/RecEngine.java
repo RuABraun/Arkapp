@@ -73,6 +73,13 @@ public class RecEngine {
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
 
+    public void transcribe_file(String wavpath, String fpath) {
+        Log.i("APP", String.format("Using EngineHandle: %d", mEngineHandle));
+        if (mEngineHandle != 0) {
+            native_transcribe_file(mEngineHandle, wavpath, fpath);
+        }
+    }
+
     public static native long native_createEngine(String modeldir);
     public static native void native_deleteEngine(long engineHandle);
     public static native void native_setAudioDeviceId(long engineHandle, int deviceId);

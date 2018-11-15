@@ -1,11 +1,17 @@
 package ark.ark;
 
+import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
+import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.internal.BottomNavigationMenuView;
@@ -22,8 +28,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -87,7 +102,6 @@ public class Manage extends Base {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
         getMenuInflater().inflate(R.menu.menu_manage, menu);
 
         final MenuItem searchItem = menu.findItem(R.id.action_search);
@@ -105,7 +119,87 @@ public class Manage extends Base {
                 return false;
             }
         });
+
+        MenuItem addItem = menu.findItem(R.id.action_add);
+        addItem.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem item) {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("*/*");
+                startActivityForResult(intent, 7);
+                return false;
+            }
+        });
+
         return true;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch(requestCode) {
+            case 7:
+                if (resultCode == RESULT_OK) {
+                    Uri furi = data.getData();
+                    String name = "";
+                    String path = "";
+                    boolean copied = false;
+                    if (furi.getScheme().equals(ContentResolver.SCHEME_FILE)) {
+                        path = furi.getPath();
+                        name = furi.getLastPathSegment();
+                        Log.i("APP", "path " + path + " filename " + name);
+                    } else if (furi.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
+                        copied = true;
+                        Cursor retCursor = getContentResolver().query(furi, null, null, null, null);
+                        retCursor.moveToFirst();
+                        int idx_name = retCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                        name = retCursor.getString(idx_name);
+                        String[] split = name.split("\\.");
+                        if (split.length == 2 && split[1].equals("wav")) {
+                            path = filesdir + split[0] + ".wav";
+                            InputStream inputStream = null;
+                            try {
+                                inputStream = getContentResolver().openInputStream(furi);
+                            } catch (FileNotFoundException e) {
+                                e.printStackTrace();
+                            }
+                            copyFileFromInputStream(inputStream, new File(path));
+                            Log.i("APP", "name " + name + " path " + path);
+                        }
+                    } else {
+                        Log.i("APP", "bla bla bla other scheme");
+                    }
+                    String[] split = name.split("\\.");
+                    Log.i("APP", "name " + name + " splitlen " + split.length + " split1 " + split[1]);
+                    if (split.length != 2 || !split[1].equals("wav")) {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                        builder.setMessage("The file has to be in wav format! There are converters available online.");
+                        builder.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                            }
+                        });
+                        AlertDialog alert = builder.create();
+                        alert.show();
+                        break;
+                    }
+                    MediaPlayer mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(path));
+                    int dur = (int) ((float)mPlayer.getDuration() / 1000.0f);
+                    mPlayer.release();
+                    String fname = split[0];
+                    String fpath_new = filesdir + fname + ".wav";
+                    if (!copied) {
+                        try {
+                            copy(new File(path), new File(fpath_new));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    AFile afile = new AFile(fname, fname, dur, getFileDate());
+                    f_repo.insert(afile);
+                }
+                break;
+        }
     }
 
     @Override
@@ -169,6 +263,53 @@ public class Manage extends Base {
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
+    }
+
+    public static void copy(File src, File dst) throws IOException {
+        InputStream in = new FileInputStream(src);
+        try {
+            OutputStream out = new FileOutputStream(dst);
+            try {
+                // Transfer bytes from in to out
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
+    }
+
+    public boolean copyFileFromInputStream(InputStream inputStream, File dest) {
+        OutputStream outputStream = null;
+        try {
+            outputStream = new FileOutputStream(dest);
+            final byte[] buffer = new byte[64 * 1024]; // 64KB
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.flush();
+            return true;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            try {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+
+                if (outputStream != null) {
+                    outputStream.close();
+                }
+            } catch (IOException e) {
+                return false;
+            }
+        }
     }
 
 }

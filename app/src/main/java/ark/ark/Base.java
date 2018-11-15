@@ -12,9 +12,12 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class Base extends AppCompatActivity {
@@ -67,6 +70,28 @@ public class Base extends AppCompatActivity {
             to = new File(filesdir + fname + suffix);
             from.renameTo(to);
         }
+    }
+
+    public String getFileDate() {
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
+        Date now = new Date();
+        String date = sdf.format(now);
+        return date;
+    }
+
+    public static String sec_to_timestr(int dur) {
+        ArrayList rests = new ArrayList();
+        while (dur % 60 != 0) {
+            rests.add(dur % 60);
+            dur /= 60;
+        }
+        String[] times = {"h ", "m ", "s"};
+        int start_idx = 3 - rests.size();
+        String duration = "";
+        for (int i = start_idx; i < 3; i++) {
+            duration += String.valueOf(rests.get(2-i)) + times[i];  // -i to reverse
+        }
+        return duration;
     }
 }
 

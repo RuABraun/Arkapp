@@ -20,26 +20,23 @@
             android:id="@+id/Row_Filename"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="2dp"
             android:fontFamily="@font/roboto"
             android:text="Filename"
             android:textColor="@color/colorText"
             android:textSize="18sp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintStart_toStartOf="@+id/Row_Date"
+            app:layout_constraintTop_toBottomOf="@+id/Row_Date" />
 
         <TextView
             android:id="@+id/Row_Audiolength"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="2dp"
             android:fontFamily="@font/roboto_slab"
             android:text="Audiolength"
             android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="@+id/Row_Filename"
             app:layout_constraintTop_toBottomOf="@+id/Row_Filename" />
 
@@ -47,13 +44,39 @@
             android:id="@+id/Row_Date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
             android:fontFamily="@font/roboto_slab"
             android:text="Date"
             android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="@+id/Row_Audiolength"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintStart_toEndOf="@+id/Row_TransBut"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageButton
+            android:id="@+id/Row_ViewOpts"
+            android:layout_width="32dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="8dp"
+            android:layout_marginTop="8dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/more_vert"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageButton
+            android:id="@+id/Row_TransBut"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginBottom="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/border"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+             />
 
     </android.support.constraint.ConstraintLayout>
 </android.support.v7.widget.CardView>

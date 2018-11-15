@@ -7,7 +7,6 @@ cmake_minimum_required(VERSION 3.4.1)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror -Wno-unused-variable")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3 -DNDEBUG -Wall -Wno-unused")
 
-
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -17,16 +16,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3 -DNDEBUG -Wall -Wno-unuse
 set(OBOE_DIR /home/seni/git/oboe)
 add_subdirectory (${OBOE_DIR} ./oboe)
 include_directories (${OBOE_DIR}/include)
-
-# Flatbuffer
-set(FLATB_DIR /home/seni/git/flatbuffers)
-#add_subdirectory(${FLATB_DIR} ./flatbuffers)
-include_directories(${FLATB_DIR}/include)
-include_directories(${FLATB_DIR}/grpc)
-
-file(GLOB flatb_src "${FLATB_DIR}/src/*.cpp")
-add_library(flatbuffer ${flatb_src})
-
 
 
 set (DEBUG_UTILS_PATH "../debug-utils")
@@ -56,16 +45,20 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
-# tensorflow lite
-#set(dist_DIR /home/seni/git/tensorflow-android/lib)
+set(FLATB_DIR /home/seni/git/flatbuffers)
+include_directories(${FLATB_DIR}/include)
+include_directories(${FLATB_DIR}/grpc)
+
+file(GLOB flatb_src "${FLATB_DIR}/src/*.cpp")
+add_library(flatbuffer ${flatb_src})
+
+
+# tensorflow #
+include_directories(/home/seni/git/tensorflow-android )
 
 add_library(libtensorflowlite SHARED IMPORTED)
-set_target_properties(libtensorflowlite PROPERTIES IMPORTED_LOCATION
-        /home/seni/AndroidStudioProjects/Ark/app/src/main/jniLibs/armeabi-v7a/libtensorflowlite.so)
+set_target_properties(libtensorflowlite PROPERTIES IMPORTED_LOCATION /home/seni/AndroidStudioProjects/Ark/app/src/main/jniLibs/armeabi-v7a/libtensorflowlite.so)
 
-
-include_directories(/home/seni/git/tensorflow-android)
-#link_directories(/home/seni/git/tensorflow-android/lib)
 
 
 # kaldi
@@ -79,7 +72,7 @@ link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi
 
 
 target_link_libraries( # Specifies the target library.
-                       rec-engine android oboe flatbuffer libtensorflowlite
+                       rec-engine android oboe libtensorflowlite flatbuffer
                        ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/util/kaldi-util.a
                        ${KALDIPATH}/lat/kaldi-lat.a ${KALDIPATH}/decoder/kaldi-decoder.a ${KALDIPATH}/matrix/kaldi-matrix.a
                        ${KALDIPATH}/hmm/kaldi-hmm.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/../tools/openfst/lib/libfst.a

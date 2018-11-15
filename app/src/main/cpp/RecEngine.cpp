@@ -8,6 +8,7 @@
 #include "RecEngine.h"
 #include <stdio.h>
 #include <chrono>
+#include <tensorflow/lite/c/c_api_internal.h>
 
 using namespace kaldi;
 using namespace fst;
@@ -101,7 +102,9 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
 
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(2, 2, -1, 15, 59999, 149889, modeldir);
+    std:vector<int32> ids;
+    kaldi::readNumsFromFile(modeldir + "ids.int", ids);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, modeldir);
 
     rnn_info = new rnnlm::RnnlmComputeStateInfo(*rnn_opts, rnnlm, (*word_emb_mat));
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, *rnn_info);
@@ -115,11 +118,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_opts(modeldir + "mfcc.conf", "mfcc") {
-    start_logger();
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
+                                            sil_config(0.001f, ""),
+                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "") {
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
+    start_logger();
     model_dir = modeldir;
     std::string nnet3_rxfilename = modeldir + "final.mdl",
             fst_rxfilename = modeldir + "HCLG.fst",
@@ -168,15 +173,20 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3), feature_
     recognition_on = false;
     do_recognition = false;
 
-    std::string casemodel_path = modeldir + "tf_model.lite";
-//    fb_model =
+    // Case model
+    LOGI("Doing case");
+    std::string casemodel_path = modeldir + "tf_model.tflite";
+    flatbuffer_model  = tflite::FlatBufferModel::BuildFromFile(casemodel_path.c_str());
 
-    /*std::unique_ptr<tflite::FlatBufferModel> model;
-    model = tflite::FlatBufferModel::BuildFromFile(casemodel_path.c_str());
-    std::unique_ptr<tflite::Interpreter> interpreter;
     tflite::ops::builtin::BuiltinOpResolver resolver;
-    tflite::InterpreterBuilder(*model, resolver)(&interpreter);*/
-
+    tflite::InterpreterBuilder builder(*flatbuffer_model.get(), resolver);
+    builder(&interpreter);
+    std::vector<int32> dims = {1, 7};
+    interpreter->ResizeInputTensor(0, dims);
+    if (interpreter->AllocateTensors() != kTfLiteOk) {
+        LOGE("FAILED TO ALLOCATE");
+    }
+    kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
 
     t.join();
     LOGI("Finished constructing rec");
@@ -272,7 +282,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 3.0);
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 5.0, 40, 3.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -517,90 +527,6 @@ void RecEngine::setDeviceId(int32_t deviceId) {
     mRecDeviceId = deviceId;
 }
 
-void RecEngine::transcribe_file(std::string wavpath, std::string ctm) {
-    //start_logger();
-    try {
-        LOGI("Transcribing file");
-        using namespace kaldi;
-        using namespace fst;
-
-        typedef int32 int32;
-        typedef int64 int64;
-
-        BaseFloat chunk_length_secs = 0.18;
-
-        LatticeFasterDecoderConfig decoder_opts(7.0, 3000, 6.0, 25, 4.0);
-
-        feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
-        decoder = new SingleUtteranceNnet3Decoder(decoder_opts, trans_model,
-                                                         *decodable_info, *decode_fst, feature_pipeline);
-
-        std::string wav_rspecifier = wavpath, ctm_wxfilename = ctm;
-        std::string align_lex = model_dir + "align_lexicon.int";
-
-        std::vector<std::vector<int32>> lexicon;
-        {
-            std::ifstream is(align_lex, std::ifstream::in);
-            ReadLexiconForWordAlign(is, &lexicon);
-        }
-        WordAlignLatticeLexiconInfo lexicon_info(lexicon);
-        WordAlignLatticeLexiconOpts opts;
-
-        Output ko(ctm_wxfilename, false);
-        ko.Stream() << std::fixed;
-        ko.Stream().precision(2);
-
-        WaveHolder wavholder;
-        std::ifstream wavis(wavpath, std::ios::binary);
-        wavholder.Read(wavis);
-        const WaveData &wave_data = wavholder.Value();
-        SubVector<BaseFloat> data(wave_data.Data(), 0);
-
-        BaseFloat samp_freq = wave_data.SampFreq();
-        int32 chunk_length;
-
-        if (chunk_length_secs > 0) {
-            chunk_length = int32(samp_freq * chunk_length_secs);
-        if (chunk_length == 0) chunk_length = 1;
-        } else {
-            chunk_length = std::numeric_limits<int32>::max();
-        }
-
-        int32 samp_offset = 0;
-        LOGI("Starting decoding.");
-
-        while (samp_offset < data.Dim()) {
-            int32 samp_remaining = data.Dim() - samp_offset;
-            int32 num_samp = chunk_length < samp_remaining ? chunk_length : samp_remaining;
-
-            SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
-
-            feature_pipeline->AcceptWaveform(samp_freq, wave_part);
-
-            samp_offset += num_samp;
-            if (samp_offset == data.Dim()) {
-                // no more input. flush out last frames
-                feature_pipeline->InputFinished();
-            }
-
-            decoder->AdvanceDecoding();
-
-        }
-        decoder->FinalizeDecoding();
-        CompactLattice clat;
-        bool end_of_utterance = true;
-        decoder->GetLattice(end_of_utterance, &clat);
-
-        //write_ctm(&clat, &trans_model, lexicon_info, opts, frame_shift, word_syms, &ko);
-
-        LOGI("Decoded file.");
-
-    } catch(const std::exception& e) {
-        LOGE("FAILED FAILED FAILED");
-        LOGE("ERROR %s",  e.what());
-        throw;
-    }
-}
 
 void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
@@ -650,30 +576,98 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 }
 
-//void RecEngine::run_casing() {
-//
-//    int* in = casemodel.get()->typed_input_tensor<int>(0);
-//    in[0] = 1;
-//
-//    float* instate = casemodel.get()->typed_input_tensor<float>(1);
-//    for(int i = 0; i < 256; i++) instate[i] = 0.f;
-//
-//    casemodel.get()->Invoke();
-//
-//    float** probs =  casemodel.get()->typed_input_tensor<float*>(0);
-//
-//    KALDI_LOG << "pro/bs: " << probs[0][0] << " " << probs[0][1] << " " << probs[0][2];
-//}
+int32 RecEngine::run_casing(std::vector<int32> casewords) {
+    int32 sz = casewords.size();
+    if (sz < 7) {
+        casewords.insert(casewords.begin(), 7 - sz, case_zero_index);
+    }
+    if (sz > 7) LOGE("SIZE IS OVER 7, SOMETHING WENT WRONG");
+    TfLiteTensor* input_tensor = interpreter->tensor(0);
+
+    int32* input = interpreter->typed_input_tensor<int32>(0);
+
+//    std::string s = "";
+//    for(int i = 0; i < 7; i++) s += std::to_string(casewords[i]) + " ";
+
+    for(int i = 0; i < 7; i++) input[i] = casewords[i];
+
+    interpreter->Invoke();
+    float* output = interpreter->typed_output_tensor<float>(0);
+    int32 argmax = -1;
+    float maxprob = 0.f;
+
+    for(int32 i = 0; i < 3; i++) {
+        float out = output[i];
+        if (out > maxprob) {
+            maxprob = out;
+            argmax = i;
+        }
+    }
+    LOGI("max %d", argmax);
+    return argmax;
+}
+
+void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* casing) {
+    int32 sz = words->size();
+    if (sz < 3) {
+        casing->resize(sz, 0);
+        return;
+    }
+
+    std::vector<int32> words_nosil;
+
+    words_nosil.reserve(sz);
+    for(int32 i = 0; i < sz; i++) {  // removes epsilon words
+        int32 w = (*words)[i];
+        if (w != 0) words_nosil.push_back(w);
+    }
+
+    // Convert ids
+    sz = words_nosil.size();
+    std::vector<int32> casewords;
+    for(int32 i = 0; i < sz; i++) {
+        int32 id = nid_to_caseid[words_nosil[i]];
+        casewords.push_back(id);
+    }
+
+    std::vector<int32> casewords_sentence(7);
+    int32 lastidx = sz - 1;
+    casing->resize(sz, 0);
+    for(int32 i = 1; i < lastidx; i++) {
+        int32 startidx = i - 5;
+        if (startidx < 0) startidx = 0;
+        int32 endidx = i + 1;  // +2 so it points one past
+
+        int32 k = 6;
+        for(int32 j = endidx; j >= startidx; j--, k--) {
+            casewords_sentence[k] = casewords[j];
+        }
+        std::string s = "";
+        for(int i = 0; i < casewords_sentence.size(); i++) s += std::to_string(casewords_sentence[i]) + " ";
+
+        (*casing)[i] = run_casing(casewords_sentence);
+    }
+}
 
 std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
                                      std::vector<int32>& indcs_kept, bool split) {
-    /*   Converts integer ids to words, adds . and replaces <unk>.
+    /*   Does casing, converts integer ids to words, adds . and replaces <unk>.
      *
      */
+    int32 num_words = words.size();
+    std::vector<int32> case_decs;  // case decisions
+    if (split) {
+        LOGI("CALLING GETTEXT");
+        get_text_case(&words, &case_decs);
+        LOGI("DONE CALLING GETTEXT");
+    } else {
+        case_decs.resize(num_words, 0);
+    }
+
     std::string text = "";
     bool doupper = false;
-    int32 num_words = words.size();
     int32 wcnt = 0;
+    int32 real_num_word = case_decs.size();
     for(size_t j = 0; j < num_words; j++) {
 
         int32 w = words[j];
@@ -683,12 +677,20 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 
         if (word == "<unk>") word = "[unknown]";
 
+        if (split && case_decs[wcnt] > 0) doupper = true;
         if (wcnt == 0 || doupper) {
             word[0] = (char) toupper((int) word[0]);  // if this next if should be false
             doupper = false;
         }
+
+        std::string wplus;
+//        LOGI("%d %d", j, num_words);
+        if ((split && wcnt != case_decs.size() - 1 && case_decs[wcnt+1] == 2) || (split && wcnt == real_num_word - 1)) {
+            wplus = word + ". ";
+        } else {
+            wplus = word + ' ';
+        }
         wcnt++;
-        std::string wplus = word + ' ';
         if (split) {
             words_split.push_back(word);
             indcs_kept.push_back(j);
@@ -696,5 +698,86 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         text += wplus;
 
     }
+    LOGI("FIN PRETTY");
     return text;
+}
+
+void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
+    start_logger();
+    try {
+        LOGI("Transcribing file");
+        using namespace kaldi;
+        using namespace fst;
+
+        typedef int32 int32;
+        typedef int64 int64;
+
+        BaseFloat chunk_length_secs = 0.72;
+
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 5.0, 40, 3.0);
+        decoder_opts->determinize_lattice = true;
+
+        feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
+        decoder = new SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
+                                                  *decodable_info, *decode_fst, feature_pipeline);
+
+        WaveHolder wavholder;
+        std::ifstream wavis(wavpath, std::ios::binary);
+        wavholder.Read(wavis);
+        const WaveData &wave_data = wavholder.Value();
+        SubVector<BaseFloat> data(wave_data.Data(), 0);
+
+        BaseFloat samp_freq = wave_data.SampFreq();
+        int32 chunk_length;
+
+        if (chunk_length_secs > 0) {
+            chunk_length = int32(samp_freq * chunk_length_secs);
+            if (chunk_length == 0) chunk_length = 1;
+        } else {
+            chunk_length = std::numeric_limits<int32>::max();
+        }
+
+        int32 samp_offset = 0;
+        LOGI("Starting decoding.");
+
+        while (samp_offset < data.Dim()) {
+            int32 samp_remaining = data.Dim() - samp_offset;
+            int32 num_samp = chunk_length < samp_remaining ? chunk_length : samp_remaining;
+
+            SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
+
+            feature_pipeline->AcceptWaveform(samp_freq, wave_part);
+
+            samp_offset += num_samp;
+            if (samp_offset == data.Dim()) {
+                // no more input. flush out last frames
+                feature_pipeline->InputFinished();
+            }
+
+            decoder->AdvanceDecoding();
+
+        }
+        decoder->FinalizeDecoding();
+        CompactLattice clat;
+        bool end_of_utterance = true;
+        decoder->GetLattice(end_of_utterance, &clat);
+        int32 num_out_frames = decoder->NumFramesDecoded();
+
+        std::string ctmpath = fpath + "_timed.txt";
+        os_ctm = fopen(ctmpath.c_str(), "wt");
+        std::string txtpath = fpath + ".txt";
+        os_txt = fopen(txtpath.c_str(), "wt");
+
+        finish_segment(&clat, num_out_frames);
+
+        fclose(os_ctm);
+        fclose(os_txt);
+
+        LOGI("Decoded file.");
+
+    } catch(const std::exception& e) {
+        LOGE("FAILED FAILED FAILED");
+        LOGE("ERROR %s",  e.what());
+        throw;
+    }
 }

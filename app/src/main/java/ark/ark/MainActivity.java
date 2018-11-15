@@ -1,39 +1,27 @@
 package ark.ark;
 
 import android.Manifest;
-import android.animation.ObjectAnimator;
-import android.app.Activity;
-import android.app.ActivityManager;
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.constraint.ConstraintLayout;
 import android.support.design.internal.BottomNavigationMenuView;
 import android.support.design.widget.BottomNavigationView;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.DialogFragment;
-import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
@@ -41,30 +29,16 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.ProgressBar;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ViewSwitcher;
-import org.tensorflow.lite.Interpreter;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends Base {
@@ -101,10 +75,11 @@ public class MainActivity extends Base {
     final String PREFS_NAME = "MyPrefsFile";
     Thread t_del, t_stoptrans, t_starttrans;
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
-    private Interpreter casemodel;
     private BottomNavigationView bottomNavigationView;
     private float ed_trans_to_edit_button_distance;
     private boolean just_closed = false;
+    private ProgressBar pb_init;
+    private TextView tv_init;
 
     static {
         System.loadLibrary("rec-engine");
@@ -113,6 +88,32 @@ public class MainActivity extends Base {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        if (settings.getBoolean("is_first_time", true)) {
+            pb_init.setVisibility(View.VISIBLE);
+            tv_init.setVisibility(View.VISIBLE);
+            spinner.setVisibility(View.INVISIBLE);
+            Log.i("APP", "Running for the first time.");
+            t_del = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    String[] dirs = {rmodeldir, filesdir};
+                    for(String dir: dirs) {
+                        File d = new File(dir);
+                        File[] dirfiles = d.listFiles();
+                        if (dirfiles != null) {
+                            for (File fobj : dirfiles) {
+                                fobj.delete();
+                            }
+                            d.delete();
+                        }
+                    }
+                }
+            });
+            settings.edit().putBoolean("is_first_time", false).apply();
+            t_del.setPriority(6);
+            t_del.start();
+        }
         switch (requestCode){
             case REQUEST_PERMISSIONS_CODE:
                 for(int i=0; i < grantResults.length; i++) {
@@ -125,32 +126,12 @@ public class MainActivity extends Base {
                 break;
         }
         perm_granted = true;
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
-        if (settings.getBoolean("is_first_time", true)) {
-            Log.i("APP", "Running for the first time.");
-            t_del = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    String[] dirs = {rmodeldir, filesdir};
-                    for(String dir: dirs) {
-                        File d = new File(dir);
-                        for(File fobj: d.listFiles()) {
-                            fobj.delete();
-                        }
-                        d.delete();
-                    }
-                }
-            });
-            settings.edit().putBoolean("is_first_time", false).apply();
-            t_del.setPriority(6);
-            t_del.start();
-        }
         onStart();
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(R.style.AppTheme);
+        setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
@@ -169,6 +150,9 @@ public class MainActivity extends Base {
         } else {
             perm_granted = true;
         }
+
+        pb_init = findViewById(R.id.progressBar_init_setup);
+        tv_init = findViewById(R.id.textview_init_setup);
 
         f_repo = new FileRepository(getApplication());
 
@@ -238,7 +222,7 @@ public class MainActivity extends Base {
             layoutParams.width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
             iconView.setLayoutParams(layoutParams);
         }
-
+        ed_trans_to_edit_button_distance = fab_edit.getTop() - ed_transtext.getTop() + 10;
     }
 
     private void do_setup() {
@@ -260,11 +244,21 @@ public class MainActivity extends Base {
             if (!mf.exists()) all_exist = false;
         }
         if (!all_exist) {
+            Log.i("APP", "before getasset");
             mgr = getResources().getAssets();
+            Log.i("APP", "extracting");
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     native_load(mgr, rmodeldir);
+                    h_main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            spinner.setVisibility(View.VISIBLE);
+                            pb_init.setVisibility(View.GONE);
+                            tv_init.setVisibility(View.GONE);
+                        }
+                    });
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
@@ -358,6 +352,8 @@ public class MainActivity extends Base {
 
     @Override
     protected void onPause() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
         super.onPause();
         if (title_runnable != null) {
             h_main.removeCallbacks(title_runnable);
@@ -368,8 +364,6 @@ public class MainActivity extends Base {
             trans_edit_runnable.run();
         }
         handlerThread.quit();
-        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
     }
 
     @Override
@@ -470,7 +464,6 @@ public class MainActivity extends Base {
             }
 
             recognition_done = false;
-//            fab_edit.setVisibility(View.INVISIBLE);
             fab_edit.animate().translationX(128f);
             fab_copy.animate().translationX(128f);
             fab_share.animate().translationX(128f);
@@ -558,13 +551,6 @@ public class MainActivity extends Base {
         return fname;
     }
 
-    public String getFileDate() {
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
-        Date now = new Date();
-        String date = sdf.format(now);
-        return date;
-    }
-
     public void update_text() {
         String str = recEngine.get_text();
         String conststr = recEngine.get_const_text();
@@ -633,6 +619,7 @@ public class MainActivity extends Base {
     }
 
     public void onEditClick(View view) {
+        if (is_spamclick()) return;
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
@@ -641,47 +628,48 @@ public class MainActivity extends Base {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
             fab_edit.setImageResource(R.drawable.done);
-            ed_trans_to_edit_button_distance = fab_edit.getTop() - ed_transtext.getTop() + 10;
+            fab_rec.setVisibility(View.INVISIBLE);
             Log.i("APP", "IN TRANSEDIT EDIT PRESS " + ed_trans_to_edit_button_distance);
             fab_edit.animate().translationY(-ed_trans_to_edit_button_distance);
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
         } else {
+            fab_rec.setVisibility(View.VISIBLE);
             just_closed = false;
             // everything already done in dispatchTouchEvent
         }
         ed_transtext.setFocusableInTouchMode(false);
     }
 
+//
+//    public void doInference() {
+//        int[] input = new int[1];
+//        Arrays.fill(input, 1);
+//        float[] state = new float[256];
+//        Arrays.fill(state, 0f);
+//
+//        Map<Integer, Object> map_of_indices_to_outputs = new HashMap<>();
+//        float[][] prob = new float[1][3];
+//        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_prob"), prob);
+//
+//        float[][] newstate = new float[1][256];
+//        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_state"), newstate);
+//
+//        Object[] inputs = {input, state};
+//        casemodel.runForMultipleInputsOutputs(inputs, map_of_indices_to_outputs);
+//        int idx = casemodel.getOutputIndex("output_prob");
+//        float val = ((float[][]) map_of_indices_to_outputs.get(idx))[0][0];
+//        Log.i("APP", "value: " + val);
+//    }
 
-    public void doInference() {
-        int[] input = new int[1];
-        Arrays.fill(input, 1);
-        float[] state = new float[256];
-        Arrays.fill(state, 0f);
-
-        Map<Integer, Object> map_of_indices_to_outputs = new HashMap<>();
-        float[][] prob = new float[1][3];
-        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_prob"), prob);
-
-        float[][] newstate = new float[1][256];
-        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_state"), newstate);
-
-        Object[] inputs = {input, state};
-        casemodel.runForMultipleInputsOutputs(inputs, map_of_indices_to_outputs);
-        int idx = casemodel.getOutputIndex("output_prob");
-        float val = ((float[][]) map_of_indices_to_outputs.get(idx))[0][0];
-        Log.i("APP", "value: " + val);
-    }
-
-    private MappedByteBuffer loadModelFile() throws IOException {
-        AssetFileDescriptor fileDescriptor = this.getAssets().openFd("model/tf_model.tflite");
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
-    }
+//    private MappedByteBuffer loadModelFile() throws IOException {
+//        AssetFileDescriptor fileDescriptor = this.getAssets().openFd("model/tf_model.tflite");
+//        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+//        FileChannel fileChannel = inputStream.getChannel();
+//        long startOffset = fileDescriptor.getStartOffset();
+//        long declaredLength = fileDescriptor.getDeclaredLength();
+//        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+//    }
 
 }
 

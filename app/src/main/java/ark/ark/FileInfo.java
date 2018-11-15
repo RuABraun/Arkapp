@@ -45,6 +45,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,7 +56,7 @@ public class FileInfo extends Base {
     private HandlerThread handlerThread;
     private Handler h_background;
     private Handler h_main = new Handler(Looper.getMainLooper());
-    private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
+    private Runnable title_runnable, seekbar_runnable, ed_trans_runnable, scroll_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
     private EditText ed_transtext;
@@ -66,12 +67,13 @@ public class FileInfo extends Base {
     private FileRepository f_repo;
     private FloatingActionButton editButton;
     private ViewSwitcher viewSwitcher;
-    private ArrayList word_times_ms = new ArrayList<Integer>();
-    private ArrayList original_words = new ArrayList<String>();
+    private List<Integer> word_times_ms = new ArrayList<>();
+    private List<String> original_words = new ArrayList<>();
     private boolean just_closed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_fileinfo);
@@ -129,6 +131,7 @@ public class FileInfo extends Base {
 
         String fpath = filesdir + afile.fname + file_suffixes.get("text");
         String normal_text;
+        boolean text_found = true;
         try {
             FileInputStream fis = new FileInputStream(fpath);
             int size = fis.available();
@@ -137,53 +140,66 @@ public class FileInfo extends Base {
             fis.close();
             normal_text = new String(buffer);
         } catch(IOException ex) {
+            text_found = false;
             normal_text = "Text file not found!";
         }
         text = normal_text;
         ed_transtext.setText(text);
 
         text_timed = new SpannableString(normal_text);
-        fpath = filesdir + afile.fname + file_suffixes.get("timed");
-        String text_timed_str;
-        try {
-            FileInputStream fis = new FileInputStream(fpath);
-            int size = fis.available();
-            byte[] buffer = new byte[size];
-            fis.read(buffer);
-            fis.close();
-            text_timed_str = new String(buffer);
-        } catch(IOException ex) {
-            text_timed_str = "Text file not found!";
-        }
-        StringReader reader = new StringReader(text_timed_str);
-        BufferedReader br = new BufferedReader(reader);
-        String line = "";
-        try {
-            line = br.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        int idx = -1;
-        while (line != null) {
-            String[] line_split = line.split(" ");
-            String word = line_split[0];  // word and space
-            original_words.add(word);
-            final int word_time_ms = (int) (Float.parseFloat(line_split[1]) * 1000.0f);
-            word_times_ms.add(word_time_ms);
-            idx = normal_text.indexOf(word, idx + 1);
-            ClickableSpanPlain span = new ClickableSpanPlain() {
-                @Override
-                public void onClick(View widget) {
-                    mPlayer.seekTo(word_time_ms);
-                    playMediaPlayer();
-                }
-            };
-            int idx_end = idx + word.length();
-            text_timed.setSpan(span, idx, idx_end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (text_found) {
+            fpath = filesdir + afile.fname + file_suffixes.get("timed");
+            String text_timed_str;
+            try {
+                FileInputStream fis = new FileInputStream(fpath);
+                int size = fis.available();
+                byte[] buffer = new byte[size];
+                fis.read(buffer);
+                fis.close();
+                text_timed_str = new String(buffer);
+            } catch (IOException ex) {
+                text_timed_str = "Timed text file not found!";
+            }
+            StringReader reader = new StringReader(text_timed_str);
+            BufferedReader br = new BufferedReader(reader);
+            String line = "";
             try {
                 line = br.readLine();
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+            int idx = -1;
+            while (line != null) {
+                String[] line_split = line.split(" ");
+                String word = line_split[0];  // word and space
+                original_words.add(word);
+                final int word_time_ms = (int) (Float.parseFloat(line_split[1]) * 1000.0f);
+                word_times_ms.add(word_time_ms);
+                int saveidx = idx;
+                idx = normal_text.indexOf(word, idx + 1);
+                if (idx == -1) {
+                    idx = saveidx;
+                    try {
+                        line = br.readLine();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    continue;
+                }
+                ClickableSpanPlain span = new ClickableSpanPlain() {
+                    @Override
+                    public void onClick(View widget) {
+                        mPlayer.seekTo(word_time_ms);
+                        playMediaPlayer();
+                    }
+                };
+                int idx_end = idx + word.length();
+                text_timed.setSpan(span, idx, idx_end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                try {
+                    line = br.readLine();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         tv_transtext.setText(text_timed);
@@ -198,21 +214,70 @@ public class FileInfo extends Base {
         mediaButton.setImageResource(R.drawable.pause);
         if (seekbar_runnable != null) {
             h_main.removeCallbacks(seekbar_runnable);
+            h_main.removeCallbacks(scroll_runnable);
         }
         seekbar_runnable = new Runnable() {
             @Override
             public void run() {
-                mSeekBar.setProgress(mPlayer.getCurrentPosition());
+                int cur_time_ms = mPlayer.getCurrentPosition();
+                mSeekBar.setProgress(cur_time_ms);
                 h_main.postDelayed(this, 25);
             }
         };
+//        scroll_runnable = new Runnable() {
+//            @Override
+//            public void run() {
+//                int cur_time_ms = mPlayer.getCurrentPosition();
+//                Layout layout = ed_transtext.getLayout();
+//                Log.i("APP", "IN SCROLLTHING 1");
+//                int first_char_idx = layout.getLineStart(layout.getLineForVertical(ed_transtext.getBottom()));
+//                String word = "";
+//                for(int i = first_char_idx; i < text.length(); i++) {
+//                    char c = text.charAt(i);
+//                    if (word.isEmpty()) {
+//                        if (c != ' ') continue;
+//                    } else {
+//                        if (c == ' ') break;
+//                    }
+//                    if (c != ' ') word += c;
+//                }
+//                Log.i("APP", "IN SCROLLTHING 2");
+//                // get corresponding timestamp
+//                int num_char_hist = 0;
+//                int i = 0;
+//                for(; i < original_words.size(); i++) {
+//                    String w = original_words.get(i);
+//                    if (num_char_hist >= first_char_idx && w.equals(word)) {
+//                        break;
+//                    }
+//                    num_char_hist += w.length() + 1;
+//                }
+//                Log.i("APP", "IN SCROLLTHING 3");
+//                int time_ms = word_times_ms.get(i);
+//                Log.i("APP", "IN SCROLLTHING 4 " + Integer.toString(time_ms) + " " + Integer.toString(time_ms));
+//                if (time_ms < cur_time_ms) {
+//                    final int y = (ed_transtext.getLineCount() - 1) * ed_transtext.getLineHeight();
+//                    Log.i("APP", "IN SCROLLTHING A");
+//                    Runnable runnable = new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            ed_transtext.scrollTo(0, y);
+//                        }
+//                    };
+//                    h_main.post(runnable);
+//                }
+//                h_main.postDelayed(this, 1000);
+//            }
+//        };
         h_main.post(seekbar_runnable);
+//        h_main.post(scroll_runnable);
         mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
                 mSeekBar.setProgress(0);
                 mediaButton.setImageResource(R.drawable.play);
                 h_main.removeCallbacks(seekbar_runnable);
+                h_main.removeCallbacks(scroll_runnable);
             }
         });
         mPlayer.start();
@@ -236,6 +301,7 @@ public class FileInfo extends Base {
                 mPlayer.pause();
                 if (h_main != null) {
                     h_main.removeCallbacks(seekbar_runnable);
+                    h_main.removeCallbacks(scroll_runnable);
                 }
             }
         }
@@ -266,6 +332,7 @@ public class FileInfo extends Base {
     }
 
     public void onEditClick(View view) {
+        if (is_spamclick()) return;
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
@@ -308,6 +375,7 @@ public class FileInfo extends Base {
                 }
             });
         } else {
+            // TODO: crashes when called on text that was edited!!
             just_closed = false;
 
             if (ed_trans_runnable != null) {
@@ -346,6 +414,7 @@ public class FileInfo extends Base {
     }
 
     public void onCopyClick(View view) {
+        if (is_spamclick()) return;
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         String simpletext = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", simpletext);
@@ -354,11 +423,13 @@ public class FileInfo extends Base {
     }
 
     public void onShareClick(View view) {
+        if (is_spamclick()) return;
         ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
         dialog.show(getSupportFragmentManager(), "ShareDialog");
     }
 
     public void onDeleteClick(View view) {
+        if (is_spamclick()) return;
         AlertDialog.Builder builder = new AlertDialog.Builder(FileInfo.this);
         builder.setTitle("Confirm")
                 .setMessage("Are you sure?")
@@ -449,6 +520,14 @@ public class FileInfo extends Base {
             ed_trans_runnable.run();
         }
         handlerThread.quit();
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        Intent intent = new Intent(getApplicationContext(), Manage.class);
+        startActivity(intent);
+        finish();
     }
 }
 

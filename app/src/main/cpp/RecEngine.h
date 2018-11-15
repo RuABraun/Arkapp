@@ -1,6 +1,6 @@
 #ifndef ARK_RECENGINE_H
 #define ARK_RECENGINE_H
-
+//#define CAFFE2_USE_LITE_PROTO 1
 
 #include <oboe/Oboe.h>
 #include <thread>
@@ -11,6 +11,7 @@
 #include "fstext/fstext-lib.h"
 #include "lat/lattice-functions.h"
 #include "util/kaldi-thread.h"
+#include "util/simple-io-funcs.h"
 #include "online2/online-nnet3-decoding.h"
 #include "online2/online-nnet2-feature-pipeline.h"
 #include "online2/onlinebin-util.h"
@@ -24,11 +25,10 @@
 #include <thread>
 #include "base/timer.h"
 #include <memory>
-#include "tensorflow/contrib/lite/model.h"
-#include "tensorflow/contrib/lite/interpreter.h"
-#include "tensorflow/contrib/lite/kernels/register.h"
-#include "tensorflow/contrib/lite/string_util.h"
-#include "tensorflow/contrib/lite/optional_debug_tools.h"
+#include "tensorflow/lite/model.h"
+#include "tensorflow/lite/interpreter.h"
+#include "tensorflow/lite/kernels/register.h"
+#include "tensorflow/lite/string_util.h"
 
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -54,7 +54,7 @@ public:
 
     int stop_trans_stream();
 
-    void transcribe_file(std::string wavpath, std::string ctm);
+    void transcribe_file(std::string wavpath, std::string fpath);
 
     void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
 
@@ -62,6 +62,8 @@ public:
 
     std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
                               std::vector<int32>& indcs_kept, bool split);
+
+    void get_text_case(std::vector<int32>* words, std::vector<int32>* casing);
 
 private:
 
@@ -99,6 +101,7 @@ private:
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;
     kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
+    kaldi::OnlineSilenceWeightingConfig sil_config;
     kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
     fst::Fst<fst::StdArc>* decode_fst;
     kaldi::OnlineNnet2FeaturePipelineInfo* feature_info = NULL;
@@ -136,15 +139,12 @@ private:
     bool rnn_ready;
 
     // case model
-//    std::unique_ptr<tflite::FlatBufferModel> fb_model;
-//    tflite::ops::builtin::BuiltinOpResolver resolver;
-//    std::unique_ptr<tflite::Interpreter> casemodel;
-    int input[1] = {1};
-    float instate[256];
-    float prob[1][3];
-    float outstate[1][256];
+    std::unique_ptr<tflite::FlatBufferModel> flatbuffer_model;
+    std::unique_ptr<tflite::Interpreter> interpreter;
+    std::vector<int32> nid_to_caseid;  // ngram index (id) to case index
+    int32 case_zero_index;  // number of case words, doubles as index to a zeroed embedding
 
-    void run_casing();
+    int32 run_casing(std::vector<int32> casewords);
 
     void write_to_wav(int32 num_frames);
 

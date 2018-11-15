@@ -9,7 +9,8 @@
     android:focusable="false"
     android:focusableInTouchMode="true"
     tools:context="ark.ark.MainActivity"
-    android:keepScreenOn="true" >
+    android:keepScreenOn="true"
+    android:background="@color/colorPrimary" >
 
 
     <ImageView
@@ -91,8 +92,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:menu="@menu/menu_navig" />
 
-
-
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/button_rec"
         android:layout_width="52dp"
@@ -100,12 +99,14 @@
         android:layout_marginBottom="128dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
+        android:background="@drawable/border_white"
         android:backgroundTint="@color/colorPrimary"
         android:clickable="true"
         android:elevation="4dp"
         android:focusable="true"
         android:onClick="record_switch"
         android:scaleType="center"
+        app:borderWidth="2dp"
         app:layout_constraintBottom_toBottomOf="@+id/botNavig"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -177,5 +178,35 @@
         app:layout_constraintBottom_toTopOf="@+id/button_copy"
         app:layout_constraintEnd_toEndOf="@+id/button_copy"
         app:srcCompat="@drawable/share_c" />
+
+    <ProgressBar
+        android:id="@+id/progressBar_init_setup"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintBottom_toBottomOf="@+id/botNavig"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/textview_init_setup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/roboto_slab"
+        android:text="...doing first time setup..."
+        android:textSize="18sp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/progressBar_init_setup" />
 
 </android.support.constraint.ConstraintLayout>

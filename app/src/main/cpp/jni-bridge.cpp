@@ -5,6 +5,7 @@
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 
+
 extern "C" {
 
 JNIEXPORT void JNICALL Java_ark_ark_Base_native_1load(JNIEnv* env, jobject, jobject Amgr, jstring modeldir) {
@@ -90,17 +91,17 @@ Java_ark_ark_RecEngine_native_1stop_1trans_1stream(JNIEnv *env, jobject, jlong e
 }
 
 JNIEXPORT void JNICALL
-Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, jlong engineHandle, jstring jwavpath, jstring jctm) {
+Java_ark_ark_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, jlong engineHandle, jstring jwavpath, jstring jfpath) {
     const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
     std::string wavpath = std::string(cstr);
-    const char* cstr3 = env->GetStringUTFChars(jctm, NULL);
-    std::string ctm = std::string(cstr3);
+    const char* cstr3 = env->GetStringUTFChars(jfpath, NULL);
+    std::string fpath = std::string(cstr3);
     RecEngine* engine = (RecEngine*) engineHandle;
     if (engine == nullptr) {
         LOGE("Engine handle is invalid");
         return;
     }
-    engine->transcribe_file(wavpath, ctm);
+    engine->transcribe_file(wavpath, fpath);
 }
 
 JNIEXPORT jstring JNICALL Java_ark_ark_RecEngine_native_1getText(JNIEnv* env, jobject, jlong engineHandle) {

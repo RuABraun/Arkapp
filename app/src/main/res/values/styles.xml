@@ -13,6 +13,8 @@
 
     <style name="AppTheme.Launcher">
         <item name="android:windowBackground">@drawable/launch_screen</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 
     <style name="btnstyle" parent="@style/Widget.AppCompat.Button.Colored">
