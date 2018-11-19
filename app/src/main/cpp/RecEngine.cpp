@@ -578,18 +578,15 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 int32 RecEngine::run_casing(std::vector<int32> casewords) {
     int32 sz = casewords.size();
-    if (sz < 7) {
-        casewords.insert(casewords.begin(), 7 - sz, case_zero_index);
+    if (sz < CASE_INNUM) {
+        casewords.insert(casewords.begin(), CASE_INNUM - sz, case_zero_index);
     }
-    if (sz > 7) LOGE("SIZE IS OVER 7, SOMETHING WENT WRONG");
+    if (sz > CASE_INNUM) LOGE("SIZE IS OVER CASE_INNUM, SOMETHING WENT WRONG");
     TfLiteTensor* input_tensor = interpreter->tensor(0);
 
     int32* input = interpreter->typed_input_tensor<int32>(0);
 
-//    std::string s = "";
-//    for(int i = 0; i < 7; i++) s += std::to_string(casewords[i]) + " ";
-
-    for(int i = 0; i < 7; i++) input[i] = casewords[i];
+    for(int i = 0; i < CASE_INNUM; i++) input[i] = casewords[i];
 
     interpreter->Invoke();
     float* output = interpreter->typed_output_tensor<float>(0);
@@ -603,7 +600,7 @@ int32 RecEngine::run_casing(std::vector<int32> casewords) {
             argmax = i;
         }
     }
-    LOGI("max %d", argmax);
+    if (output[0] > 0.1f) argmax = 0;
     return argmax;
 }
 
@@ -630,20 +627,23 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
         casewords.push_back(id);
     }
 
-    std::vector<int32> casewords_sentence(7);
-    int32 lastidx = sz - 1;
+    std::vector<int32> casewords_sentence(CASE_INNUM);
     casing->resize(sz, 0);
-    for(int32 i = 1; i < lastidx; i++) {
-        int32 startidx = i - 5;
+    for(int32 i = 1; i < sz; i++) {
+        int32 startidx = i - (CASE_INNUM - CASE_OFFSET - 1);
         if (startidx < 0) startidx = 0;
-        int32 endidx = i + 1;  // +2 so it points one past
+        int32 endidx = i + CASE_OFFSET;
 
-        int32 k = 6;
+        int32 k = CASE_INNUM - 1;
         for(int32 j = endidx; j >= startidx; j--, k--) {
-            casewords_sentence[k] = casewords[j];
+            int32 wid;
+            if (endidx < sz) {
+                wid = casewords[j];
+            } else {
+                wid = case_zero_index;
+            }
+            casewords_sentence[k] = wid;
         }
-        std::string s = "";
-        for(int i = 0; i < casewords_sentence.size(); i++) s += std::to_string(casewords_sentence[i]) + " ";
 
         (*casing)[i] = run_casing(casewords_sentence);
     }
@@ -698,7 +698,6 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         text += wplus;
 
     }
-    LOGI("FIN PRETTY");
     return text;
 }
 

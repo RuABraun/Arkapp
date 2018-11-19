@@ -178,12 +178,7 @@
             android:scrollbars="vertical"
             android:textColor="@color/colorText"
             android:lineSpacingExtra="4dp"
-            android:fadeScrollbars="false"
-            android:scrollbarFadeDuration="0"
-            android:scrollbarAlwaysDrawVerticalTrack="true"
-            android:scrollbarSize="12dp"
-            android:textSize="16sp"
-            android:paddingEnd="4dp" />
+            android:textSize="16sp" />
 
         <EditText
             android:id="@+id/ed_trans"

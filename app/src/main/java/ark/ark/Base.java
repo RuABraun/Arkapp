@@ -3,10 +3,12 @@ package ark.ark;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -92,6 +94,13 @@ public class Base extends AppCompatActivity {
             duration += String.valueOf(rests.get(2-i)) + times[i];  // -i to reverse
         }
         return duration;
+    }
+
+    public static int convertPixelsToDp(float px, Context context){
+        Resources resources = context.getResources();
+        DisplayMetrics metrics = resources.getDisplayMetrics();
+        int dp = (int) (px / (metrics.densityDpi / 160f));
+        return dp;
     }
 }
 

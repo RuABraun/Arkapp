@@ -139,6 +139,8 @@ private:
     bool rnn_ready;
 
     // case model
+    int32 CASE_INNUM = 8;
+    int32 CASE_OFFSET = 2;
     std::unique_ptr<tflite::FlatBufferModel> flatbuffer_model;
     std::unique_ptr<tflite::Interpreter> interpreter;
     std::vector<int32> nid_to_caseid;  // ngram index (id) to case index

@@ -1,5 +1,6 @@
 package ark.ark;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.ClipData;
@@ -16,12 +17,14 @@ import android.os.Looper;
 import android.support.design.widget.FloatingActionButton;
 import android.text.Editable;
 import android.text.Layout;
+import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextWatcher;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MenuItem;
@@ -49,6 +52,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.lang.Math.abs;
+
 public class FileInfo extends Base {
 
     private ImageButton mediaButton;
@@ -63,12 +68,12 @@ public class FileInfo extends Base {
     private EditText fileinfo_ed_title;
     private TextView tv_transtext;
     private String text;
-    private SpannableString text_timed;
     private FileRepository f_repo;
     private FloatingActionButton editButton;
     private ViewSwitcher viewSwitcher;
     private List<Integer> word_times_ms = new ArrayList<>();
     private List<String> original_words = new ArrayList<>();
+    private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
     private boolean just_closed = false;
 
     @Override
@@ -91,6 +96,7 @@ public class FileInfo extends Base {
         fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onStart() {
         super.onStart();
@@ -114,6 +120,83 @@ public class FileInfo extends Base {
             public void onStopTrackingTouch(SeekBar seekBar) {
 
             }
+        });
+
+        tv_transtext.setOnTouchListener(new View.OnTouchListener() {
+            int MAX_CLICK_DUR = 100;
+            int MAX_CLICK_DIST = 10;
+            long click_start_time, click_last_time;
+            int start_y, x, y;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch(event.getAction()) {
+                    case MotionEvent.ACTION_DOWN: {
+                        click_start_time = System.currentTimeMillis();
+                        click_last_time = click_start_time;
+                        x = (int) event.getX();
+                        start_y = (int) event.getY();
+                        y = start_y;
+                        return true;
+                    }
+                    case MotionEvent.ACTION_MOVE: {
+                        int new_y = (int) event.getY();
+                        int dy = new_y - y;
+                        tv_transtext.scrollBy(0, -dy);
+                        click_last_time = System.currentTimeMillis();
+                        y = new_y;
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP: {
+                        long cur_time = System.currentTimeMillis();
+                        long dt = cur_time - click_start_time;
+                        int new_y = (int) event.getY();
+                        int dy = new_y - start_y;
+//                        Log.i("APP", "UP + " + dy + " " + dt);
+                        if ((abs(dy) > MAX_CLICK_DIST) && (dt > MAX_CLICK_DUR)) {
+                            long ddt = cur_time - click_last_time;
+                            int ddy = new_y - y;
+                            float vel = ((float) ddy) / ((float) ddt);
+                            int dist = (int) vel * 10;
+//                            int cur_y_scroll = tv_transtext.getScrollY();
+//                            int new_y_scroll = cur_y_scroll - dist;
+//                            tv_transtext.measure(0, 0);
+//                            int h = tv_transtext.getMeasuredHeight();
+//                            if (new_y_scroll < 0) new_y_scroll = 0;
+//                            if (new_y_scroll > h) new_y_scroll = h;
+//                            tv_transtext.scrollTo(0, new_y_scroll);
+
+//                            if (cur_y_scroll < 0) tv_transtext.scrollTo(0, 0);
+//                            else if (cur_y_scroll > h) tv_transtext.scrollTo(0, h);
+                        } else {
+                            Log.i("APP", "PLAY");
+                            Layout layout = tv_transtext.getLayout();
+                            int lineidx = layout.getLineForVertical(y);
+                            int offset = layout.getOffsetForHorizontal(lineidx, x);
+                            int sz = word_start_c_idx.size();
+                            int i = 0;
+                            while(word_start_c_idx.get(i) < offset) {
+                                i++;
+                                if (i == sz) break;
+                            }
+                            i--;
+                            int time_ms = word_times_ms.get(i);
+                            mPlayer.seekTo(time_ms);
+                            playMediaPlayer();
+                            Spannable s = (Spannable) tv_transtext.getText();
+                            String word = original_words.get(i);
+                            int startidx = word_start_c_idx.get(i);
+                            int endidx = startidx + word.length();
+                            s.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorPrimary)),
+                                    startidx, endidx, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        }
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+
         });
 
         if (text == null) {
@@ -145,8 +228,8 @@ public class FileInfo extends Base {
         }
         text = normal_text;
         ed_transtext.setText(text);
+        tv_transtext.setText(text, TextView.BufferType.SPANNABLE);
 
-        text_timed = new SpannableString(normal_text);
         if (text_found) {
             fpath = filesdir + afile.fname + file_suffixes.get("timed");
             String text_timed_str;
@@ -169,6 +252,7 @@ public class FileInfo extends Base {
                 e.printStackTrace();
             }
             int idx = -1;
+            int num_char = 0;
             while (line != null) {
                 String[] line_split = line.split(" ");
                 String word = line_split[0];  // word and space
@@ -186,15 +270,7 @@ public class FileInfo extends Base {
                     }
                     continue;
                 }
-                ClickableSpanPlain span = new ClickableSpanPlain() {
-                    @Override
-                    public void onClick(View widget) {
-                        mPlayer.seekTo(word_time_ms);
-                        playMediaPlayer();
-                    }
-                };
-                int idx_end = idx + word.length();
-                text_timed.setSpan(span, idx, idx_end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                word_start_c_idx.add(idx);
                 try {
                     line = br.readLine();
                 } catch (IOException e) {
@@ -202,8 +278,6 @@ public class FileInfo extends Base {
                 }
             }
         }
-        tv_transtext.setText(text_timed);
-        tv_transtext.setMovementMethod(LinkMovementMethod.getInstance());
 
         fileinfo_ed_title.setText(afile.title);
 

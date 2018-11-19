@@ -1,6 +1,7 @@
 package ark.ark;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -9,10 +10,13 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.CpuUsageInfo;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.constraint.ConstraintLayout;
+import android.support.constraint.Constraints;
 import android.support.design.internal.BottomNavigationMenuView;
 import android.support.design.widget.BottomNavigationView;
 import android.support.design.widget.FloatingActionButton;
@@ -29,7 +33,11 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -77,9 +85,11 @@ public class MainActivity extends Base {
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
     private BottomNavigationView bottomNavigationView;
     private float ed_trans_to_edit_button_distance;
-    private boolean just_closed = false;
+    private boolean is_editing = false, just_closed = false;
     private ProgressBar pb_init;
     private TextView tv_init;
+    private int imageview_margin = 0;
+    private ImageView img_view;
 
     static {
         System.loadLibrary("rec-engine");
@@ -159,6 +169,8 @@ public class MainActivity extends Base {
         spinner = findViewById(R.id.progressBar);
         ed_title = findViewById(R.id.ed_title);
 
+        img_view = findViewById(R.id.imageView);
+
         final View activityRootView = findViewById(R.id.main_root_view);
         activityRootView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -222,7 +234,6 @@ public class MainActivity extends Base {
             layoutParams.width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
             iconView.setLayoutParams(layoutParams);
         }
-        ed_trans_to_edit_button_distance = fab_edit.getTop() - ed_transtext.getTop() + 10;
     }
 
     private void do_setup() {
@@ -307,6 +318,12 @@ public class MainActivity extends Base {
             }
         }, 100);
 
+        DisplayMetrics dm = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(dm);
+        int screenHeight = dm.heightPixels;
+
+        Log.i("APP", "height " + screenHeight + " " + dm.density);
+        ed_trans_to_edit_button_distance = (screenHeight / dm.density);
     }
 
 
@@ -396,44 +413,13 @@ public class MainActivity extends Base {
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
         h_main.removeCallbacks(runnable);
         h_main.post(new Runnable() {
-            @Override
-            public void run() {
-                update_text();
-                fab_edit.animate().translationX(0f);
-                fab_copy.animate().translationX(0f);
-                fab_share.animate().translationX(0f);
-                ed_transtext.addTextChangedListener(new TextWatcher() {
-                    @Override
-                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-                    }
-
-                    @Override
-                    public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                    }
-
-                    @Override
-                    public void afterTextChanged(final Editable s) {
-                        final String text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
-
-                        h_background.removeCallbacks(trans_edit_runnable);
-                        trans_edit_runnable = new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("text")), false);
-                                    fw.write(text);
-                                    fw.close();
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        };
-                        h_background.postDelayed(trans_edit_runnable, 500);
-                    }
-                });
-            }
+                        @Override
+                        public void run() {
+                            update_text();
+                            fab_edit.animate().translationX(0f);
+                            fab_copy.animate().translationX(0f);
+                            fab_share.animate().translationX(0f);
+                        }
         });
         recognition_done = true;
     }
@@ -563,24 +549,43 @@ public class MainActivity extends Base {
     public boolean dispatchTouchEvent(MotionEvent event) {
         View v = getCurrentFocus();
         boolean ret = super.dispatchTouchEvent(event);
-        if (v instanceof EditText) {
+        if (v == ed_transtext) {
             View w = getCurrentFocus();
             int scrcoords[] = new int[2];
             w.getLocationOnScreen(scrcoords);
             float x = event.getRawX() + w.getLeft() - scrcoords[0];
             float y = event.getRawY() + w.getTop() - scrcoords[1];
-
-            //Log.d("Activity", "Touch event "+event.getRawX()+","+event.getRawY()+" "+x+","+y+" rect "+w.getLeft()+","+w.getTop()+","+w.getRight()+","+w.getBottom()+" coords "+scrcoords[0]+","+scrcoords[1]);
-            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) ) {
-                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
-                fab_edit.setImageResource(R.drawable.edit);
+            int r = fab_edit.getLeft();
+//            Log.d("APP", "Touch event " + x + " right " + w.getRight() + " fabedit left " + r);
+            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) && is_editing) {
+                Log.i("APP", "in if of dispatch");
+                InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
+                View view = this.getCurrentFocus();
+                if (view == null) {
+                    view = new View(this);
+                }
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
                 fab_edit.animate().translationY(0.f);
                 fab_share.setVisibility(View.VISIBLE);
                 fab_copy.setVisibility(View.VISIBLE);
                 ed_transtext.clearFocus();
                 ed_transtext.setFocusableInTouchMode(false);
+                is_editing = false;
                 just_closed = true;
+            }
+        } else if (v == ed_title) {
+            View w = getCurrentFocus();
+            int scrcoords[] = new int[2];
+            w.getLocationOnScreen(scrcoords);
+            float x = event.getRawX() + w.getLeft() - scrcoords[0];
+            float y = event.getRawY() + w.getTop() - scrcoords[1];
+            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom())) {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
+                View view = this.getCurrentFocus();
+                if (view == null) {
+                    view = new View(this);
+                }
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
             }
         }
         return ret;
@@ -623,9 +628,10 @@ public class MainActivity extends Base {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
-        if (!ed_transtext.hasFocus() && !just_closed) {
+        if (!is_editing && !just_closed) {
+            is_editing = true;
             ed_transtext.requestFocus();
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
             fab_edit.setImageResource(R.drawable.done);
             fab_rec.setVisibility(View.INVISIBLE);
@@ -633,9 +639,57 @@ public class MainActivity extends Base {
             fab_edit.animate().translationY(-ed_trans_to_edit_button_distance);
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
+
+            ed_transtext.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+                }
+
+                @Override
+                public void afterTextChanged(final Editable s) {
+                    final String text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+
+                    h_background.removeCallbacks(trans_edit_runnable);
+                    trans_edit_runnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                FileWriter fw = new FileWriter(new File(filesdir + curr_afile.fname + file_suffixes.get("text")), false);
+                                fw.write(text);
+                                fw.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+                    h_background.postDelayed(trans_edit_runnable, 500);
+                }
+            });
+
+            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            imageview_margin = lay_params.bottomMargin;
+            int n = convertPixelsToDp((float) imageview_margin * 9, getApplicationContext());
+            lay_params.bottomMargin = n;
+
+            ed_transtext.invalidate();
+            ed_transtext.requestLayout();
         } else {
-            fab_rec.setVisibility(View.VISIBLE);
             just_closed = false;
+            Log.i("APP", "DONE EDIT");
+            h_background.removeCallbacks(trans_edit_runnable);
+            fab_edit.setImageResource(R.drawable.edit);
+            fab_rec.setVisibility(View.VISIBLE);
+            is_editing = false;
+            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            lay_params.bottomMargin = imageview_margin;
+            ed_transtext.invalidate();
+            ed_transtext.requestLayout();
             // everything already done in dispatchTouchEvent
         }
         ed_transtext.setFocusableInTouchMode(false);
