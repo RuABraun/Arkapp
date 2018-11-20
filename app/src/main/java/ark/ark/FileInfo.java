@@ -171,7 +171,8 @@ public class FileInfo extends Base {
                         } else {
                             Log.i("APP", "PLAY");
                             Layout layout = tv_transtext.getLayout();
-                            int lineidx = layout.getLineForVertical(y);
+                            int yscroll = tv_transtext.getScrollY();
+                            int lineidx = layout.getLineForVertical(y + yscroll);
                             int offset = layout.getOffsetForHorizontal(lineidx, x);
                             int sz = word_start_c_idx.size();
                             int i = 0;
