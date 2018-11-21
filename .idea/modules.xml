@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Ark.iml" filepath="$PROJECT_DIR$/Ark.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/fingerless.iml" filepath="$PROJECT_DIR$/fingerless.iml" />
+      <module fileurl="file://$PROJECT_DIR$/fingerless/fingerless-fingerless.iml" filepath="$PROJECT_DIR$/fingerless/fingerless-fingerless.iml" />
     </modules>
   </component>
 </project>
