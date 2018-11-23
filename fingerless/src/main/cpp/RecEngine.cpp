@@ -187,6 +187,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
         LOGE("FAILED TO ALLOCATE");
     }
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
+    case_zero_index = 10422;
 
     t.join();
     LOGI("Finished constructing rec");
@@ -606,7 +607,7 @@ int32 RecEngine::run_casing(std::vector<int32> casewords) {
 
 void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* casing) {
     int32 sz = words->size();
-    if (sz < 3) {
+    if (sz < 5) {
         casing->resize(sz, 0);
         return;
     }
@@ -657,9 +658,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
     int32 num_words = words.size();
     std::vector<int32> case_decs;  // case decisions
     if (split) {
-        LOGI("CALLING GETTEXT");
         get_text_case(&words, &case_decs);
-        LOGI("DONE CALLING GETTEXT");
     } else {
         case_decs.resize(num_words, 0);
     }

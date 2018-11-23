@@ -90,6 +90,7 @@ public class MainActivity extends Base {
     private TextView tv_init;
     private int imageview_margin = 0;
     private ImageView img_view;
+    private TextWatcher title_textWatcher;
 
     static {
         System.loadLibrary("rec-engine");
@@ -334,37 +335,42 @@ public class MainActivity extends Base {
         handlerThread = new HandlerThread("BackgroundHandlerThread");
         handlerThread.start();
         h_background = new Handler(handlerThread.getLooper());
-        ed_title.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        if (title_textWatcher == null) {
+            title_textWatcher = new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-            }
-
-            @Override
-            public void afterTextChanged(final Editable s) {
-                curr_cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
-                if (curr_cname.equals("")) {
-                    curr_cname = getString(R.string.default_convname);
                 }
-                fname_prefix = getFileName(curr_cname, f_repo);
-                h_main.removeCallbacks(title_runnable);
-                if (recognition_done && !edited_title) {
-                    title_runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            Log.i("APP", "fname " + fname_prefix + " cname " + curr_cname);
-                            f_repo.rename(curr_afile, curr_cname, fname_prefix);
-                        }
-                    };
-                    h_main.postDelayed(title_runnable, 500);
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+
                 }
-            }
-        });
+
+                @Override
+                public void afterTextChanged(final Editable s) {
+                    curr_cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                    if (curr_cname.equals("")) {
+                        curr_cname = getString(R.string.default_convname);
+                    }
+                    fname_prefix = getFileName(curr_cname, f_repo);
+                    h_main.removeCallbacks(title_runnable);
+                    if (recognition_done && !edited_title) {
+                        title_runnable = new Runnable() {
+                            @Override
+                            public void run() {
+                                Log.i("APP", "fname " + fname_prefix + " cname " + curr_cname);
+                                f_repo.rename(curr_afile, curr_cname, fname_prefix);
+                            }
+                        };
+                        h_main.postDelayed(title_runnable, 500);
+                    }
+                }
+
+
+            };
+            ed_title.addTextChangedListener(title_textWatcher);
+        }
     }
 
     @Override
@@ -396,8 +402,6 @@ public class MainActivity extends Base {
         if (curr_cname.equals("")) {
             curr_cname = getString(R.string.default_convname);
         }
-
-//        doInference();
 
         String date = getFileDate();
         String title = curr_cname;
@@ -528,11 +532,13 @@ public class MainActivity extends Base {
         int cnt = fcount.get() + 1;
         cname = cname.replace(' ', '_') + "_";
         String fname = cname + Integer.toString(cnt);
-        String wavpath = fname + ".wav";
-        while (new File(wavpath).exists()) {
+        String wavpath = filesdir + fname + ".wav";
+        File f = new File(wavpath);
+        while (f.exists()) {
             cnt++;
             fname = cname + Integer.toString(cnt);
-            wavpath = fname + ".wav";
+            wavpath = filesdir + fname + ".wav";
+            f = new File(wavpath);
         }
         return fname;
     }
@@ -683,6 +689,10 @@ public class MainActivity extends Base {
             just_closed = false;
             Log.i("APP", "DONE EDIT");
             h_background.removeCallbacks(trans_edit_runnable);
+            ed_transtext.addTextChangedListener(null);
+            if (trans_edit_runnable != null) {
+                h_background.post(trans_edit_runnable);
+            }
             fab_edit.setImageResource(R.drawable.edit);
             fab_rec.setVisibility(View.VISIBLE);
             is_editing = false;
