@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">typefree</string>
+    <string name="button_recstart">Record</string>
+    <string name="button_recstop">Stop</string>
+    <string name="Contact">contact@typefree.io</string>
+    <string name="HelloMsg">"Ready!"</string>
+    <string name="LoadingMsg">"...starting up..."</string>
+    <string name="ManButtonPlay">Play</string>
+    <string name="ManButtonTrans">Transcribe</string>
+    <string name="ManButtonDel">Delete</string>
+    <string name="CloseX">X</string>
+    <string name="title_activity_file_info">""</string>
+    <string name="default_convname">A Conversation</string>
+    <string name="name_call2action">Name the conversation</string>
+</resources>
