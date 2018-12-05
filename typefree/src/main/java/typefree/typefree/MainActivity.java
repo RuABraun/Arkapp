@@ -534,7 +534,7 @@ public class MainActivity extends Base {
         }
 
         int cnt = fcount.get() + 1;
-        cname = cname.replace(' ', '_') + "_";
+        cname = cname.replaceAll("[ ?\\\\:\\/]", "_") + "_";
         String fname = cname + Integer.toString(cnt);
         String wavpath = filesdir + fname + ".wav";
         File f = new File(wavpath);

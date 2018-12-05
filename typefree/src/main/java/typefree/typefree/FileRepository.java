@@ -104,9 +104,7 @@ public class FileRepository {
             AFile afile = (AFile) objects[0];
             String cname = (String) objects[1];
             String fname = (String) objects[2];
-            Log.i("APP", "Old " + afile.fname + ", new name: " + fname);
             aSyncTaskaFileDao.rename(afile.getId(), fname, cname);
-            Log.i("APP", "Old " + afile.fname + ", new name: " + fname);
             Base.renameConv(afile.fname, fname);
             return null;
         }

@@ -94,13 +94,14 @@ public class FileInfo extends Base {
         ed_transtext = findViewById(R.id.ed_trans);
         tv_transtext = findViewById(R.id.tv_trans);
         fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
+
     }
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onStart() {
         super.onStart();
-        File file = new File(filesdir + afile.fname + ".wav");
+
         mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));
         mSeekBar.setMax(mPlayer.getDuration());
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -158,16 +159,6 @@ public class FileInfo extends Base {
                             int ddy = new_y - y;
                             float vel = ((float) ddy) / ((float) ddt);
                             int dist = (int) vel * 10;
-//                            int cur_y_scroll = tv_transtext.getScrollY();
-//                            int new_y_scroll = cur_y_scroll - dist;
-//                            tv_transtext.measure(0, 0);
-//                            int h = tv_transtext.getMeasuredHeight();
-//                            if (new_y_scroll < 0) new_y_scroll = 0;
-//                            if (new_y_scroll > h) new_y_scroll = h;
-//                            tv_transtext.scrollTo(0, new_y_scroll);
-
-//                            if (cur_y_scroll < 0) tv_transtext.scrollTo(0, 0);
-//                            else if (cur_y_scroll > h) tv_transtext.scrollTo(0, h);
                         } else {
                             Log.i("APP", "PLAY");
                             Layout layout = tv_transtext.getLayout();
@@ -196,8 +187,6 @@ public class FileInfo extends Base {
                 }
                 return false;
             }
-
-
         });
 
         if (text == null) {

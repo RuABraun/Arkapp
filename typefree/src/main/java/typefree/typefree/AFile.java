@@ -32,6 +32,7 @@ public class AFile implements Parcelable {
         this.fname = afile.fname;
         this.len_s = afile.len_s;
         this.date = afile.date;
+        this.id = afile.id;
     }
 
     public int getId() {

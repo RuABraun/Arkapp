@@ -206,6 +206,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                         Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
                         return;
                     }
+                    
                     Intent intent = new Intent(context, FileInfo.class);
                     intent.putExtra("file_obj", afile_to_use);
                     context.startActivity(intent);
