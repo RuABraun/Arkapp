@@ -51,14 +51,16 @@ public class Base extends AppCompatActivity {
         Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
         shareIntent.setType("message/rfc822");
         ArrayList<Uri> files = new ArrayList<>();
-        int num = Base.file_suffixes.size();
 
-        int i = 0;
+        int i = -1;
         for(Object suffix : file_suffixes.values()) {
-            if (!checked.contains(i)) continue;
+            i++;
+            if (!checked.contains(i)) {
+                Log.i("APP", "skipping " + suffix + " " + i);
+                continue;
+            }
             File f = new File(Base.filesdir, fname + suffix);
             files.add(Uri.fromFile(f));
-            i++;
         }
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
