@@ -168,7 +168,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
     fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-    int_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
+    int_audio = static_cast<uint16_t*>(calloc(mFramesPerBurst, sizeof(uint16_t)));
 
     recognition_on = false;
     do_recognition = false;
@@ -259,10 +259,10 @@ void RecEngine::transcribe_stream(std::string fpath){
         f.open(wavpath.c_str(), std::ios::binary);
 
         f << "RIFF----WAVEfmt ";
-        int32_t format_chk_sz = 18;
+        int32_t format_chk_sz = 16;
         write_word(f, format_chk_sz, 4);  // is (empty) extension data
-        int16_t bytes_perSample = 4;
-        int16_t format_int = 3;  // 1 is PCM, 3 is float
+        int16_t bytes_perSample = 2;
+        int16_t format_int = 1;  // 1 is PCM, 3 is float
         write_word(f, format_int, 2);
         write_word(f, num_filechannels, 2);
         write_word(f, fin_sample_rate, 4);
@@ -270,14 +270,14 @@ void RecEngine::transcribe_stream(std::string fpath){
         write_word(f, num_filechannels * bytes_perSample, 2);  // data block size (size of two integer samples, one for each channel, in bytes)
         int16_t bits_per_byte = 8;
         write_word(f, bytes_perSample * bits_per_byte, 2);  // number of bits per sample (use a multiple of 8)
-        int16_t ext_size = 0;
-        write_word(f, ext_size, 2);
+//        int16_t ext_size = 0;
+//        write_word(f, ext_size, 2);
 
-        f << "fact";
-        int32_t chk_sz = 4;
-        write_word(f, chk_sz, 4);
-        fact_chunk_pos = f.tellp();
-        f << "----";
+//        f << "fact";
+//        int32_t chk_sz = 4;
+//        write_word(f, chk_sz, 4);
+//        fact_chunk_pos = f.tellp();
+//        f << "----";
 
         data_chunk_pos = f.tellp();
         f << "data----";  // (chunk size to be filled in later)
@@ -351,9 +351,9 @@ int RecEngine::stop_trans_stream() {
         int32 num_bytes = file_length - data_chunk_pos - 8;
         write_word(f, num_bytes, 4);
 
-        int32 num_frames = (file_length - data_chunk_pos - 8) / sizeof(float);
-        f.seekp(fact_chunk_pos);
-        write_word(f, num_frames, 4);
+//        int32 num_frames = (file_length - data_chunk_pos - 8) / sizeof(float);
+//        f.seekp(fact_chunk_pos);
+//        write_word(f, num_frames, 4);
 
         f.seekp(4);
         write_word(f, file_length - 8, 4);
@@ -437,10 +437,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     float val;
     int32_t num_samples_in = numFrames * mChannelCount;
     tot_num_frames += numFrames;
-    bool damp_shock = false;
-    int32 damp_cnt = 0;
-    int32 damp_cnt_max = -1;
-    BaseFloat ampl_adj = 25.0f;
+    // Note we put data in floating point format but in PCM (int) range
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
         int k = 0;
@@ -449,40 +446,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
             for (int j = 0; j < mChannelCount; j++) {
                 val += audio_data[i + j];
             }
-            val = val / cnt_channel_fp;
-            /*if (k > 1) {
-                BaseFloat diff = val - fp_audio[k - 1];
-                BaseFloat diffabs = std::abs(diff);
-                if(damp_shock) {
-                    damp_cnt++;
-                    val = val / (ampl_adj * pow(2.0f, -0.001f * damp_cnt));
-                }
-                BaseFloat difftwo = diff + fp_audio[k-1] - fp_audio[k-2];
-                BaseFloat difftwoabs = abs(difftwo);
-                BaseFloat max_change = 10.0f * amplitude_delta_avg;
-
-                if (diffabs > max_change && !damp_shock && diffabs > 0.1f) {
-                    val = fp_audio[k - 1] + diff / ampl_adj;
-                    damp_shock = true;
-                    damp_cnt_max = 2000 * (int) diffabs;
-                    damp_cnt++;
-//                    LOGI("CLIPPING val %f, diff %f, maxdiff %f", val, diff, max_change);
-                } else if (difftwoabs > max_change && !damp_shock && difftwoabs > 0.1f) {
-                    BaseFloat lastval = fp_audio[k-1];
-                    fp_audio[k-1] = lastval / ampl_adj;
-                    val = lastval + diff / ampl_adj;
-                    damp_shock = true;
-                    damp_cnt_max = 2000 * (int) diffabs;
-                    damp_cnt++;
-//                    LOGI("CLIPPING val %f, diff %f, difftwo %f, maxdiff %f", val, diff, difftwo, max_change);
-                }
-                if (damp_cnt == damp_cnt_max) {
-                    damp_shock = false;
-                    damp_cnt = 0;
-                }
-                amplitude_delta_avg = 0.9f * amplitude_delta_avg + 0.1f * diffabs;
-            }*/
-            fp_audio[k] = val;
+            fp_audio[k] = val * mul;
             k++;
         }
     } else {
@@ -492,23 +456,24 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
         for (int i = 0; i < num_samples_in; i += mChannelCount) {
             val = 0.0f;
             for (int j = 0; j < mChannelCount; j++) {
-                val += (static_cast<float>(audio_data[i + j]) * mul_div);
+                val += static_cast<float>(audio_data[i + j]);
             }
             fp_audio[k] = (val / cnt_channel_fp);
             k++;
         }
     }
 
-    for (int i = 0; i < numFrames; i++) {
-        val = fp_audio[i];
-        int_audio[i] = val * mul;
-    }
     do_recognition = false;  // this is to prevent recognition from starting while appending data
-    SubVector<float> data(int_audio, numFrames);
+    SubVector<float> data(fp_audio, numFrames);
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
     do_recognition = true;
 
-    f.write((char*) &fp_audio[0], numFrames * 4);
+    for (int i = 0; i < numFrames; i++) {
+        val = fp_audio[i];
+        int_audio[i] = static_cast<uint16_t>(val + 0.5f);
+    }
+
+    f.write((char*) &int_audio[0], numFrames * 2);
 
 //    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
 //    auto underrunCount = audioStream->getXRunCount();
@@ -517,7 +482,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     if (numFrames < mFramesPerBurst) {
         for(int i = 0; i < mFramesPerBurst; i++) {
-            int_audio[i] = 0.0;
+            int_audio[i] = 0;
         }
     }
 

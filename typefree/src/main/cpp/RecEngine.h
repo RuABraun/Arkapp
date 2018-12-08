@@ -84,7 +84,7 @@ private:
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
     float_t* fp_audio;
-    float_t* int_audio; // is in int16 range
+    uint16_t* int_audio; // is in int16 range
 
     FILE* os_ctm;
     FILE* os_txt;
