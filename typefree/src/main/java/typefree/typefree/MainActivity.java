@@ -709,36 +709,6 @@ public class MainActivity extends Base {
         ed_transtext.setFocusableInTouchMode(false);
     }
 
-//
-//    public void doInference() {
-//        int[] input = new int[1];
-//        Arrays.fill(input, 1);
-//        float[] state = new float[256];
-//        Arrays.fill(state, 0f);
-//
-//        Map<Integer, Object> map_of_indices_to_outputs = new HashMap<>();
-//        float[][] prob = new float[1][3];
-//        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_prob"), prob);
-//
-//        float[][] newstate = new float[1][256];
-//        map_of_indices_to_outputs.put(casemodel.getOutputIndex("output_state"), newstate);
-//
-//        Object[] inputs = {input, state};
-//        casemodel.runForMultipleInputsOutputs(inputs, map_of_indices_to_outputs);
-//        int idx = casemodel.getOutputIndex("output_prob");
-//        float val = ((float[][]) map_of_indices_to_outputs.get(idx))[0][0];
-//        Log.i("APP", "value: " + val);
-//    }
-
-//    private MappedByteBuffer loadModelFile() throws IOException {
-//        AssetFileDescriptor fileDescriptor = this.getAssets().openFd("model/tf_model.tflite");
-//        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-//        FileChannel fileChannel = inputStream.getChannel();
-//        long startOffset = fileDescriptor.getStartOffset();
-//        long declaredLength = fileDescriptor.getDeclaredLength();
-//        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
-//    }
-
 }
 
 

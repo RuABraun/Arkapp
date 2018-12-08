@@ -248,23 +248,6 @@ public class Manage extends Base {
 
     }
 
-    public void share(String fname, ArrayList checked) {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
-        shareIntent.setType("message/rfc822");
-        ArrayList<Uri> files = new ArrayList<>();
-
-        int i = 0;
-        for(Object suffix : file_suffixes.values()) {
-            if (!checked.contains(i)) continue;
-            File f = new File(Base.filesdir, fname + suffix);
-            files.add(Uri.fromFile(f));
-            i++;
-        }
-        shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
-    }
-
     public static void copy(File src, File dst) throws IOException {
         InputStream in = new FileInputStream(src);
         try {

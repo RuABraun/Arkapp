@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.graphics.Rect;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -21,6 +23,7 @@ import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,7 +43,10 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
     private Context context;
     private FileRepository f_repo;
     private FragmentManager fragmentManager;
+    Handler h_main = new Handler(Looper.getMainLooper());
     private Thread t;
+    private boolean recog_done = false;
+    private Runnable runnable;
 
     MyRecyclerAdapter(Context ctx, FileRepository f_repo, FragmentManager fragmentManager) {
         this.context = ctx;
@@ -85,6 +91,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
     public class ViewHolder extends RecyclerView.ViewHolder {
         TextView tv_fname, tv_flen, tv_date;
         ImageButton button_opts, button_trans, button_img;
+        final ProgressBar spinner;
         public View itemView;
         public int curr_pos;
 
@@ -95,6 +102,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             tv_date = v.findViewById(R.id.Row_Date);
             button_opts = v.findViewById(R.id.Row_ViewOpts);
             button_trans = v.findViewById(R.id.Row_TransBut);
+            spinner = v.findViewById(R.id.progressBar_trans);
 
             button_trans.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -106,23 +114,41 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                     final String wavpath = Base.filesdir + fname + ".wav";
                     Log.i("APP", "Pressed on file " + fpath + " with name " + afile_to_use.title);
                     MediaPlayer mPlayer = MediaPlayer.create(context, Uri.parse(wavpath));
-                    int dur = (int) ((float)mPlayer.getDuration() / 4000.0f);
+                    int dur = (int) ((float)mPlayer.getDuration() / 2000.0f);
                     String est_time = Base.sec_to_timestr(dur);
                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
+
                     builder.setTitle("Transcribe audio file")
                             .setMessage("This is estimated to take: " + est_time + "\n\nThis will run in the background so" +
                                     " you can switch to other apps while it runs, but your phone will run slower than normal.")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final RecEngine recEngine = RecEngine.getInstance(rmodeldir);  // RISKY!! what if it was GCed and needs to be recreated?
+                                    spinner.setVisibility(View.VISIBLE);
+                                    button_trans.setVisibility(View.INVISIBLE);
+                                    recog_done = false;
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
                                             recEngine.transcribe_file(wavpath, fpath);
+                                            recog_done = true;
                                         }
                                     });
                                     t.setPriority(6);
                                     t.start();
+                                    h_main.post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            runnable = this;
+                                            if (recog_done) {
+                                                spinner.setVisibility(View.INVISIBLE);
+                                                button_trans.setImageResource(R.drawable.textfile);
+                                                button_trans.setVisibility(View.VISIBLE);
+                                            } else {
+                                                h_main.postDelayed(runnable, 100);
+                                            }
+                                        }
+                                    });
                                     dialog.dismiss();
                                 }
                             }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -162,8 +188,9 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                     break;
                                 case R.id.Share:
                                     ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
-                                    dialog.show(((AppCompatActivity) context).getSupportFragmentManager(), "ShareDialog");
+                                    dialog.show(((Manage) context).getSupportFragmentManager(), "ShareDialog");
                                     break;
+
                                 case R.id.Delete:
                                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
                                     builder.setTitle("Confirm")
