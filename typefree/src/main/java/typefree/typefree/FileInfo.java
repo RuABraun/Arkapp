@@ -288,53 +288,8 @@ public class FileInfo extends Base {
                 h_main.postDelayed(this, 25);
             }
         };
-//        scroll_runnable = new Runnable() {
-//            @Override
-//            public void run() {
-//                int cur_time_ms = mPlayer.getCurrentPosition();
-//                Layout layout = ed_transtext.getLayout();
-//                Log.i("APP", "IN SCROLLTHING 1");
-//                int first_char_idx = layout.getLineStart(layout.getLineForVertical(ed_transtext.getBottom()));
-//                String word = "";
-//                for(int i = first_char_idx; i < text.length(); i++) {
-//                    char c = text.charAt(i);
-//                    if (word.isEmpty()) {
-//                        if (c != ' ') continue;
-//                    } else {
-//                        if (c == ' ') break;
-//                    }
-//                    if (c != ' ') word += c;
-//                }
-//                Log.i("APP", "IN SCROLLTHING 2");
-//                // get corresponding timestamp
-//                int num_char_hist = 0;
-//                int i = 0;
-//                for(; i < original_words.size(); i++) {
-//                    String w = original_words.get(i);
-//                    if (num_char_hist >= first_char_idx && w.equals(word)) {
-//                        break;
-//                    }
-//                    num_char_hist += w.length() + 1;
-//                }
-//                Log.i("APP", "IN SCROLLTHING 3");
-//                int time_ms = word_times_ms.get(i);
-//                Log.i("APP", "IN SCROLLTHING 4 " + Integer.toString(time_ms) + " " + Integer.toString(time_ms));
-//                if (time_ms < cur_time_ms) {
-//                    final int y = (ed_transtext.getLineCount() - 1) * ed_transtext.getLineHeight();
-//                    Log.i("APP", "IN SCROLLTHING A");
-//                    Runnable runnable = new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            ed_transtext.scrollTo(0, y);
-//                        }
-//                    };
-//                    h_main.post(runnable);
-//                }
-//                h_main.postDelayed(this, 1000);
-//            }
-//        };
+
         h_main.post(seekbar_runnable);
-//        h_main.post(scroll_runnable);
         mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
@@ -554,15 +509,21 @@ public class FileInfo extends Base {
             @Override
             public void afterTextChanged(final Editable s) {
                 Log.i("APP", "In text change.");
-                final String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
+                if (cname.equals("")) {
+                    cname = getString(R.string.default_convname);
+                }
+                final String curname = cname;
                 final String fname = MainActivity.getFileName(cname, f_repo);
                 h_background.removeCallbacks(title_runnable);
 
                 title_runnable = new Runnable() {
                     @Override
                     public void run() {
-                        Log.i("APP", "fname " + fname + " cname " + cname);
-                        f_repo.rename(afile, cname, fname);
+                        Log.i("APP", "fname " + fname + " cname " + curname);
+                        f_repo.rename(afile, curname, fname);
+                        afile.title = curname;
+                        afile.fname = fname;
                     }
                 };
                 h_background.postDelayed(title_runnable, 500);

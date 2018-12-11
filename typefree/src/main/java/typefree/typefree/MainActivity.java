@@ -355,7 +355,7 @@ public class MainActivity extends Base {
                     }
 
                     fname_prefix = getFileName(curr_cname, f_repo);
-                    h_main.removeCallbacks(title_runnable);
+                    h_background.removeCallbacks(title_runnable);
                     if (recognition_done && !edited_title) {
                         title_runnable = new Runnable() {
                             @Override
@@ -366,7 +366,7 @@ public class MainActivity extends Base {
                                 curr_afile.fname = fname_prefix;
                             }
                         };
-                        h_main.postDelayed(title_runnable, 500);
+                        h_background.postDelayed(title_runnable, 500);
                     }
                 }
 
@@ -383,7 +383,7 @@ public class MainActivity extends Base {
         imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
         super.onPause();
         if (title_runnable != null) {
-            h_main.removeCallbacks(title_runnable);
+            h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
         if (trans_edit_runnable != null) {
