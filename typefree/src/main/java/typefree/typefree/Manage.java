@@ -120,17 +120,6 @@ public class Manage extends Base {
             }
         });
 
-        MenuItem addItem = menu.findItem(R.id.action_add);
-        addItem.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.setType("*/*");
-                startActivityForResult(intent, 7);
-                return false;
-            }
-        });
-
         return true;
     }
 
@@ -293,6 +282,12 @@ public class Manage extends Base {
                 return false;
             }
         }
+    }
+
+    public void onAddPress(View view) {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");
+        startActivityForResult(intent, 7);
     }
 
 }

@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"
-    tools:context="ark.ark.Manage">
+    tools:context="typefree.typefree.Manage">
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/rv_files"
@@ -28,5 +28,23 @@
         app:itemBackground="@color/colorPrimary"
         app:itemIconTint="@color/colBackground"
         app:itemTextColor="@color/colBackground" />
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/button_rec"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/border_white"
+        android:backgroundTint="@color/colorPrimary"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:onClick="onAddPress"
+        android:scaleType="center"
+        app:borderWidth="2dp"
+        app:layout_constraintBottom_toTopOf="@+id/botNavigB"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:srcCompat="@drawable/circle" />
 
 </android.support.constraint.ConstraintLayout>
