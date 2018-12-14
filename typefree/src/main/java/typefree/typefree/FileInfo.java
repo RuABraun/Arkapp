@@ -444,7 +444,7 @@ public class FileInfo extends Base {
     public void onShareClick(View view) {
         if (is_spamclick()) return;
         ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
-        dialog.show(getSupportFragmentManager(), "ShareDialog");
+        dialog.show(getFragmentManager(), "ShareDialog");
     }
 
     public void onDeleteClick(View view) {

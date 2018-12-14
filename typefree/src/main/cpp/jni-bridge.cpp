@@ -8,7 +8,7 @@
 
 extern "C" {
 
-JNIEXPORT void JNICALL Java_typefree_typefree_Base_native_1load(JNIEnv* env, jobject, jobject Amgr, jstring modeldir) {
+JNIEXPORT void JNICALL Java_typefree_typefree_MainActivity_native_1load(JNIEnv* env, jobject, jobject Amgr, jstring modeldir) {
 
     AAssetManager *mgr = AAssetManager_fromJava(env, Amgr);
 

@@ -76,22 +76,14 @@ void RecEngine::setupLex(std::string wsyms, std::string align_lex) {
 void RecEngine::setupRnnlm(std::string modeldir) {
     rnn_ready = false;
     std::string lm_to_subtract_fname = modeldir + "o3_1M.carpa",
-            word_feat_fname = modeldir + "word_feats.bin",
-            feat_emb_fname = modeldir + "feat_embedding.final.mat",
+            word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
+            word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
+            word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
             rnnlm_raw_fname = modeldir + "final.raw";
 
-    ReadKaldiObject(feat_emb_fname, &feat_emb_mat);
-
-    //  Input input(word_feat_fname);
-    int32 rnn_featdim = feat_emb_mat.NumRows();
-    SparseMatrix<BaseFloat> cpu_word_feat;
-    rnnlm::ReadSparseWordFeaturesBinary(word_feat_fname, rnn_featdim,
-                                        &cpu_word_feat);
-    word_feat.Swap(&cpu_word_feat);
-
-    word_emb_mat = new CuMatrix<BaseFloat>(word_feat.NumRows(), feat_emb_mat.NumCols());
-    word_emb_mat->AddSmatMat(1.0, word_feat, kNoTrans, feat_emb_mat, 0.0);
-
+    ReadKaldiObject(word_large_emb_fname, &word_emb_mat_large);
+    ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
+    ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
     BaseFloat rnn_scale = 0.9f;
 
     const_arpa = new ConstArpaLm();
@@ -102,12 +94,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
 
-    std:vector<int32> ids;
+    std::vector<int32> ids;
     kaldi::readNumsFromFile(modeldir + "ids.int", ids);
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, modeldir);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, 140000, modeldir);
 
-    rnn_info = new rnnlm::RnnlmComputeStateInfo(*rnn_opts, rnnlm, (*word_emb_mat));
-    lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFst(max_ngram_order, *rnn_info);
+    rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
+        word_emb_mat_med, word_emb_mat_small, 10000, 50000);
+    lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
 
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
 
@@ -163,12 +156,12 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
 
     // ! -- AM setup end, doing RNN setup
 
-    compose_opts = new ComposeLatticePrunedOptions(2.0, 150, 1.25, 75);
+    compose_opts = new ComposeLatticePrunedOptions(2.0, 200, 1.25, 75);
 
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
     fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-    int_audio = static_cast<uint16_t*>(calloc(mFramesPerBurst, sizeof(uint16_t)));
+    int_audio = static_cast<int16_t*>(calloc(mFramesPerBurst, sizeof(int16_t)));
 
     recognition_on = false;
     do_recognition = false;
@@ -188,6 +181,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
     }
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
     case_zero_index = 10422;
+    casepos_zero_index = CASE_INNUM;
 
     t.join();
     LOGI("Finished constructing rec");
@@ -228,6 +222,7 @@ void RecEngine::transcribe_stream(std::string fpath){
     builder.setPerformanceMode(oboe::PerformanceMode::PowerSaving);
     builder.setCallback(this);
     builder.setDirection(oboe::Direction::Input);
+    builder.setChannelCount(1);
 //    builder.setFramesPerCallback(mFramesPerBurst);
     builder.setSampleRate(fin_sample_rate);
 
@@ -470,7 +465,7 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
 
     for (int i = 0; i < numFrames; i++) {
         val = fp_audio[i];
-        int_audio[i] = static_cast<uint16_t>(val + 0.5f);
+        int_audio[i] = static_cast<int16_t>(val + 0.5f);
     }
 
     f.write((char*) &int_audio[0], numFrames * 2);
@@ -542,17 +537,18 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 }
 
-int32 RecEngine::run_casing(std::vector<int32> casewords) {
+int32 RecEngine::run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos) {
     int32 sz = casewords.size();
-    if (sz < CASE_INNUM) {
-        casewords.insert(casewords.begin(), CASE_INNUM - sz, case_zero_index);
+    if (sz != CASE_INNUM) {
+        LOGE("SIZE IS DIFFERENT THAN CASE_INNUM, SOMETHING WENT WRONG");
     }
-    if (sz > CASE_INNUM) LOGE("SIZE IS OVER CASE_INNUM, SOMETHING WENT WRONG");
-    TfLiteTensor* input_tensor = interpreter->tensor(0);
 
     int32* input = interpreter->typed_input_tensor<int32>(0);
-
-    for(int i = 0; i < CASE_INNUM; i++) input[i] = casewords[i];
+    int32* input_pos = interpreter->typed_input_tensor<int32>(1);
+    for(int i = 0; i < CASE_INNUM; i++) {
+        input[i] = casewords[i];
+        input_pos[i] = casewords_pos[i];
+    }
 
     interpreter->Invoke();
     float* output = interpreter->typed_output_tensor<float>(0);
@@ -572,7 +568,7 @@ int32 RecEngine::run_casing(std::vector<int32> casewords) {
 
 void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* casing) {
     int32 sz = words->size();
-    if (sz < 5) {
+    if (sz < 6) {
         casing->resize(sz, 0);
         return;
     }
@@ -587,13 +583,14 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
 
     // Convert ids
     sz = words_nosil.size();
-    std::vector<int32> casewords;
+    std::vector<int32> casewords(sz);
     for(int32 i = 0; i < sz; i++) {
         int32 id = nid_to_caseid[words_nosil[i]];
-        casewords.push_back(id);
+        casewords[i] = id;
     }
 
-    std::vector<int32> casewords_sentence(CASE_INNUM);
+    std::vector<int32> casewords_sentence(CASE_INNUM, case_zero_index);
+    std::vector<int32> casepos_sentence(CASE_INNUM, casepos_zero_index);
     casing->resize(sz, 0);
     for(int32 i = 1; i < sz; i++) {
         int32 startidx = i - (CASE_INNUM - CASE_OFFSET - 1);
@@ -602,16 +599,19 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
 
         int32 k = CASE_INNUM - 1;
         for(int32 j = endidx; j >= startidx; j--, k--) {
-            int32 wid;
-            if (endidx < sz) {
+            int32 wid, pos;
+            if (j < sz) {
                 wid = casewords[j];
+                pos = k;
             } else {
                 wid = case_zero_index;
+                pos = casepos_zero_index;
             }
             casewords_sentence[k] = wid;
+            casepos_sentence[k] = pos;
         }
 
-        (*casing)[i] = run_casing(casewords_sentence);
+        (*casing)[i] = run_casing(casewords_sentence, casepos_sentence);
     }
 }
 

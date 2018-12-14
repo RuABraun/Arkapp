@@ -37,8 +37,6 @@ public class Base extends AppCompatActivity {
     };
     private long time_lastclick = 0;
 
-    public native void native_load(AssetManager mgr, String rmodeldir);
-
     public boolean is_spamclick() {
         if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
             return true;

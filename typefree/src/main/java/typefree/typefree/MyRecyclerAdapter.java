@@ -188,7 +188,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                     break;
                                 case R.id.Share:
                                     ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
-                                    dialog.show(((Manage) context).getSupportFragmentManager(), "ShareDialog");
+                                    dialog.show(((Manage) context).getFragmentManager(), "ShareDialog");
                                     break;
 
                                 case R.id.Delete:

@@ -84,7 +84,7 @@ private:
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
     float_t* fp_audio;
-    uint16_t* int_audio; // is in int16 range
+    int16_t* int_audio; // is in int16 range
 
     FILE* os_ctm;
     FILE* os_txt;
@@ -123,16 +123,16 @@ private:
 
     // RNN vars
     int32 max_ngram_order = 4;
-    kaldi::CuMatrix<kaldi::BaseFloat> feat_emb_mat;
-    kaldi::CuSparseMatrix<kaldi::BaseFloat> word_feat;
-    kaldi::CuMatrix<kaldi::BaseFloat>* word_emb_mat = NULL;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_large;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_med;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_small;
     kaldi::ConstArpaLm* const_arpa = NULL;
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_to_subtract_fst = NULL;
     fst::ScaleDeterministicOnDemandFst* lm_to_subtract_det_scale = NULL;
     kaldi::nnet3::Nnet rnnlm;
     kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts;
-    kaldi::rnnlm::RnnlmComputeStateInfo* rnn_info;
-    kaldi::rnnlm::KaldiRnnlmDeterministicFst* lm_to_add_orig;
+    kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info;
+    kaldi::rnnlm::KaldiRnnlmDeterministicFstAdapt* lm_to_add_orig;
     fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
     const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
     const kaldi::ComposeLatticePrunedOptions* compose_opts;
@@ -140,13 +140,14 @@ private:
 
     // case model
     int32 CASE_INNUM = 8;
-    int32 CASE_OFFSET = 2;
+    int32 CASE_OFFSET = 1;
     std::unique_ptr<tflite::FlatBufferModel> flatbuffer_model;
     std::unique_ptr<tflite::Interpreter> interpreter;
     std::vector<int32> nid_to_caseid;  // ngram index (id) to case index
     int32 case_zero_index;  // number of case words, doubles as index to a zeroed embedding
+    int32 casepos_zero_index;
 
-    int32 run_casing(std::vector<int32> casewords);
+    int32 run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos);
 
     void write_to_wav(int32 num_frames);
 
