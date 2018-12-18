@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.graphics.Rect;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.v7.app.AppCompatActivity;
@@ -66,7 +67,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
         AFile elem = getItem(pos);
         holder.tv_fname.setText(elem.title);
         holder.tv_date.setText(elem.date);
-
         String duration = Base.sec_to_timestr(elem.len_s);
         holder.tv_flen.setText(duration);
         holder.curr_pos = pos;
@@ -182,9 +182,12 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                         Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
                                         break;
                                     }
-                                    Intent intent = new Intent(context, FileInfo.class);
-                                    intent.putExtra("file_obj", afile_to_use);
-                                    context.startActivity(intent);
+                                    Bundle bundle = new Bundle();
+                                    bundle.putParcelable("file_obj", afile_to_use);
+                                    FileInfo finfo_frag = new FileInfo();
+                                    finfo_frag.setArguments(bundle);
+                                    fragmentManager.beginTransaction().replace(R.id.main_root_view,
+                                            finfo_frag, "fileinfo").addToBackStack(null).commit();
                                     break;
                                 case R.id.Share:
                                     ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
@@ -234,9 +237,12 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                         return;
                     }
 
-                    Intent intent = new Intent(context, FileInfo.class);
-                    intent.putExtra("file_obj", afile_to_use);
-                    context.startActivity(intent);
+                    Bundle bundle = new Bundle();
+                    bundle.putParcelable("file_obj", afile_to_use);
+                    FileInfo finfo_frag = new FileInfo();
+                    finfo_frag.setArguments(bundle);
+                    fragmentManager.beginTransaction().replace(R.id.main_root_view,
+                        finfo_frag, "fileinfo").addToBackStack(null).commit();
                 }
             });
         }

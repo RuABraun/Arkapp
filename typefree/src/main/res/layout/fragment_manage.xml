@@ -2,32 +2,22 @@
 <android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/manage_fragment"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"
-    tools:context="typefree.typefree.Manage">
+    tools:context="typefree.typefree.MainActivity"
+    android:background="@color/colBackground" >
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/rv_files"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@drawable/recview_background"
-        app:layout_constraintBottom_toTopOf="@+id/botNavigB"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <android.support.design.widget.BottomNavigationView
-        android:id="@+id/botNavigB"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:menu="@menu/menu_navig"
-        app:itemBackground="@color/colorPrimary"
-        app:itemIconTint="@color/colBackground"
-        app:itemTextColor="@color/colBackground" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/button_rec"
@@ -43,7 +33,7 @@
         android:onClick="onAddPress"
         android:scaleType="center"
         app:borderWidth="2dp"
-        app:layout_constraintBottom_toTopOf="@+id/botNavigB"
+        app:layout_constraintBottom_toBottomOf="@+id/rv_files"
         app:layout_constraintEnd_toEndOf="parent"
         app:srcCompat="@drawable/circle" />
 

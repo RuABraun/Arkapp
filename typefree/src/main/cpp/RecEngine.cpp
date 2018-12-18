@@ -113,7 +113,8 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
 RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
                                             sil_config(0.001f, ""),
-                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "") {
+                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
+                                            tot_num_frames_decoded(0) {
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -229,6 +230,7 @@ void RecEngine::transcribe_stream(std::string fpath){
     oboe::Result result = builder.openStream(&mRecStream);
 
     oboe::AudioFormat mFormat;
+    tot_num_frames_decoded = 0;
     if (result == oboe::Result::OK && mRecStream != nullptr) {
         mSampleRate = mRecStream->getSampleRate();
         mFormat = mRecStream->getFormat();
@@ -333,7 +335,7 @@ int RecEngine::stop_trans_stream() {
         CompactLattice olat;
         decoder->GetLattice(true, &olat);
 
-        int32 num_out_frames = decoder->NumFramesDecoded();
+        int32 num_out_frames = tot_num_frames_decoded + decoder->NumFramesDecoded();
 
         if (t_finishsegment.joinable()) t_finishsegment.join();
         finish_segment(&olat, num_out_frames);
@@ -393,6 +395,7 @@ void RecEngine::recognition_loop() {
 
             if (decoder->isStopTime(silence_phones, trans_model, 3)) {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
+                tot_num_frames_decoded += num_frames_decoded;
                 LOGI("Stopped %d", num_frames_decoded);
                 if (t_finishsegment.joinable()) t_finishsegment.join();
                 decoder->GetLattice(false, &finish_seg_clat);

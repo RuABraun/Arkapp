@@ -2,7 +2,7 @@ package typefree.typefree;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.arch.lifecycle.ViewModelProviders;
+import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -26,20 +26,17 @@ import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.MenuItem;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewSwitcher;
-
-import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -49,18 +46,13 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.lang.Math.abs;
 
-public class FileInfo extends Base {
+public class FileInfo extends Fragment {
 
     private ImageButton mediaButton;
     private MediaPlayer mPlayer;
-    private HandlerThread handlerThread;
-    private Handler h_background;
-    private Handler h_main = new Handler(Looper.getMainLooper());
     private Runnable title_runnable, seekbar_runnable, ed_trans_runnable, scroll_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
@@ -68,33 +60,41 @@ public class FileInfo extends Base {
     private EditText fileinfo_ed_title;
     private TextView tv_transtext;
     private String text;
-    private FileRepository f_repo;
     private FloatingActionButton editButton;
     private ViewSwitcher viewSwitcher;
     private List<Integer> word_times_ms = new ArrayList<>();
     private List<String> original_words = new ArrayList<>();
     private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
     private boolean just_closed = false;
+    private MainActivity act;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_fileinfo);
+//        afile = savedInstanceState.getParcelable("file_obj");
+        Bundle bundle = this.getArguments();
+        afile = bundle.getParcelable("file_obj");
+        act = (MainActivity) getActivity();
 
-        afile = getIntent().getParcelableExtra("file_obj");
+    }
 
-        mediaButton = findViewById(R.id.mediaButton);
-        editButton = findViewById(R.id.fileinfo_edit_button);
-        viewSwitcher = findViewById(R.id.trans_view_switch);
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_fileinfo, container, false);
 
-        mSeekBar = findViewById(R.id.seekBar);
+        mediaButton = view.findViewById(R.id.mediaButton);
+        editButton = view.findViewById(R.id.fileinfo_edit_button);
+        viewSwitcher = view.findViewById(R.id.trans_view_switch);
 
-        ed_transtext = findViewById(R.id.ed_trans);
-        tv_transtext = findViewById(R.id.tv_trans);
-        fileinfo_ed_title = findViewById(R.id.fileinfo_ed_title);
+        mSeekBar = view.findViewById(R.id.seekBar);
 
+        ed_transtext = view.findViewById(R.id.ed_trans);
+        tv_transtext = view.findViewById(R.id.tv_trans);
+        fileinfo_ed_title = view.findViewById(R.id.fileinfo_ed_title);
+        act.bottomNavigationView.setVisibility(View.INVISIBLE);
+        return view;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -102,7 +102,7 @@ public class FileInfo extends Base {
     public void onStart() {
         super.onStart();
 
-        mPlayer = MediaPlayer.create(getApplicationContext(), Uri.parse(filesdir + afile.fname + ".wav"));
+        mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(Base.filesdir + afile.fname + ".wav"));
         mSeekBar.setMax(mPlayer.getDuration());
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -165,13 +165,7 @@ public class FileInfo extends Base {
                             int yscroll = tv_transtext.getScrollY();
                             int lineidx = layout.getLineForVertical(y + yscroll);
                             int offset = layout.getOffsetForHorizontal(lineidx, x);
-                            int sz = word_start_c_idx.size();
-                            int i = 0;
-                            while(word_start_c_idx.get(i) < offset) {
-                                i++;
-                                if (i == sz) break;
-                            }
-                            i--;
+                            int i = getIdxForCharOffset(offset);
                             int time_ms = word_times_ms.get(i);
                             mPlayer.seekTo(time_ms);
                             playMediaPlayer();
@@ -195,14 +189,25 @@ public class FileInfo extends Base {
 
     }
 
+    private int getIdxForCharOffset(int offset) {
+        int sz = word_start_c_idx.size();
+        int i = 0;
+        while(word_start_c_idx.get(i) < offset) {
+            i++;
+            if (i == sz) break;
+        }
+        i--;
+        return i;
+    }
+
     public void setFileFields() {
-        TextView tv = findViewById(R.id.file_date);
+        TextView tv = getView().findViewById(R.id.file_date);
         tv.setText(afile.date);
-        tv = findViewById(R.id.file_duration);
+        tv = getView().findViewById(R.id.file_duration);
         int file_len_s = afile.len_s;
         tv.setText(String.valueOf(file_len_s));
 
-        String fpath = filesdir + afile.fname + file_suffixes.get("text");
+        String fpath = Base.filesdir + afile.fname + Base.file_suffixes.get("text");
         String normal_text;
         boolean text_found = true;
         try {
@@ -221,7 +226,7 @@ public class FileInfo extends Base {
         tv_transtext.setText(text, TextView.BufferType.SPANNABLE);
 
         if (text_found) {
-            fpath = filesdir + afile.fname + file_suffixes.get("timed");
+            fpath = Base.filesdir + afile.fname + Base.file_suffixes.get("timed");
             String text_timed_str;
             try {
                 FileInputStream fis = new FileInputStream(fpath);
@@ -271,39 +276,49 @@ public class FileInfo extends Base {
 
         fileinfo_ed_title.setText(afile.title);
 
-        f_repo = new FileRepository(getApplication());
+        act.f_repo = new FileRepository(act.getApplication());
     }
 
     public void playMediaPlayer() {
         mediaButton.setImageResource(R.drawable.pause);
         if (seekbar_runnable != null) {
-            h_main.removeCallbacks(seekbar_runnable);
-            h_main.removeCallbacks(scroll_runnable);
+            act.h_main.removeCallbacks(seekbar_runnable);
+            act.h_main.removeCallbacks(scroll_runnable);
         }
         seekbar_runnable = new Runnable() {
             @Override
             public void run() {
                 int cur_time_ms = mPlayer.getCurrentPosition();
                 mSeekBar.setProgress(cur_time_ms);
-                h_main.postDelayed(this, 25);
+                Layout layout = tv_transtext.getLayout();
+                int h = tv_transtext.getMeasuredHeight();
+                int yscroll = tv_transtext.getScrollY();
+                int lineidx = layout.getLineForVertical(h + yscroll - 24) - 1;
+                int offset = layout.getOffsetForHorizontal(lineidx, tv_transtext.getMeasuredWidth());
+                int idx = getIdxForCharOffset(offset);
+                if (word_times_ms.get(idx) + 1000 < cur_time_ms && idx < word_times_ms.size() - 8) {  // otherwise scrolls at end of text
+                    int line_height = tv_transtext.getLineHeight();
+                    tv_transtext.scrollBy(0, line_height);
+                }
+
+                act.h_main.postDelayed(this, 100);
             }
         };
 
-        h_main.post(seekbar_runnable);
+        act.h_main.post(seekbar_runnable);
         mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
                 mSeekBar.setProgress(0);
                 mediaButton.setImageResource(R.drawable.play);
-                h_main.removeCallbacks(seekbar_runnable);
-                h_main.removeCallbacks(scroll_runnable);
+                act.h_main.removeCallbacks(seekbar_runnable);
+                act.h_main.removeCallbacks(scroll_runnable);
             }
         });
         mPlayer.start();
     }
 
-    public void onMediaClick(View view) {
-        if (is_spamclick()) return;
+    public void on_media_click(View view) {
 
         if (!mPlayer.isPlaying()) {
             playMediaPlayer();
@@ -318,40 +333,34 @@ public class FileInfo extends Base {
         if (mPlayer != null) {
             if (mPlayer.isPlaying()) {
                 mPlayer.pause();
-                if (h_main != null) {
-                    h_main.removeCallbacks(seekbar_runnable);
-                    h_main.removeCallbacks(scroll_runnable);
+                if (act.h_main != null) {
+                    act.h_main.removeCallbacks(seekbar_runnable);
+                    act.h_main.removeCallbacks(scroll_runnable);
                 }
             }
         }
     }
 
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
-        View v = getCurrentFocus();
-        boolean ret = super.dispatchTouchEvent(event);
-        if (v instanceof EditText) {
-            View w = getCurrentFocus();
+    public void handle_touch_event(View view, MotionEvent event) {
+        if (view instanceof EditText) {
             int scrcoords[] = new int[2];
-            w.getLocationOnScreen(scrcoords);
-            float x = event.getRawX() + w.getLeft() - scrcoords[0];
-            float y = event.getRawY() + w.getTop() - scrcoords[1];
+            view.getLocationOnScreen(scrcoords);
+            float x = event.getRawX() + view.getLeft() - scrcoords[0];
+            float y = event.getRawY() + view.getTop() - scrcoords[1];
 
             //Log.d("Activity", "Touch event "+event.getRawX()+","+event.getRawY()+" "+x+","+y+" rect "+w.getLeft()+","+w.getTop()+","+w.getRight()+","+w.getBottom()+" coords "+scrcoords[0]+","+scrcoords[1]);
-            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) ) {
-                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
+            if (event.getAction() == MotionEvent.ACTION_UP && (x < view.getLeft() || x >= view.getRight() || y < view.getTop() || y > view.getBottom()) ) {
+                InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
 
                 ed_transtext.clearFocus();
                 ed_transtext.setFocusableInTouchMode(false);
                 just_closed = true;
             }
         }
-        return ret;
     }
 
-    public void onEditClick(View view) {
-        if (is_spamclick()) return;
+    public void on_edit_click(View view) {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
@@ -359,7 +368,7 @@ public class FileInfo extends Base {
             viewSwitcher.showNext();
 
             ed_transtext.requestFocus();
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
             editButton.setImageResource(R.drawable.done);
 
@@ -377,12 +386,12 @@ public class FileInfo extends Base {
                 @Override
                 public void afterTextChanged(Editable s) {
                     final String new_text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
-                    h_background.removeCallbacks(ed_trans_runnable);
+                    act.h_background.removeCallbacks(ed_trans_runnable);
                     ed_trans_runnable = new Runnable() {
                         @Override
                         public void run() {
                             try {
-                                FileWriter fw = new FileWriter(new File(filesdir + afile.fname + file_suffixes.get("text")), false);
+                                FileWriter fw = new FileWriter(new File(Base.filesdir + afile.fname + Base.file_suffixes.get("text")), false);
                                 fw.write(new_text);
                                 fw.close();
                             } catch (IOException e) {
@@ -390,7 +399,7 @@ public class FileInfo extends Base {
                             }
                         }
                     };
-                    h_background.postDelayed(ed_trans_runnable, 500);
+                    act.h_background.postDelayed(ed_trans_runnable, 500);
                 }
             });
         } else {
@@ -398,7 +407,7 @@ public class FileInfo extends Base {
             just_closed = false;
 
             if (ed_trans_runnable != null) {
-                h_background.removeCallbacks(ed_trans_runnable);
+                act.h_background.removeCallbacks(ed_trans_runnable);
                 ed_trans_runnable.run();
             }
 
@@ -432,24 +441,22 @@ public class FileInfo extends Base {
         ed_transtext.setFocusableInTouchMode(false);
     }
 
-    public void onCopyClick(View view) {
-        if (is_spamclick()) return;
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+    public void on_copy_click(View view) {
+
+        ClipboardManager clipboard = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
         String simpletext = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", simpletext);
         clipboard.setPrimaryClip(clip);
-        Toast.makeText(getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
+        Toast.makeText(act.getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
     }
 
-    public void onShareClick(View view) {
-        if (is_spamclick()) return;
+    public void on_share_click(View view) {
         ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
         dialog.show(getFragmentManager(), "ShareDialog");
     }
 
-    public void onDeleteClick(View view) {
-        if (is_spamclick()) return;
-        AlertDialog.Builder builder = new AlertDialog.Builder(FileInfo.this);
+    public void on_delete_click(View view) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(act);
         builder.setTitle("Confirm")
                 .setMessage("Are you sure?")
                 .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
@@ -469,12 +476,11 @@ public class FileInfo extends Base {
     }
 
     public void delete(AFile afile) {
-        f_repo.delete(afile);
-        finish();
+        act.f_repo.delete(afile);
     }
 
     @Override
-    protected void onStop() {
+    public void onStop() {
         super.onStop();
         if (mSeekBar != null) {
             mSeekBar.setOnSeekBarChangeListener(null);
@@ -489,11 +495,14 @@ public class FileInfo extends Base {
     }
 
     @Override
-    protected void onResume() {
+    public void onDestroyView() {
+        super.onDestroyView();
+        act.bottomNavigationView.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onResume() {
         super.onResume();
-        handlerThread = new HandlerThread("BackgroundHandlerThread");
-        handlerThread.start();
-        h_background = new Handler(handlerThread.getLooper());
 
         fileinfo_ed_title.addTextChangedListener(new TextWatcher() {
             @Override
@@ -514,46 +523,45 @@ public class FileInfo extends Base {
                     cname = getString(R.string.default_convname);
                 }
                 final String curname = cname;
-                final String fname = MainActivity.getFileName(cname, f_repo);
-                h_background.removeCallbacks(title_runnable);
+                final String fname = MainActivity.getFileName(cname, act.f_repo);
+                act.h_background.removeCallbacks(title_runnable);
 
                 title_runnable = new Runnable() {
                     @Override
                     public void run() {
                         Log.i("APP", "fname " + fname + " cname " + curname);
-                        f_repo.rename(afile, curname, fname);
+                        act.f_repo.rename(afile, curname, fname);
                         afile.title = curname;
                         afile.fname = fname;
                     }
                 };
-                h_background.postDelayed(title_runnable, 500);
+                act.h_background.postDelayed(title_runnable, 500);
 
             }
         });
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         pausePlaying();
         if (title_runnable != null) {
-            h_background.removeCallbacks(title_runnable);
+            act.h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
         if (ed_trans_runnable != null) {
-            h_background.removeCallbacks(ed_trans_runnable);
+            act.h_background.removeCallbacks(ed_trans_runnable);
             ed_trans_runnable.run();
         }
-        handlerThread.quit();
     }
 
-    @Override
-    public void onBackPressed() {
-        super.onBackPressed();
-        Intent intent = new Intent(getApplicationContext(), Manage.class);
-        startActivity(intent);
-        finish();
-    }
+//    @Override
+//    public void onBackPressed() {
+//        super.onBackPressed();
+//        Intent intent = new Intent(getApplicationContext(), Manage.class);
+//        startActivity(intent);
+//        finish();
+//    }
 }
 
 abstract class ClickableSpanPlain extends ClickableSpan {

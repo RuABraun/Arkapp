@@ -4,7 +4,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:focusableInTouchMode="true" >
+    android:focusableInTouchMode="true"
+    android:id="@+id/fileinfo_fragment"
+    tools:context="typefree.typefree.MainActivity"
+    android:background="@color/colBackground" >
 
     <EditText
         android:id="@+id/fileinfo_ed_title"
@@ -115,7 +118,7 @@
         android:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:focusable="true"
-        android:onClick="onEditClick"
+        android:onClick="onEditClickFI"
         android:scaleType="center"
         app:borderWidth="1dp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -131,7 +134,7 @@
         android:layout_marginEnd="8dp"
         android:background="@drawable/border"
         android:elevation="6dp"
-        android:onClick="onCopyClick"
+        android:onClick="onCopyClickFI"
         android:scaleType="fitCenter"
         app:layout_constraintEnd_toStartOf="@+id/fileinfo_edit_button"
         app:layout_constraintTop_toTopOf="@+id/fileinfo_edit_button"
@@ -145,7 +148,7 @@
         android:layout_marginEnd="8dp"
         android:background="@drawable/border"
         android:elevation="6dp"
-        android:onClick="onShareClick"
+        android:onClick="onShareClickFI"
         android:scaleType="fitCenter"
         app:layout_constraintEnd_toStartOf="@+id/button_copy"
         app:layout_constraintTop_toTopOf="@+id/button_copy"
@@ -157,7 +160,7 @@
         android:layout_height="40dp"
         android:layout_marginTop="4dp"
         android:background="@drawable/border_del"
-        android:onClick="onDeleteClick"
+        android:onClick="onDeleteClickFI"
         android:scaleType="fitCenter"
         app:layout_constraintEnd_toEndOf="@+id/fileinfo_edit_button"
         app:layout_constraintTop_toTopOf="parent"

@@ -97,6 +97,8 @@ private:
 
     kaldi::BaseFloat amplitude_delta_avg = 0.5;
 
+    int32 tot_num_frames_decoded;
+
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;

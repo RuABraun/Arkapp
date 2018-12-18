@@ -47,8 +47,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends Base {
 
-    private BottomNavigationView bottomNavigationView;
+    protected BottomNavigationView bottomNavigationView;
     protected RecEngine recEngine;
+    protected FileRepository f_repo;
+    Handler h_main = new Handler(Looper.getMainLooper());
+    HandlerThread handlerThread;
+    Handler h_background;
+
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
@@ -57,7 +62,6 @@ public class MainActivity extends Base {
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
     final String PREFS_NAME = "MyPrefsFile";
-    private MainFragment main_frag;
 
     static {
         System.loadLibrary("rec-engine");
@@ -125,20 +129,19 @@ public class MainActivity extends Base {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
                 int item_id = item.getItemId();
-                Intent intent;
                 if (item_id == R.id.Manage) {
-                    intent = new Intent(getApplicationContext(), Manage.class);
-                    startActivity(intent);
+                    ManageFragment frag = new ManageFragment();
+                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Transcribe) {
                     MainFragment frag = new MainFragment();
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").commit();
+                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Settings) {
                     Settings frag = new Settings();
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag).commit();
+                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag).addToBackStack(null).commit();
                     return true;
                 }
                 return true;
@@ -169,6 +172,8 @@ public class MainActivity extends Base {
         } else {
             perm_granted = true;
         }
+
+        f_repo = new FileRepository(getApplication());
     }
 
 
@@ -219,7 +224,16 @@ public class MainActivity extends Base {
         do_asr_setup();
         MainFragment frag = new MainFragment();
         fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").commit();
-        main_frag = frag;
+
+        handlerThread = new HandlerThread("BackgroundHandlerThread");
+        handlerThread.start();
+        h_background = new Handler(handlerThread.getLooper());
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        handlerThread.quit();
     }
 
 
@@ -232,23 +246,61 @@ public class MainActivity extends Base {
 
     public void recordSwitch(View v) {
         if (is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.record_switch(v);
     }
 
     public void onCopyClick(View v) {
         if (is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.on_copy_click(v);
     }
 
     public void onShareClick(View v) {
         if (is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.on_share_click(v);
     }
 
     public void onEditClick(View v) {
         if (is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.on_edit_click(v);
     }
+
+    public void onAddPress(View view) {
+        if (is_spamclick()) return;
+        ManageFragment frag = (ManageFragment) fragmentManager.findFragmentByTag("manage");
+        frag.on_add_press(view);
+    }
+
+    // FileInfo buttons
+    public void onMediaClick(View view) {
+        if (is_spamclick()) return;
+        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        frag.on_media_click(view);
+    }
+    public void onEditClickFI(View view) {
+        if (is_spamclick()) return;
+        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        frag.on_edit_click(view);
+    }
+    public void onCopyClickFI(View view) {
+        if (is_spamclick()) return;
+        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        frag.on_copy_click(view);
+    }
+    public void onShareClickFI(View view) {
+        if (is_spamclick()) return;
+        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        frag.on_share_click(view);
+    }
+    public void onDeleteClickFI(View view) {
+        if (is_spamclick()) return;
+        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        frag.on_delete_click(view);
+    }
+
 
     public static String getFileName(String cname, final FileRepository f_repo_) {
         final AtomicInteger fcount = new AtomicInteger();
@@ -287,10 +339,15 @@ public class MainActivity extends Base {
         View v = getCurrentFocus();
         boolean ret = super.dispatchTouchEvent(event);
         MainFragment frag = (MainFragment) fragmentManager.findFragmentByTag("main");
-        if (frag == null || !frag.isVisible()) {
+        if (frag != null && frag.isVisible()) {
+            frag.handle_touch_event(v, event);
             return ret;
         }
-        frag.handle_touch_event(v, event);
+        FileInfo fragb = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        if (fragb != null && fragb.isVisible()) {
+            fragb.handle_touch_event(v, event);
+            return ret;
+        }
         return ret;
     }
 

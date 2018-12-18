@@ -7,18 +7,10 @@ import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
-import android.support.annotation.NonNull;
 import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.DisplayMetrics;
@@ -38,7 +30,6 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 
 import static typefree.typefree.Base.filesdir;
 
@@ -47,14 +38,10 @@ public class MainFragment extends Fragment {
 
 
     public boolean is_recording = false;
-    Handler h_main = new Handler(Looper.getMainLooper());
-    HandlerThread handlerThread;
-    Handler h_background;
     Runnable title_runnable;
     Runnable runnable;
     Runnable trans_done_runnable;
     Runnable trans_edit_runnable;
-    private FileRepository f_repo;
     private EditText ed_transtext;
     private FloatingActionButton fab_rec;
     private FloatingActionButton fab_edit;
@@ -85,30 +72,22 @@ public class MainFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        act = (MainActivity) getActivity();
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_main, container, false);
-    }
+        View view = inflater.inflate(R.layout.fragment_main, container, false);
+        pb_init = view.findViewById(R.id.progressBar_init_setup);
+        tv_init = view.findViewById(R.id.textview_init_setup);
 
-    @SuppressLint("ClickableViewAccessibility")
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+        spinner = view.findViewById(R.id.progressBar);
+        ed_title = view.findViewById(R.id.ed_title);
 
-        pb_init = getView().findViewById(R.id.progressBar_init_setup);
-        tv_init = getView().findViewById(R.id.textview_init_setup);
+        img_view = view.findViewById(R.id.imageView);
 
-        f_repo = new FileRepository(getActivity().getApplication());
-
-        spinner = getView().findViewById(R.id.progressBar);
-        ed_title = getView().findViewById(R.id.ed_title);
-
-        img_view = getView().findViewById(R.id.imageView);
-
-        final View activityRootView = getView().findViewById(R.id.main_fragment);
+        final View activityRootView = view.findViewById(R.id.main_fragment);
         activityRootView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
@@ -124,36 +103,35 @@ public class MainFragment extends Fragment {
             }
         });
 
-        fab_rec = getView().findViewById(R.id.button_rec);
+        fab_rec = view.findViewById(R.id.button_rec);
 
-        ed_transtext = getView().findViewById(R.id.trans_edit_view);
+        ed_transtext = view.findViewById(R.id.trans_edit_view);
 
         fab_rec.setVisibility(View.INVISIBLE);
         spinner.setVisibility(View.VISIBLE);
 
-        fab_edit = getView().findViewById(R.id.button_edit);
+        fab_edit = view.findViewById(R.id.button_edit);
         fab_edit.setTranslationX(128f);
 
-        fab_copy = getView().findViewById(R.id.button_copy);
-        fab_share = getView().findViewById(R.id.button_share);
+        fab_copy = view.findViewById(R.id.button_copy);
+        fab_share = view.findViewById(R.id.button_share);
         fab_copy.setTranslationX(128f);
         fab_share.setTranslationX(128f);
-        act = (MainActivity) getActivity();
-
+        return view;
     }
 
     @Override
     public void onStart() {
         super.onStart();
 
-        h_main.postDelayed(new Runnable() {
+        act.h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
-                h_main.postDelayed(runnable, 100);
+                act.h_main.postDelayed(runnable, 100);
                 if (RecEngine.isready) {
                     fab_rec.setVisibility(View.VISIBLE);
                     spinner.setVisibility(View.INVISIBLE);
-                    h_main.removeCallbacks(runnable);
+                    act.h_main.removeCallbacks(runnable);
                 }
             }
         }, 100);
@@ -170,10 +148,6 @@ public class MainFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-
-        handlerThread = new HandlerThread("BackgroundHandlerThread");
-        handlerThread.start();
-        h_background = new Handler(handlerThread.getLooper());
         if (title_textWatcher == null) {
             title_textWatcher = new TextWatcher() {
                 @Override
@@ -193,19 +167,19 @@ public class MainFragment extends Fragment {
                         curr_cname = getString(R.string.default_convname);
                     }
 
-                    fname_prefix = MainActivity.getFileName(curr_cname, f_repo);
-                    h_background.removeCallbacks(title_runnable);
+                    fname_prefix = MainActivity.getFileName(curr_cname, act.f_repo);
+                    act.h_background.removeCallbacks(title_runnable);
                     if (recognition_done && !edited_title) {
                         title_runnable = new Runnable() {
                             @Override
                             public void run() {
                                 Log.i("APP", "Renaming " + curr_afile.getId() + " from " + curr_afile.fname + " to " + fname_prefix);
-                                f_repo.rename(curr_afile, curr_cname, fname_prefix);
+                                act.f_repo.rename(curr_afile, curr_cname, fname_prefix);
                                 curr_afile.title = curr_cname;
                                 curr_afile.fname = fname_prefix;
                             }
                         };
-                        h_background.postDelayed(title_runnable, 500);
+                        act.h_background.postDelayed(title_runnable, 500);
                     }
                 }
 
@@ -213,7 +187,6 @@ public class MainFragment extends Fragment {
             };
             ed_title.addTextChangedListener(title_textWatcher);
         }
-
     }
 
     @Override
@@ -222,14 +195,13 @@ public class MainFragment extends Fragment {
         imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
         super.onPause();
         if (title_runnable != null) {
-            h_background.removeCallbacks(title_runnable);
+            act.h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
         if (trans_edit_runnable != null) {
-            h_background.removeCallbacks(trans_edit_runnable);
+            act.h_background.removeCallbacks(trans_edit_runnable);
             trans_edit_runnable.run();
         }
-        handlerThread.quit();
     }
 
 
@@ -241,18 +213,18 @@ public class MainFragment extends Fragment {
 
         String date = act.getFileDate();
         String title = curr_cname;
-        String fname = act.getFileName(curr_cname, f_repo);
+        String fname = act.getFileName(curr_cname, act.f_repo);
         fname_prefix = fname;
 
         MainActivity.renameConv("tmpfile", fname);
 
         int duration_s = (int) (3 * num_out_frames) / 100;
         AFile afile = new AFile(title, fname, duration_s, date);
-        long id = f_repo.insert(afile);
-        curr_afile = f_repo.getById(id);  // has correct ID
+        long id = act.f_repo.insert(afile);
+        curr_afile = act.f_repo.getById(id);  // has correct ID
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
-        h_main.removeCallbacks(runnable);
-        h_main.post(new Runnable() {
+        act.h_main.removeCallbacks(runnable);
+        act.h_main.post(new Runnable() {
             @Override
             public void run() {
                 update_text();
@@ -282,8 +254,8 @@ public class MainFragment extends Fragment {
             }
 
             if (trans_edit_runnable != null) {
-                h_background.removeCallbacks(trans_edit_runnable);
-                h_background.post(trans_edit_runnable);
+                act.h_background.removeCallbacks(trans_edit_runnable);
+                act.h_background.post(trans_edit_runnable);
             }
 
             recognition_done = false;
@@ -307,11 +279,11 @@ public class MainFragment extends Fragment {
 
             is_recording = true;
 
-            h_main.postDelayed(new Runnable() {
+            act.h_main.postDelayed(new Runnable() {
                 public void run() {
                     runnable=this;
                     update_text();
-                    h_main.postDelayed(runnable, 25);
+                    act.h_main.postDelayed(runnable, 25);
                 }
             }, 25);
 
@@ -319,15 +291,15 @@ public class MainFragment extends Fragment {
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
 
-            h_main.postDelayed(new Runnable() {
+            act.h_main.postDelayed(new Runnable() {
                 public void run() {
                     trans_done_runnable=this;
-                    h_main.postDelayed(trans_done_runnable, 100);
+                    act.h_main.postDelayed(trans_done_runnable, 100);
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
                         fab_rec.setImageResource(R.drawable.mic_full_inv);
                         spinner.setVisibility(View.INVISIBLE);
-                        h_main.removeCallbacks(trans_done_runnable);
+                        act.h_main.removeCallbacks(trans_done_runnable);
                     }
                 }
             }, 100);
@@ -467,7 +439,7 @@ public class MainFragment extends Fragment {
                 public void afterTextChanged(final Editable s) {
                     final String text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
 
-                    h_background.removeCallbacks(trans_edit_runnable);
+                    act.h_background.removeCallbacks(trans_edit_runnable);
                     trans_edit_runnable = new Runnable() {
                         @Override
                         public void run() {
@@ -480,16 +452,16 @@ public class MainFragment extends Fragment {
                             }
                         }
                     };
-                    h_background.postDelayed(trans_edit_runnable, 500);
+                    act.h_background.postDelayed(trans_edit_runnable, 500);
                 }
             });
 
         } else {
             just_closed = false;
             Log.i("APP", "DONE EDIT");
-            h_background.removeCallbacks(trans_edit_runnable);
+            act.h_background.removeCallbacks(trans_edit_runnable);
             if (trans_edit_runnable != null) {
-                h_background.post(trans_edit_runnable);
+                act.h_background.post(trans_edit_runnable);
             }
             ed_transtext.addTextChangedListener(null);
             fab_edit.setImageResource(R.drawable.edit);
