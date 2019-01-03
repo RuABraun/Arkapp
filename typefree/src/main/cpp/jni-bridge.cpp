@@ -138,4 +138,24 @@ Java_typefree_typefree_RecEngine_native_1setAudioDeviceId(
     }
     engine->setDeviceId(deviceId);
 }
+
+JNIEXPORT jint JNICALL
+Java_typefree_typefree_RecEngine_native_1convertAudio(
+        JNIEnv *env,
+        jobject,
+        jlong engineHandle,
+        jstring jaudiopath,
+        jstring jwavpath) {
+
+    RecEngine *engine = (RecEngine *) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid, call createHandle() to create a new one");
+        return -1;
+    }
+    const char* audiopath = env->GetStringUTFChars(jaudiopath, NULL);
+    const char* wavpath = env->GetStringUTFChars(jwavpath, NULL);
+    return engine->convert_audio(audiopath, wavpath);
+
+}
+
 }

@@ -10,6 +10,16 @@
 #include <chrono>
 #include <tensorflow/lite/c/c_api_internal.h>
 
+extern "C"
+{
+    #include <zlib.h>
+    #include <zconf.h>
+    #include "libavutil/opt.h"
+    #include "libavcodec/avcodec.h"
+    #include "libavformat/avformat.h"
+    #include "libswresample/swresample.h"
+}
+
 using namespace kaldi;
 using namespace fst;
 
@@ -746,4 +756,142 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
         LOGE("ERROR %s",  e.what());
         throw;
     }
+
+}
+extern "C" {
+int decode_audio_file(const char *path, const int fs, signed short **data, int *size) {
+
+    //av_register_all();
+    AVFormatContext *format = avformat_alloc_context();
+
+    if (avformat_open_input(&format, path, NULL, NULL) != 0) {
+        fprintf(stderr, "Could not open file");
+        return -1;
+    }
+
+    if (avformat_find_stream_info(format, NULL) < 0) {
+        fprintf(stderr, "Could not get stream info");
+        return -1;
+    }
+
+    int stream_idx = -1;
+    for (int i = 0; i < format->nb_streams; i++) {
+        if (format->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+            stream_idx = i;
+            break;
+        }
+    }
+
+    if (stream_idx == -1) {
+        fprintf(stderr, "Failed");
+        return -1;
+    }
+
+    AVStream *stream = format->streams[stream_idx];
+
+    AVCodecContext *codec = stream->codec;
+
+    if (avcodec_open2(codec, avcodec_find_decoder(codec->codec_id), NULL) < 0) {
+        fprintf(stderr, "Failed to open decoder");
+        return -1;
+    }
+
+    struct SwrContext *swr = swr_alloc();
+    av_opt_set_int(swr, "in_channel_count", codec->channels, 0);
+    av_opt_set_int(swr, "out_channel_count", 1, 0);
+    av_opt_set_int(swr, "in_channel_layout", codec->channel_layout, 0);
+    av_opt_set_int(swr, "out_channel_layout", AV_CH_LAYOUT_MONO, 0);
+    av_opt_set_int(swr, "in_sample_rate", codec->sample_rate, 0);
+    av_opt_set_int(swr, "out_sample_rate", fs, 0);
+    av_opt_set_sample_fmt(swr, "in_sample_fmt", codec->sample_fmt, 0);
+    av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);
+    swr_init(swr);
+
+    if (!swr_is_initialized(swr)) {
+        fprintf(stderr, "failed");
+        return -1;
+    }
+
+    AVPacket packet;
+    av_init_packet(&packet);
+    AVFrame *frame = av_frame_alloc();
+    if (!frame) {
+        fprintf(stderr, "Error allocating the frame\n");
+        return -1;
+    }
+
+    *data = NULL;
+    *size = 0;
+    printf("Sizeof %zu\n", sizeof(short));
+
+    while (av_read_frame(format, &packet) >= 0) {
+        int gotFrame;
+        if (avcodec_decode_audio4(codec, frame, &gotFrame, &packet) < 0) {
+            break;
+        }
+        if (!gotFrame) {
+            continue;
+        }
+
+        signed short *buffer;
+        av_samples_alloc((uint8_t * *) & buffer, NULL, 1, frame->nb_samples, AV_SAMPLE_FMT_S16, 0);
+        int frame_count = swr_convert(swr, (uint8_t * *) & buffer, frame->nb_samples,
+                                      (const uint8_t **) frame->data, frame->nb_samples);
+        *data = (signed short *) realloc(*data, (*size + frame->nb_samples) * sizeof(short));
+        memcpy(*data + *size, buffer, frame_count * sizeof(short));
+        *size += frame_count;
+    }
+
+    av_frame_free(&frame);
+    swr_free(&swr);
+    avcodec_close(codec);
+    avformat_free_context(format);
+
+    return 0;
+}
+}
+
+int write_wav(const char* newf, signed short* data, int size, int fs) {
+    FILE* os_wav;
+    os_wav = fopen(newf, "wb");
+    fprintf(os_wav, "RIFF");
+    int fsize = 44 - 8 + size * 2;
+    printf("fsize %d : %zu\n", fsize, sizeof(fsize));
+    fflush(os_wav);
+    fwrite(&fsize, 4, 1, os_wav);
+    fprintf(os_wav, "WAVEfmt ");
+    fflush(os_wav);
+    int format_chk_sz = 16;
+    signed short bytes_perSample = 2;
+    signed short format_int = 1;
+    signed short num_c = 1;
+    fwrite(&format_chk_sz, 4, 1, os_wav);
+    fwrite(&format_int, 2, 1, os_wav);
+    fwrite(&num_c, 2, 1, os_wav);
+    fwrite(&fs, 4, 1, os_wav);
+    int num_bytes_persec = fs * (int) num_c * (int) bytes_perSample;
+    fwrite(&num_bytes_persec, 4, 1, os_wav);
+    signed short block_sz = num_c * bytes_perSample;
+    fwrite(&block_sz, 2, 1, os_wav);
+    signed short bit_blocksz = 8 * bytes_perSample;
+    fwrite(&bit_blocksz, 2, 1, os_wav);
+    fprintf(os_wav, "data");
+    fflush(os_wav);
+    int num_b = (int) num_c * size * (int) bytes_perSample;
+    printf("Num b %d\n", num_b);
+    fwrite(&num_b, 4, 1, os_wav);
+    fwrite(data, 2, size, os_wav);
+    fclose(os_wav);
+    return 0;
+}
+
+int RecEngine::convert_audio(const char* audiopath, const char* wavpath) {
+    signed short* data;
+    int size;
+    if (decode_audio_file(audiopath, fin_sample_rate, &data, &size) != 0) {
+        return -1;
+    }
+    write_wav(wavpath, data, size, fin_sample_rate);
+    free(data);
+    return 0;
 }

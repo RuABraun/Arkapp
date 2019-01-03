@@ -65,6 +65,8 @@ public:
 
     void get_text_case(std::vector<int32>* words, std::vector<int32>* casing);
 
+    int convert_audio(const char* audiopath, const char* wavpath);
+
 private:
 
     kaldi::Timer timer;

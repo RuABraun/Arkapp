@@ -20,6 +20,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import java.io.File;
@@ -45,6 +46,8 @@ public class ManageFragment extends Fragment {
     MyRecyclerAdapter adapter;
     private FileViewModel fviewmodel;
     private MainActivity act;
+    private ProgressBar pb;
+    Runnable r;
 
     public ManageFragment() {
         // Required empty public constructor
@@ -63,10 +66,11 @@ public class ManageFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_manage, container, false);
+        pb = view.findViewById(R.id.load_manage);
         RecyclerView recview = view.findViewById(R.id.rv_files);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
-
+        Log.i("APP", "bla");
         fviewmodel.getAllFiles().observe(act, new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
@@ -90,9 +94,55 @@ public class ManageFragment extends Fragment {
                     }
                 });
                 adapter.setData(aFiles);
+                pb.setVisibility(View.INVISIBLE);
             }
         });
+        Log.i("APP", "bla2");
         return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+    }
+
+    class ConvertAudioRunnable implements Runnable {
+        String fname;
+        String inpath;
+        String outpath;
+        ConvertAudioRunnable(String f, String inp, String outp) {
+            fname = f;
+            inpath = inp;
+            outpath = outp;
+        }
+        public void run() {
+            Log.i("APP-MANAGEFRAG", "IN");
+            int ret = act.recEngine.convert_audio(inpath, outpath);
+            Log.i("APP-MANAGEFRAG", "Done " + ret);
+            if (ret != 0) {
+                act.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(act);
+                        builder.setMessage("Could not include this file :( Are you sure this is an audio file?");
+                        builder.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                            }
+                        });
+                        AlertDialog alert = builder.create();
+                        alert.show();
+                    }
+                });
+                return;
+            }
+            MediaPlayer mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(outpath));
+            int dur = (int) ((float) mPlayer.getDuration() / 1000.0f);
+            mPlayer.release();
+            AFile afile = new AFile(fname, fname, dur, act.getFileDate());
+            act.f_repo.insert(afile);
+        }
     }
 
     @Override
@@ -103,69 +153,63 @@ public class ManageFragment extends Fragment {
                     Uri furi = data.getData();
                     String name = "";
                     String path = "";
+                    String newpath = "";
+                    String fname_tmp = "";
                     boolean copied = false;
                     if (furi.getScheme().equals(ContentResolver.SCHEME_FILE)) {
                         path = furi.getPath();
                         name = furi.getLastPathSegment();
-                        Log.i("APP", "path " + path + " filename " + name);
+                        Log.i("APP", "bla bla path " + path + " filename " + name);
                     } else if (furi.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
                         copied = true;
+
                         Cursor retCursor = act.getContentResolver().query(furi, null, null, null, null);
                         retCursor.moveToFirst();
                         int idx_name = retCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                         name = retCursor.getString(idx_name);
                         String[] split = name.split("\\.");
-                        if (split.length == 2 && split[1].equals("wav")) {
-                            path = Base.filesdir + split[0] + ".wav";
-                            InputStream inputStream = null;
-                            try {
-                                inputStream = act.getContentResolver().openInputStream(furi);
-                            } catch (FileNotFoundException e) {
-                                e.printStackTrace();
-                            }
-                            copyFileFromInputStream(inputStream, new File(path));
-                            Log.i("APP", "name " + name + " path " + path);
+                        path = Base.filesdir + "tmp." + split[split.length-1];
+                        Log.i("APP", "bla bla path " + path + " filename " + name);
+                        InputStream inputStream = null;
+                        try {
+                            inputStream = act.getContentResolver().openInputStream(furi);
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
                         }
+                        copyFileFromInputStream(inputStream, new File(path));
+
+                        fname_tmp = split[0];
+                        for (int i = 1; i < split.length - 1; i++) {
+                            fname_tmp += split[i];
+                        }
+                        newpath = Base.filesdir + fname_tmp + ".wav";
+
                     } else {
                         Log.i("APP", "bla bla bla other scheme");
                     }
-                    String[] split = name.split("\\.");
-                    Log.i("APP", "name " + name + " splitlen " + split.length + " split1 " + split[1]);
-                    if (split.length != 2 || !split[1].equals("wav")) {
-                        AlertDialog.Builder builder = new AlertDialog.Builder(act);
-                        builder.setMessage("The file has to be in wav format! There are converters available online.");
-                        builder.setNeutralButton("OK", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                            }
-                        });
-                        AlertDialog alert = builder.create();
-                        alert.show();
-                        break;
+
+                    if (newpath.equals("")) {
+                        Log.e("APP", "Newpath is empty!");
+                        return;
                     }
-                    MediaPlayer mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(path));
-                    int dur = (int) ((float)mPlayer.getDuration() / 1000.0f);
-                    mPlayer.release();
-                    String fname = split[0];
-                    String fpath_new = Base.filesdir + fname + ".wav";
-                    if (!copied) {
-                        try {
-                            copy(new File(path), new File(fpath_new));
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    AFile afile = new AFile(fname, fname, dur, act.getFileDate());
-                    act.f_repo.insert(afile);
+                    final String inpath = path;
+                    final String outpath = newpath;
+                    final String fname = fname_tmp;
+
+                    r = new ConvertAudioRunnable(fname, inpath, outpath);
+                    new Thread(r).start();
+                    //act.h_background.post(new );
+
+                    Log.i("APP-MANAGEFRAG", "Done");
+                    break;
                 }
-                break;
+
         }
     }
 
     public void on_add_press(View view) {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");
+        intent.setType("audio/*");
         startActivityForResult(intent, 7);
     }
 

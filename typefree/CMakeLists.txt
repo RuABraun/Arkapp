@@ -61,6 +61,10 @@ set_target_properties(libtensorflowlite PROPERTIES IMPORTED_LOCATION /home/seni/
 
 
 
+# ffmpeg
+include_directories(/home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/include )
+
+
 # kaldi
 set (KALDIPATH "/home/seni/androidkaldi/kaldi/src")
 include_directories(${KALDIPATH})
@@ -70,6 +74,8 @@ link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
+
+include_directories("/home/seni/git/prebuilt-libz/android-armeabi-v7a/include")
 
 target_link_libraries( # Specifies the target library.
                        rec-engine android oboe libtensorflowlite flatbuffer
@@ -84,6 +90,13 @@ target_link_libraries( # Specifies the target library.
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libf2c.a
+
+                        /home/seni/git/prebuilt-libz/android-armeabi-v7a/lib/libz.a
+
+                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavutil.a
+                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavcodec.a
+                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavformat.a
+                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libswresample.a
 
                        # Links the target library to the log library
                        # included in the NDK.

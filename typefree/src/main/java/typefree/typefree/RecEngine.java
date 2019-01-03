@@ -80,6 +80,14 @@ public class RecEngine {
         }
     }
 
+    public int convert_audio(String audiopath, String wavpath) {
+        int n = -1;
+        if (mEngineHandle != 0) {
+            n = native_convertAudio(mEngineHandle, audiopath, wavpath);
+        }
+        return n;
+    }
+
     public static native long native_createEngine(String modeldir);
     public static native void native_deleteEngine(long engineHandle);
     public static native void native_setAudioDeviceId(long engineHandle, int deviceId);
@@ -88,4 +96,5 @@ public class RecEngine {
     public static native void native_transcribe_stream(long engineHandle, String wavpath);
     public static native long native_stop_trans_stream(long engineHandle);
     public static native void native_transcribe_file(long engineHandle, String wavpath, String ctm);
+    public static native int native_convertAudio(long engineHandle, String audiopath, String wavpath);
 }

@@ -294,6 +294,7 @@ public class FileInfo extends Fragment {
                 int h = tv_transtext.getMeasuredHeight();
                 int yscroll = tv_transtext.getScrollY();
                 int lineidx = layout.getLineForVertical(h + yscroll - 24) - 1;
+                if (lineidx < 0) lineidx = 0;
                 int offset = layout.getOffsetForHorizontal(lineidx, tv_transtext.getMeasuredWidth());
                 int idx = getIdxForCharOffset(offset);
                 if (word_times_ms.get(idx) + 1000 < cur_time_ms && idx < word_times_ms.size() - 8) {  // otherwise scrolls at end of text
