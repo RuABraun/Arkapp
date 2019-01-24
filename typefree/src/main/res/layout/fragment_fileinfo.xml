@@ -50,29 +50,15 @@
     <SeekBar
         android:id="@+id/seekBar"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginBottom="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="4dp"
         android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:elevation="3dp"
+        app:layout_constraintBottom_toBottomOf="@+id/playView"
         app:layout_constraintEnd_toStartOf="@+id/file_duration"
         app:layout_constraintStart_toEndOf="@+id/mediaButton"
-        app:layout_constraintTop_toTopOf="@+id/guideline" />
-
-    <ImageButton
-        android:id="@+id/mediaButton"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="16dp"
-        android:background="@android:color/transparent"
-        android:onClick="onMediaClick"
-        android:scaleType="centerCrop"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintDimensionRatio="1:1"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/guideline"
-        app:srcCompat="@drawable/play" />
+        app:layout_constraintTop_toTopOf="@+id/playView" />
 
     <android.support.constraint.Guideline
         android:id="@+id/guideline"
@@ -87,23 +73,24 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="8dp"
         android:layout_marginTop="8dp"
+        android:elevation="3dp"
         android:text=""
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/guideline" />
+        app:layout_constraintBottom_toBottomOf="@+id/playView"
+        app:layout_constraintEnd_toEndOf="@+id/playView"
+        app:layout_constraintTop_toTopOf="@+id/playView" />
 
     <ImageView
         android:id="@+id/imageView2"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
         android:src="@drawable/plain_square"
-        app:layout_constraintBottom_toTopOf="@+id/guideline"
+        app:layout_constraintBottom_toTopOf="@+id/playView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/file_date" />
@@ -158,7 +145,7 @@
         android:id="@+id/button_del"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/border_del"
         android:onClick="onDeleteClickFI"
         android:scaleType="fitCenter"
@@ -212,5 +199,32 @@
             tools:layout_editor_absoluteY="456dp" />
 
     </ViewSwitcher>
+
+
+    <ImageView
+        android:id="@+id/playView"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:elevation="2dp"
+        android:src="@drawable/mediaplayer_backg"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/imageView2"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="@+id/imageView2" />
+
+    <ImageButton
+        android:id="@+id/mediaButton"
+        android:layout_width="48dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="8dp"
+        android:background="@android:color/transparent"
+        android:elevation="2dp"
+        android:onClick="onMediaClick"
+        android:scaleType="centerCrop"
+        app:layout_constraintBottom_toBottomOf="@+id/playView"
+        app:layout_constraintDimensionRatio="h,1:1"
+        app:layout_constraintStart_toStartOf="@+id/playView"
+        app:srcCompat="@drawable/play" />
 
 </android.support.constraint.ConstraintLayout>

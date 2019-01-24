@@ -104,12 +104,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
 
+    int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
     std::vector<int32> ids;
     kaldi::readNumsFromFile(modeldir + "ids.int", ids);
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, 140000, modeldir);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, rnnlm_vocab_sz, modeldir);
 
     rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
-        word_emb_mat_med, word_emb_mat_small, 10000, 50000);
+        word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
 
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
@@ -121,7 +122,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
                                             tot_num_frames_decoded(0) {
@@ -376,13 +377,15 @@ void RecEngine::write_to_wav(int32 num_frames) {
 
 void RecEngine::recognition_loop() {
     Timer timer_rnn;
+    Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
-
+            tt.Reset();
             decoder->AdvanceDecoding();
+            LOGI("Decode time %f", tt.Elapsed());
 
             if (decoder->isPruneTime()) {
                 did_rnn = true;
@@ -395,7 +398,7 @@ void RecEngine::recognition_loop() {
                 timer_rnn.Reset();
                 ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
                                              const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                             &clat_rescored, max_ngram_order);
+                                             &clat_rescored, max_ngram_order, false);
                 double tt = timer_rnn.Elapsed();
                 KALDI_LOG << "RESCORE TIME TAKEN " << tt;
                 CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
@@ -430,10 +433,10 @@ void RecEngine::recognition_loop() {
 
             do_recognition = false;
         }
-        if (!did_rnn) {
+        /*if (!did_rnn) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             did_rnn = false;
-        }
+        }*/
     }
 }
 
@@ -512,7 +515,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
         CompactLattice clat_rescored;
         ComposeCompactLatticePrunedB(*compose_opts, *clat,
                                      const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                     &clat_rescored, max_ngram_order);
+                                     &clat_rescored, max_ngram_order, true);
         CompactLatticeShortestPath(clat_rescored, &best_path);
     } else {
         CompactLatticeShortestPath(*clat, &best_path);
@@ -661,11 +664,13 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
         }
 
         std::string wplus;
-//        LOGI("%d %d", j, num_words);
+
         if ((split && wcnt != case_decs.size() - 1 && case_decs[wcnt+1] == 2) || (split && wcnt == real_num_word - 1)) {
             wplus = word + ". ";
+        } else if (j != num_words - 1 && word_syms->Find(words[j+1]) == "'s") {
+            wplus = word;
         } else {
-            wplus = word + ' ';
+            wplus = word + " ";
         }
         wcnt++;
         if (split) {
@@ -680,6 +685,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 
 void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
     start_logger();
+
     try {
         LOGI("Transcribing file");
         using namespace kaldi;
@@ -729,7 +735,6 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
                 // no more input. flush out last frames
                 feature_pipeline->InputFinished();
             }
-
             decoder->AdvanceDecoding();
 
         }

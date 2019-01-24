@@ -60,9 +60,8 @@ public class MainFragment extends Fragment {
     private boolean is_editing = false, just_closed = false;
     private ProgressBar pb_init;
     private TextView tv_init;
-    private int imageview_margin = 0;
     private ImageView img_view;
-    private TextWatcher title_textWatcher;
+    private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
 
     public MainFragment() {
@@ -141,7 +140,7 @@ public class MainFragment extends Fragment {
         int screenHeight = dm.heightPixels;
 
         Log.i("APP", "height " + screenHeight + " " + dm.density);
-        ed_trans_to_edit_button_distance = (screenHeight / dm.density);
+        ed_trans_to_edit_button_distance = (screenHeight / dm.density) - 2 * ed_title.getMeasuredHeight();
     }
 
 
@@ -202,6 +201,7 @@ public class MainFragment extends Fragment {
             act.h_background.removeCallbacks(trans_edit_runnable);
             trans_edit_runnable.run();
         }
+        ed_title.removeTextChangedListener(title_textWatcher);
     }
 
 
@@ -409,9 +409,16 @@ public class MainFragment extends Fragment {
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
 
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            imageview_margin = lay_params.bottomMargin;
-            int n = Base.convertPixelsToDp((float) imageview_margin * 9, act.getApplicationContext());
-            lay_params.bottomMargin = n;
+            float fac = 0.5f;
+            int h = img_view.getMeasuredHeight();
+
+            Log.i("APP", "height " + h);
+//            DisplayMetrics dm = new DisplayMetrics();
+//            act.getWindowManager().getDefaultDisplay().getMetrics(dm);
+//            int n = (int) ((h * fac) / dm.density);
+//            int n = Base.convertPixelsToDp(h * fac, act.getApplicationContext());
+//            Log.i("APP", "margin " + n);
+            lay_params.bottomMargin = (int) (h * fac * fac);
 
             ed_transtext.invalidate();
             ed_transtext.requestLayout();
@@ -419,12 +426,11 @@ public class MainFragment extends Fragment {
             fab_edit.setImageResource(R.drawable.done);
             fab_rec.setVisibility(View.INVISIBLE);
             Log.i("APP", "IN TRANSEDIT EDIT PRESS " + ed_trans_to_edit_button_distance);
-            fab_edit.animate().translationY(-ed_trans_to_edit_button_distance);
+            fab_edit.animate().translationY(-(int)ed_trans_to_edit_button_distance*fac * fac    );
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
 
-
-            ed_transtext.addTextChangedListener(new TextWatcher() {
+            text_textWatcher = new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 
@@ -454,7 +460,8 @@ public class MainFragment extends Fragment {
                     };
                     act.h_background.postDelayed(trans_edit_runnable, 500);
                 }
-            });
+            };
+            ed_transtext.addTextChangedListener(text_textWatcher);
 
         } else {
             just_closed = false;
@@ -463,12 +470,12 @@ public class MainFragment extends Fragment {
             if (trans_edit_runnable != null) {
                 act.h_background.post(trans_edit_runnable);
             }
-            ed_transtext.addTextChangedListener(null);
+            ed_transtext.removeTextChangedListener(text_textWatcher);
             fab_edit.setImageResource(R.drawable.edit);
             fab_rec.setVisibility(View.VISIBLE);
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            lay_params.bottomMargin = imageview_margin;
+            lay_params.bottomMargin = 0;
             ed_transtext.invalidate();
             ed_transtext.requestLayout();
             // everything already done in dispatchTouchEvent

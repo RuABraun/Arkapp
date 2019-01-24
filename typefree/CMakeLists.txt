@@ -77,6 +77,8 @@ link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi
 
 include_directories("/home/seni/git/prebuilt-libz/android-armeabi-v7a/include")
 
+include_directories(/home/seni/git/QNNPACK/include /home/seni/git/QNNPACK/deps/clog/include /home/seni/git/QNNPACK/deps/pthreadpool/include /home/seni/git/QNNPACK/deps/cpuinfo/include)
+
 target_link_libraries( # Specifies the target library.
                        rec-engine android oboe libtensorflowlite flatbuffer
                        ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/util/kaldi-util.a
@@ -90,6 +92,9 @@ target_link_libraries( # Specifies the target library.
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a
                        /home/seni/androidkaldi/OpenBLAS/install/lib/libf2c.a
+
+                       /home/seni/git/QNNPACK/build/android/armeabi-v7a/libqnnpack.a /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/pthreadpool/libpthreadpool.a
+                       /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/cpuinfo/libcpuinfo.a /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/clog/libclog.a
 
                         /home/seni/git/prebuilt-libz/android-armeabi-v7a/lib/libz.a
 

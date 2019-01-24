@@ -11,7 +11,7 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-fexceptions -pthread"
+                cppFlags "-fexceptions -pthread "
                 arguments "-DANDROID_STL=c++_shared"
                 abiFilters 'armeabi-v7a'
             }
