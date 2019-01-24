@@ -30,8 +30,8 @@
         android:textSize="20sp"
         app:layout_constraintBottom_toTopOf="@+id/trans_view_switch"
         app:layout_constraintEnd_toStartOf="@+id/button_share"
-        app:layout_constraintStart_toStartOf="@+id/imageView2"
-        app:layout_constraintTop_toTopOf="@+id/imageView2" />
+        app:layout_constraintStart_toStartOf="@+id/file_holder"
+        app:layout_constraintTop_toTopOf="@+id/file_holder" />
 
     <TextView
         android:id="@+id/file_date"
@@ -82,7 +82,7 @@
         app:layout_constraintTop_toTopOf="@+id/playView" />
 
     <ImageView
-        android:id="@+id/imageView2"
+        android:id="@+id/file_holder"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginBottom="8dp"
@@ -109,7 +109,7 @@
         android:scaleType="center"
         app:borderWidth="1dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/imageView2"
+        app:layout_constraintTop_toTopOf="@+id/file_holder"
         app:pressedTranslationZ="12dp"
         app:srcCompat="@drawable/edit" />
 
@@ -161,9 +161,9 @@
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView2"
-        app:layout_constraintEnd_toEndOf="@+id/imageView2"
-        app:layout_constraintStart_toStartOf="@+id/imageView2"
+        app:layout_constraintBottom_toBottomOf="@+id/file_holder"
+        app:layout_constraintEnd_toEndOf="@+id/file_holder"
+        app:layout_constraintStart_toStartOf="@+id/file_holder"
         app:layout_constraintTop_toBottomOf="@+id/button_share">
 
         <TextView
@@ -183,7 +183,7 @@
             android:layout_height="match_parent"
             android:background="@android:color/transparent"
             android:cursorVisible="true"
-            android:elevation="2dp"
+            android:elevation="3dp"
             android:focusable="true"
             android:focusableInTouchMode="false"
             android:fontFamily="@font/montserrat"
@@ -209,9 +209,9 @@
         android:elevation="2dp"
         android:src="@drawable/mediaplayer_backg"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@+id/imageView2"
+        app:layout_constraintEnd_toEndOf="@+id/file_holder"
         app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="@+id/imageView2" />
+        app:layout_constraintStart_toStartOf="@+id/file_holder" />
 
     <ImageButton
         android:id="@+id/mediaButton"

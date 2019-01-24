@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.text.Editable;
 import android.text.Layout;
@@ -52,7 +53,7 @@ import static java.lang.Math.abs;
 
 public class FileInfo extends Fragment {
 
-    private ImageButton mediaButton;
+    private ImageButton mediaButton, shareButton, copyButton;
     private MediaPlayer mPlayer;
     private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
     private SeekBar mSeekBar;
@@ -68,8 +69,9 @@ public class FileInfo extends Fragment {
     private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
     private boolean just_closed = false;
     private TextWatcher title_textWatcher, text_textWatcher;
-    private ImageView playView;
+    private ImageView playView, fileViewHolder;
     private int playView_offset;
+    private int ed_transtext_bottom_margin;
     private MainActivity act;
 
     @Override
@@ -91,6 +93,8 @@ public class FileInfo extends Fragment {
 
         mediaButton = view.findViewById(R.id.mediaButton);
         editButton = view.findViewById(R.id.fileinfo_edit_button);
+        shareButton = view.findViewById(R.id.button_share);
+        copyButton = view.findViewById(R.id.button_copy);
         viewSwitcher = view.findViewById(R.id.trans_view_switch);
 
         mSeekBar = view.findViewById(R.id.seekBar);
@@ -99,6 +103,7 @@ public class FileInfo extends Fragment {
         tv_transtext = view.findViewById(R.id.tv_trans);
         fileinfo_ed_title = view.findViewById(R.id.fileinfo_ed_title);
         playView = view.findViewById(R.id.playView);
+        fileViewHolder = view.findViewById(R.id.file_holder);
         act.bottomNavigationView.setVisibility(View.INVISIBLE);
         return view;
     }
@@ -349,18 +354,12 @@ public class FileInfo extends Fragment {
         if (view instanceof EditText) {
             int scrcoords[] = new int[2];
             view.getLocationOnScreen(scrcoords);
-            Log.i("APP", ed_transtext.getLeft()+ " "+ed_transtext.getRight() + " " +ed_transtext.getTop()+" " +ed_transtext.getBottom());
-            Log.i("APP", view.getLeft() + " " + view.getTop() + " " + view.getRight());
-            Log.i("APP", scrcoords[0] + " " + scrcoords[1]);
             int x = (int) event.getRawX();
             int y = (int) event.getRawY();
             int view_left = view.getLeft() + scrcoords[0], view_right = view.getRight() + scrcoords[0],
                     view_top = view.getTop() + scrcoords[1], view_bottom = view.getBottom() + scrcoords[1];
-            Log.i("APP", event.getRawX() + " " + event.getRawY());
-            Log.i("APP", x + " " + y);
 
             //Log.d("Activity", "Touch event "+event.getRawX()+","+event.getRawY()+" "+x+","+y+" rect "+w.getLeft()+","+w.getTop()+","+w.getRight()+","+w.getBottom()+" coords "+scrcoords[0]+","+scrcoords[1]);
-            Log.d("APP", "top " + playView.getTop() + " " +playView.getBottom() + " "+playView_offset + " " + y);
             if (event.getAction() == MotionEvent.ACTION_UP && (x < view_left || x >= view_right || y < view_top || y > view_bottom) &&
                     (x < playView.getLeft() || x > playView.getRight() || y > (playView.getBottom()+playView_offset) || y < (playView.getTop()+playView_offset))) {
                 InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -417,13 +416,26 @@ public class FileInfo extends Fragment {
             };
             ed_transtext.addTextChangedListener(text_textWatcher);
 
-            int playview_top = playView.getTop() - 4;
+            int playview_top = playView.getTop() - 16;
             playView_offset = -playview_top;
-            playView.animate().translationY(-playview_top);
-            mediaButton.animate().translationY(-playview_top);
-            tv_fduration.animate().translationY(-playview_top);
-            mSeekBar.animate().translationY(-playview_top);
+            playView.animate().translationY(playView_offset);
+            mediaButton.animate().translationY(playView_offset);
+            tv_fduration.animate().translationY(playView_offset);
+            mSeekBar.animate().translationY(playView_offset);
+            fileinfo_ed_title.setVisibility(View.INVISIBLE);
+            shareButton.setVisibility(View.INVISIBLE);
+            copyButton.setVisibility(View.INVISIBLE);
+            editButton.animate().translationY(280);
+            editButton.animate().translationX(18);
+            Log.i("APP", fileViewHolder.getTop() +" "+ (viewSwitcher.getTop()));
+            viewSwitcher.animate().translationY(fileViewHolder.getTop() - viewSwitcher.getTop() + 44);
+            fileViewHolder.animate().translationY(26);
 
+            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+            ed_transtext_bottom_margin = lay_params.bottomMargin;
+            lay_params.bottomMargin = ed_transtext_bottom_margin  + ed_transtext.getMeasuredHeight() / 2;
+            ed_transtext.invalidate();
+            ed_transtext.requestLayout();
         } else {
             // TODO: crashes when called on text that was edited!!
             just_closed = false;
@@ -432,6 +444,18 @@ public class FileInfo extends Fragment {
             mediaButton.animate().translationY(0);
             tv_fduration.animate().translationY(0);
             mSeekBar.animate().translationY(0);
+            editButton.animate().translationY(0);
+            editButton.animate().translationX(0);
+            viewSwitcher.animate().translationY(0);
+            fileViewHolder.animate().translationY(0);
+            fileinfo_ed_title.setVisibility(View.VISIBLE);
+            shareButton.setVisibility(View.VISIBLE);
+            copyButton.setVisibility(View.VISIBLE);
+
+            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+            lay_params.bottomMargin = ed_transtext_bottom_margin;
+            ed_transtext.invalidate();
+            ed_transtext.requestLayout();
 
             if (ed_trans_runnable != null) {
                 act.h_background.removeCallbacks(ed_trans_runnable);
@@ -564,17 +588,4 @@ public class FileInfo extends Fragment {
         fileinfo_ed_title.removeTextChangedListener(title_textWatcher);
     }
 
-//    @Override
-//    public void onBackPressed() {
-//        super.onBackPressed();
-//        Intent intent = new Intent(getApplicationContext(), Manage.class);
-//        startActivity(intent);
-//        finish();
-//    }
-}
-
-abstract class ClickableSpanPlain extends ClickableSpan {
-    public void updateDrawState(TextPaint ds) {
-        ds.setUnderlineText(false);
-    }
 }
