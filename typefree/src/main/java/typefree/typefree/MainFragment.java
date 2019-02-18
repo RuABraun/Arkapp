@@ -63,6 +63,10 @@ public class MainFragment extends Fragment {
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
+    private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
+    private boolean showingKeyboard = false;
+    private boolean hidingKeyboard = false;
+    private View fview;
 
     public MainFragment() {
         // Required empty public constructor
@@ -116,6 +120,7 @@ public class MainFragment extends Fragment {
         fab_share = view.findViewById(R.id.button_share);
         fab_copy.setTranslationX(128f);
         fab_share.setTranslationX(128f);
+        this.fview = view;
         return view;
     }
 
@@ -186,6 +191,29 @@ public class MainFragment extends Fragment {
             };
             ed_title.addTextChangedListener(title_textWatcher);
         }
+        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+
+                Rect r = new Rect();
+                fview.getWindowVisibleDisplayFrame(r);
+                int screenheight = fview.getRootView().getHeight();
+                int height_diff = screenheight - (r.bottom - r.top);
+                if (height_diff > 120 && !hidingKeyboard) {
+                    if (!showingKeyboard) {
+                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+                        showingKeyboard = true;
+                        mainview_layout.bottomMargin = height_diff - 56  * 2;
+                        img_view.invalidate();
+                        img_view.requestLayout();
+                    }
+                } else {
+                    hidingKeyboard = false;
+                }
+
+            }
+        };
+        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
     }
 
     @Override
@@ -202,6 +230,7 @@ public class MainFragment extends Fragment {
             trans_edit_runnable.run();
         }
         ed_title.removeTextChangedListener(title_textWatcher);
+        fview.getViewTreeObserver().removeOnGlobalLayoutListener(layoutListener);
     }
 
 
@@ -408,25 +437,13 @@ public class MainFragment extends Fragment {
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
             imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
 
-            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            float fac = 0.5f;
-            int h = img_view.getMeasuredHeight();
-
-            Log.i("APP", "height " + h);
-//            DisplayMetrics dm = new DisplayMetrics();
-//            act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-//            int n = (int) ((h * fac) / dm.density);
-//            int n = Base.convertPixelsToDp(h * fac, act.getApplicationContext());
-//            Log.i("APP", "margin " + n);
-            lay_params.bottomMargin = (int) (h * fac * fac);
-
             ed_transtext.invalidate();
             ed_transtext.requestLayout();
 
             fab_edit.setImageResource(R.drawable.done);
             fab_rec.setVisibility(View.INVISIBLE);
             Log.i("APP", "IN TRANSEDIT EDIT PRESS " + ed_trans_to_edit_button_distance);
-            fab_edit.animate().translationY(-(int)ed_trans_to_edit_button_distance*fac * fac    );
+            fab_edit.animate().translationY(-(int)ed_trans_to_edit_button_distance*0.5f);
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
 
@@ -465,6 +482,8 @@ public class MainFragment extends Fragment {
 
         } else {
             just_closed = false;
+            hidingKeyboard = true;
+            showingKeyboard = false;
             Log.i("APP", "DONE EDIT");
             act.h_background.removeCallbacks(trans_edit_runnable);
             if (trans_edit_runnable != null) {
@@ -476,8 +495,8 @@ public class MainFragment extends Fragment {
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
             lay_params.bottomMargin = 0;
-            ed_transtext.invalidate();
-            ed_transtext.requestLayout();
+            img_view.invalidate();
+            img_view.requestLayout();
             // everything already done in dispatchTouchEvent
         }
         ed_transtext.setFocusableInTouchMode(false);

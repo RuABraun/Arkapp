@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <tensorflow/lite/c/c_api_internal.h>
+#include "qnnpack.h"
 
 extern "C"
 {
@@ -95,7 +96,6 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
     ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
     BaseFloat rnn_scale = 0.9f;
-
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
     carpa_lm_to_subtract_fst = new ConstArpaLmDeterministicFst(*const_arpa);
@@ -103,6 +103,9 @@ void RecEngine::setupRnnlm(std::string modeldir) {
                                                                       carpa_lm_to_subtract_fst);
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
+    SetBatchnormTestMode(true, &(rnnlm));
+    SetDropoutTestMode(true, &(rnnlm));
+    SetQuantTestMode(true, &(rnnlm));
 
     int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
     std::vector<int32> ids;
@@ -112,9 +115,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
         word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
-
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
-
     combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
 
     LOGI("done setuprnnlm");
@@ -140,6 +141,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     t_rnnlm = std::thread(&RecEngine::setupRnnlm, this, modeldir);
 
     decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
+
     {
         bool binary;
         Input ki(nnet3_rxfilename, &binary);
@@ -148,7 +150,8 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
 
         SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
-        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
+        SetQuantTestMode(true, &(am_nnet.GetNnet()));
+//        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
 
     left_context = am_nnet.LeftContext();
@@ -165,7 +168,6 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
             break;
         }
     }
-
     // ! -- AM setup end, doing RNN setup
 
     compose_opts = new ComposeLatticePrunedOptions(2.0, 200, 1.25, 75);
@@ -376,16 +378,16 @@ void RecEngine::write_to_wav(int32 num_frames) {
 }
 
 void RecEngine::recognition_loop() {
-    Timer timer_rnn;
-    Timer tt;
+//    Timer timer_rnn;
+//    Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
-            tt.Reset();
+//            tt.Reset();
             decoder->AdvanceDecoding();
-            LOGI("Decode time %f", tt.Elapsed());
+//            LOGI("Decode time %f", tt.Elapsed());
 
             if (decoder->isPruneTime()) {
                 did_rnn = true;
@@ -395,12 +397,12 @@ void RecEngine::recognition_loop() {
 
                 if (t_rnnlm.joinable()) t_rnnlm.join();
                 if (t_finishsegment.joinable()) t_finishsegment.join();
-                timer_rnn.Reset();
+//                timer_rnn.Reset();
                 ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
                                              const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
                                              &clat_rescored, max_ngram_order, false);
-                double tt = timer_rnn.Elapsed();
-                KALDI_LOG << "RESCORE TIME TAKEN " << tt;
+//                double tt = timer_rnn.Elapsed();
+//                KALDI_LOG << "RESCORE TIME TAKEN " << tt;
                 CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
                 decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
                 decoder->StrictPrune();
