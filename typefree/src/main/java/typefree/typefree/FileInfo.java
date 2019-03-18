@@ -1,5 +1,7 @@
 package typefree.typefree;
 
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.Fragment;
@@ -27,12 +29,14 @@ import android.text.TextWatcher;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.animation.LinearInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -61,7 +65,7 @@ public class FileInfo extends Fragment {
     private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
-    private EditText ed_transtext;
+    private EditTextCursorListener ed_transtext;
     private EditText fileinfo_ed_title;
     private TextView tv_transtext, tv_fduration;
     private String text;
@@ -79,6 +83,7 @@ public class FileInfo extends Fragment {
     private MainActivity act;
     private View fview;
     private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
+    private ImageView cursortick;
     private boolean showingKeyboard = false;
     private boolean hidingKeyboard = false;
 
@@ -255,6 +260,27 @@ public class FileInfo extends Fragment {
         }
         text = normal_text;
         ed_transtext.setText(text);
+        cursortick = getView().findViewById(R.id.cursortick);
+        ed_transtext.setCallback(new CursorCallback() {
+            @Override
+            public void onSelectionChanged(int startoffset) {
+                int wordidx = getIdxForCharOffset(startoffset);
+                int time_ms = word_times_ms.get(wordidx);
+                float ratio = (float) time_ms / mPlayer.getDuration();
+                Log.i("APP", "ratio " + ratio);
+//                mSeekBar.measure(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                int seekbar_width = mSeekBar.getWidth() - mSeekBar.getPaddingLeft() - mSeekBar.getPaddingRight();  // -32 because of padding 16
+                int xoffset = (int) (ratio * seekbar_width);
+                Log.i("APP", "xoffset  " + xoffset );
+                AnimatorSet animSetXY = new AnimatorSet();
+                ObjectAnimator animx = ObjectAnimator.ofFloat(cursortick, "translationX", xoffset);
+                ObjectAnimator animy = ObjectAnimator.ofFloat(cursortick, "translationY", playView_offset);
+                animSetXY.playTogether(animx, animy);
+                animSetXY.setInterpolator(new LinearInterpolator());
+                animSetXY.setDuration(1);
+                animSetXY.start();
+            }
+        });
         tv_transtext.setText(text, TextView.BufferType.SPANNABLE);
 
         if (text_found) {
@@ -444,6 +470,7 @@ public class FileInfo extends Fragment {
             playView.animate().translationY(playView_offset);
             mediaButton.animate().translationY(playView_offset);
             tv_fduration.animate().translationY(playView_offset);
+            cursortick.animate().translationY(playView_offset);
             mSeekBar.animate().translationY(playView_offset);
             fileinfo_ed_title.setVisibility(View.INVISIBLE);
             shareButton.setVisibility(View.INVISIBLE);
@@ -471,7 +498,8 @@ public class FileInfo extends Fragment {
             mSeekBar.animate().translationY(0);
             editButton.animate().translationY(0);
             editButton.animate().translationX(0);
-//            viewSwitcher.animate().translationY(0);
+            cursortick.animate().translationY(0);
+            cursortick.animate().translationX(0);
             fileViewHolder.animate().translationY(0);
             fileinfo_ed_title.setVisibility(View.VISIBLE);
             shareButton.setVisibility(View.VISIBLE);
@@ -651,3 +679,4 @@ public class FileInfo extends Fragment {
     }
 
 }
+
