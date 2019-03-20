@@ -74,7 +74,7 @@ public class FileInfo extends Fragment {
     private List<Integer> word_times_ms = new ArrayList<>();
     private List<String> original_words = new ArrayList<>();
     private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
-    private boolean just_closed = false;
+    private boolean in_edit_mode = false;
     private TextWatcher title_textWatcher, text_textWatcher;
     private ImageView playView, fileViewHolder;
     private int playView_offset;
@@ -119,6 +119,11 @@ public class FileInfo extends Fragment {
         playView = view.findViewById(R.id.playView);
         fileViewHolder = view.findViewById(R.id.file_holder);
         act.bottomNavigationView.setVisibility(View.INVISIBLE);
+        view.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View view, MotionEvent event) {
+                return true;
+            }
+        });
         this.fview = view;
         return view;
     }
@@ -398,6 +403,10 @@ public class FileInfo extends Fragment {
     }
 
     public void handle_touch_event(View view, MotionEvent event) {
+        Log.i("APP", "IN TOUCH EVENT!");
+        if (in_edit_mode && view instanceof EditText) {
+            ed_transtext.requestFocus();
+        }
         if (view instanceof EditText) {
             int scrcoords[] = new int[2];
             view.getLocationOnScreen(scrcoords);
@@ -424,7 +433,8 @@ public class FileInfo extends Fragment {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
 
-        if (!ed_transtext.hasFocus() && !just_closed) {
+        if (!ed_transtext.hasFocus() && !in_edit_mode) {
+            in_edit_mode = true;
             viewSwitcher.showNext();
 
             ed_transtext.requestFocus();
@@ -490,7 +500,7 @@ public class FileInfo extends Fragment {
 //            Log.i("APP", "margin2 " + ed_lay_params.bottomMargin);
         } else {
             // TODO: crashes when called on text that was edited!!
-            just_closed = false;
+            in_edit_mode = false;
             playView_offset = 0;
             playView.animate().translationY(0);
             mediaButton.animate().translationY(0);

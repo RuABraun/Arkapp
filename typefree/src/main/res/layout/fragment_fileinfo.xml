@@ -7,7 +7,8 @@
     android:focusableInTouchMode="true"
     android:id="@+id/fileinfo_fragment"
     tools:context="typefree.typefree.MainActivity"
-    android:background="@color/colBackground" >
+    android:background="@color/colBackground"
+    android:clickable="true" >
 
     <EditText
         android:id="@+id/fileinfo_ed_title"
