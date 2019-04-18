@@ -268,6 +268,13 @@ public class MainActivity extends Base {
         main_frag.on_edit_click(v);
     }
 
+    public void onDeleteClick(View view) {
+        if (is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
+        main_frag.on_delete_click(view);
+    }
+
+    // Manage buttons
     public void onAddPress(View view) {
         if (is_spamclick()) return;
         ManageFragment frag = (ManageFragment) fragmentManager.findFragmentByTag("manage");

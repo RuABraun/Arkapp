@@ -43,10 +43,7 @@ public class MainFragment extends Fragment {
     Runnable trans_done_runnable;
     Runnable trans_edit_runnable;
     private EditText ed_transtext;
-    private FloatingActionButton fab_rec;
-    private FloatingActionButton fab_edit;
-    private FloatingActionButton fab_copy;
-    private FloatingActionButton fab_share;
+    private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del;
     private EditText ed_title;
     private String fname_prefix = "";
     private String curr_cname = "";
@@ -118,8 +115,10 @@ public class MainFragment extends Fragment {
 
         fab_copy = view.findViewById(R.id.button_copy);
         fab_share = view.findViewById(R.id.button_share);
+        fab_del = view.findViewById(R.id.button_delete);
         fab_copy.setTranslationX(128f);
         fab_share.setTranslationX(128f);
+        fab_del.setTranslationX(-128f);
         this.fview = view;
         return view;
     }
@@ -260,6 +259,7 @@ public class MainFragment extends Fragment {
                 fab_edit.animate().translationX(0f);
                 fab_copy.animate().translationX(0f);
                 fab_share.animate().translationX(0f);
+                fab_del.animate().translationX(0f);
             }
         });
         recognition_done = true;
@@ -291,6 +291,7 @@ public class MainFragment extends Fragment {
             fab_edit.animate().translationX(128f);
             fab_copy.animate().translationX(128f);
             fab_share.animate().translationX(128f);
+            fab_del.animate().translationX(-128f);
             float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
             fab_rec.animate().translationX(offset);
             fab_rec.setImageResource(R.drawable.stop);
@@ -500,6 +501,20 @@ public class MainFragment extends Fragment {
             // everything already done in dispatchTouchEvent
         }
         ed_transtext.setFocusableInTouchMode(false);
+    }
+
+    public void on_delete_click(View view) {
+        ed_transtext.setText("", TextView.BufferType.EDITABLE);
+        ed_transtext.setSelection(0);
+        edited_title = true;
+        ed_title.setText("", TextView.BufferType.EDITABLE);
+        act.f_repo.delete(curr_afile);
+        curr_afile = null;
+        fab_edit.animate().translationX(128f);
+        fab_copy.animate().translationX(128f);
+        fab_share.animate().translationX(128f);
+        fab_del.animate().translationX(-128f);
+        edited_title = false;
     }
 
 }

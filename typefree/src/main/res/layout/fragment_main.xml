@@ -188,4 +188,21 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/button_delete"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/border"
+        android:backgroundTint="@color/colBackground"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:onClick="onDeleteClick"
+        android:scaleType="center"
+        app:borderWidth="1dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/button_edit"
+        app:srcCompat="@drawable/delete_c" />
+
 </android.support.constraint.ConstraintLayout>
