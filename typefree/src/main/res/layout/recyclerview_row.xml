@@ -7,7 +7,7 @@
     android:layout_height="wrap_content"
     android:layout_width="match_parent"
     android:layout_margin="2dp"
-    card_view:cardCornerRadius="3dp"
+
     card_view:cardElevation="3dp">
 
     <android.support.constraint.ConstraintLayout
@@ -20,38 +20,39 @@
             android:id="@+id/Row_Filename"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
             android:fontFamily="@font/roboto"
             android:text="Filename"
             android:textColor="@color/colorText"
-            android:textSize="18sp"
-            app:layout_constraintStart_toStartOf="@+id/Row_Date"
-            app:layout_constraintTop_toBottomOf="@+id/Row_Date" />
+            android:textSize="20sp"
+            app:layout_constraintStart_toEndOf="@+id/progressBar_trans"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/Row_Audiolength"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
             android:fontFamily="@font/roboto_slab"
             android:text="Audiolength"
             android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
-            app:layout_constraintStart_toStartOf="@+id/Row_Filename"
-            app:layout_constraintTop_toBottomOf="@+id/Row_Filename" />
+            app:layout_constraintBottom_toBottomOf="@+id/Row_Date"
+            app:layout_constraintStart_toEndOf="@+id/Row_Date" />
 
         <TextView
             android:id="@+id/Row_Date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
+            android:layout_marginBottom="4dp"
             android:layout_marginTop="4dp"
             android:fontFamily="@font/roboto_slab"
             android:text="Date"
             android:textColor="@color/colorTextMinor"
             android:textSize="14sp"
-            app:layout_constraintStart_toEndOf="@+id/Row_TransBut"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="@+id/Row_Filename"
+            app:layout_constraintTop_toBottomOf="@+id/Row_Filename" />
 
         <ImageButton
             android:id="@+id/Row_ViewOpts"

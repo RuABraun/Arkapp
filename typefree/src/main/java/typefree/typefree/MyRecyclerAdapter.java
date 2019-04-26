@@ -66,7 +66,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
     public void onBindViewHolder(ViewHolder holder, int pos) {
         AFile elem = getItem(pos);
         holder.tv_fname.setText(elem.title);
-        holder.tv_date.setText(elem.date);
+        holder.tv_date.setText(elem.date + " \u2022 ");
         String duration = Base.sec_to_timestr(elem.len_s);
         holder.tv_flen.setText(duration);
         holder.curr_pos = pos;
