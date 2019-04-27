@@ -9,27 +9,18 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.graphics.Rect;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
 import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.Layout;
 import android.text.Spannable;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.TextPaint;
 import android.text.TextWatcher;
-import android.text.method.LinkMovementMethod;
-import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -86,13 +77,14 @@ public class FileInfo extends Fragment {
     private ImageView cursortick;
     private boolean showingKeyboard = false;
     private boolean hidingKeyboard = false;
+    private Toolbar toolbar;
+    private boolean title_in_focus = false;
 
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-//        afile = savedInstanceState.getParcelable("file_obj");
         Bundle bundle = this.getArguments();
         afile = bundle.getParcelable("file_obj");
         playView_offset = 0;
@@ -119,6 +111,9 @@ public class FileInfo extends Fragment {
         playView = view.findViewById(R.id.playView);
         fileViewHolder = view.findViewById(R.id.file_holder);
         act.bottomNavigationView.setVisibility(View.INVISIBLE);
+
+        toolbar = (Toolbar) view.findViewById(R.id.toolbar);
+
         view.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View view, MotionEvent event) {
                 return true;
@@ -132,6 +127,12 @@ public class FileInfo extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                act.getFragmentManager().popBackStack();
+            }
+        });
 
         mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(Base.filesdir + afile.fname + ".wav"));
         mSeekBar.setMax(mPlayer.getDuration());
@@ -181,10 +182,16 @@ public class FileInfo extends Fragment {
                         }
                         int size_text_y = tv_transtext.getLineCount() * tv_transtext.getLineHeight();
                         int tv_height = tv_transtext.getHeight();
-                        if (curr_scroll_y - dy > (size_text_y - tv_height)) {
+//                        Log.i("APP", "dy " + dy + " " + curr_scroll_y + " " + size_text_y + " " + tv_height);
+                        // for when text is smaller than textview
+                        if (size_text_y < tv_height) {
+                            dy = 0;
+                        } else if (curr_scroll_y - dy > (size_text_y - tv_height)) {
+                            // for when text is larger than textview
                             dy = curr_scroll_y - (size_text_y - tv_height);
                             new_y = y + dy;
                         }
+//                        Log.i("APP", "scroll " + dy);
                         tv_transtext.scrollBy(0, -dy);
                         y = new_y;
                         click_last_time = System.currentTimeMillis();
@@ -197,26 +204,46 @@ public class FileInfo extends Fragment {
                         int dy = new_y - start_y;
 //                        Log.i("APP", "UP + " + dy + " " + dt);
                         if ((abs(dy) > MAX_CLICK_DIST) || (dt > MAX_CLICK_DUR)) {
-                            long ddt = cur_time - click_last_time;
-                            int ddy = new_y - y;
-                            float vel = ((float) ddy) / ((float) ddt);
-                            int dist = (int) vel * 10;
+
+                            float vel = ((float) dy) / ((float) dt);
+                            int dist = (int) vel * 5;
+                            int curr_scroll_y = tv_transtext.getScrollY();
+                            Log.i("APP", " " + curr_scroll_y + " " + dist + " " + dy);
+                            if (curr_scroll_y - dist < 0) {
+                                dist = curr_scroll_y;
+                            }
+                            int size_text_y = tv_transtext.getLineCount() * tv_transtext.getLineHeight();
+                            int tv_height = tv_transtext.getHeight();
+                            Log.i("APP", "scrollinga " + dist);
+                            if (size_text_y < tv_height) {
+                                dist = 0;
+                            } else if (curr_scroll_y - dist > (size_text_y - tv_height)) {
+                                // for when text is larger than textview
+                                dist = curr_scroll_y - (size_text_y - tv_height);
+                            }
+                            tv_transtext.scrollBy(0, -dist);
+                            Log.i("APP", "scrolling " + dist);
                         } else {
-                            Log.i("APP", "PLAY");
                             Layout layout = tv_transtext.getLayout();
                             int yscroll = tv_transtext.getScrollY();
                             int lineidx = layout.getLineForVertical(y + yscroll);
-                            int offset = layout.getOffsetForHorizontal(lineidx, x);
-                            int i = getIdxForCharOffset(offset);
-                            int time_ms = word_times_ms.get(i);
-                            mPlayer.seekTo(time_ms);
-                            playMediaPlayer();
-                            Spannable s = (Spannable) tv_transtext.getText();
-                            String word = original_words.get(i);
-                            int startidx = word_start_c_idx.get(i);
-                            int endidx = startidx + word.length();
-                            s.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorPrimary)),
-                                    startidx, endidx, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            // if the line idx is the same it means the click position is far below
+                            // the text and we don't want to play
+                            int lineidx_check = layout.getLineForVertical(y + yscroll - 50);
+                            if (lineidx != lineidx_check) {
+                                Log.i("APP", "PLAY");
+                                int offset = layout.getOffsetForHorizontal(lineidx, x);
+                                int i = getIdxForCharOffset(offset);
+                                int time_ms = word_times_ms.get(i);
+                                mPlayer.seekTo(time_ms);
+                                playMediaPlayer();
+                                Spannable s = (Spannable) tv_transtext.getText();
+                                String word = original_words.get(i);
+                                int startidx = word_start_c_idx.get(i);
+                                int endidx = startidx + word.length();
+                                s.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorPrimary)),
+                                        startidx, endidx, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            }
                         }
                         return false;
                     }
@@ -266,6 +293,7 @@ public class FileInfo extends Fragment {
         text = normal_text;
         ed_transtext.setText(text);
         cursortick = getView().findViewById(R.id.cursortick);
+        cursortick.setVisibility(View.INVISIBLE);
         ed_transtext.setCallback(new CursorCallback() {
             @Override
             public void onSelectionChanged(int startoffset) {
@@ -403,39 +431,44 @@ public class FileInfo extends Fragment {
     }
 
     public void handle_touch_event(View view, MotionEvent event) {
-        Log.i("APP", "IN TOUCH EVENT!");
-        if (in_edit_mode && view instanceof EditText) {
+        Log.i("APP", "IN HANDLE TOUCH EVENT!");
+        if (in_edit_mode && view instanceof EditText && !title_in_focus) {
             ed_transtext.requestFocus();
         }
-        if (view instanceof EditText) {
-            int scrcoords[] = new int[2];
-            view.getLocationOnScreen(scrcoords);
-            int x = (int) event.getRawX();
-            int y = (int) event.getRawY();
-            int view_left = view.getLeft() + scrcoords[0], view_right = view.getRight() + scrcoords[0],
-                    view_top = view.getTop() + scrcoords[1], view_bottom = view.getBottom() + scrcoords[1];
 
-//            if (false) {
-//                if (event.getAction() == MotionEvent.ACTION_UP && (x < view_left || x >= view_right || y < view_top || y > view_bottom) &&
-//                        (x < playView.getLeft() || x > playView.getRight() || y > (playView.getBottom() + playView_offset) || y < (playView.getTop() + playView_offset))) {
-//                    InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
-//                    imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
-//                    Log.i("APP", "closed!");
-//                    ed_transtext.clearFocus();
-//                    ed_transtext.setFocusableInTouchMode(false);
-//                    just_closed = true;
-//                }
-//            }
+        int x = (int) event.getRawX();
+        int y = (int) event.getRawY();
+
+        int view_left = fileinfo_ed_title.getLeft(), view_right = fileinfo_ed_title.getRight(),
+            view_top = fileinfo_ed_title.getTop() + 24, view_bottom = fileinfo_ed_title.getBottom() + 24;
+
+//        Log.i("APP", view_left + " " + " " + view_right + " " + view_top + " " + view_bottom);
+//        Log.i("APP", x + " " + y);
+        if (x > view_left && x < view_right && y > view_top && y < view_bottom) {
+            title_in_focus = true;
+        } else if (title_in_focus) {
+            title_in_focus = false;
+            showingKeyboard = false;
+            hidingKeyboard = true;
+            InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
+
+            ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+            fv_lay_params.bottomMargin = ed_transtext_bottom_margin;
+            fileViewHolder.invalidate();
+            fileViewHolder.requestLayout();
         }
     }
 
     public void on_edit_click(View view) {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
-
+        Log.i("APP", "editing");
         if (!ed_transtext.hasFocus() && !in_edit_mode) {
+            Log.i("APP", "in A");
             in_edit_mode = true;
             viewSwitcher.showNext();
+            cursortick.setVisibility(View.VISIBLE);
 
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -487,20 +520,16 @@ public class FileInfo extends Fragment {
             copyButton.setVisibility(View.INVISIBLE);
             editButton.animate().translationY(280);
             editButton.animate().translationX(18);
+            fileViewHolder.animate().translationY(8);
 //            viewSwitcher.animate().translationY(fileViewHolder.getTop() - viewSwitcher.getTop() + 44);
-            fileViewHolder.animate().translationY(26);
-
-            ConstraintLayout.LayoutParams vs_lay_params = (ConstraintLayout.LayoutParams) viewSwitcher.getLayoutParams();
-            vs_top_margin = vs_lay_params.topMargin;
-            vs_lay_params.topMargin = 16 + 26;
 
             viewSwitcher.invalidate();
             viewSwitcher.requestLayout();
 
-//            Log.i("APP", "margin2 " + ed_lay_params.bottomMargin);
         } else {
             // TODO: crashes when called on text that was edited!!
             in_edit_mode = false;
+            cursortick.setVisibility(View.INVISIBLE);
             playView_offset = 0;
             playView.animate().translationY(0);
             mediaButton.animate().translationY(0);
@@ -509,8 +538,8 @@ public class FileInfo extends Fragment {
             editButton.animate().translationY(0);
             editButton.animate().translationX(0);
             cursortick.animate().translationY(0);
-            cursortick.animate().translationX(0);
             fileViewHolder.animate().translationY(0);
+            cursortick.animate().translationX(0);
             fileinfo_ed_title.setVisibility(View.VISIBLE);
             shareButton.setVisibility(View.VISIBLE);
             copyButton.setVisibility(View.VISIBLE);
@@ -518,14 +547,10 @@ public class FileInfo extends Fragment {
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
 
-            ConstraintLayout.LayoutParams vs_lay_params = (ConstraintLayout.LayoutParams) viewSwitcher.getLayoutParams();
-            vs_lay_params.topMargin = vs_top_margin;
-            viewSwitcher.invalidate();
-            viewSwitcher.requestLayout();
-
-            ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
             showingKeyboard = false;
             hidingKeyboard = true;
+
+            ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
             fv_lay_params.bottomMargin = ed_transtext_bottom_margin;
             fileViewHolder.invalidate();
             fileViewHolder.requestLayout();
