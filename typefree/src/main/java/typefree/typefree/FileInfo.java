@@ -23,6 +23,9 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +36,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -51,7 +55,7 @@ import static java.lang.Math.abs;
 
 public class FileInfo extends Fragment {
 
-    private ImageButton mediaButton, shareButton, copyButton;
+    private ImageButton mediaButton;
     private MediaPlayer mPlayer;
     private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
     private SeekBar mSeekBar;
@@ -74,7 +78,7 @@ public class FileInfo extends Fragment {
     private MainActivity act;
     private View fview;
     private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
-    private ImageView cursortick;
+    private ImageView cursortick, opts_menu;
     private boolean showingKeyboard = false;
     private boolean hidingKeyboard = false;
     private Toolbar toolbar;
@@ -89,7 +93,6 @@ public class FileInfo extends Fragment {
         afile = bundle.getParcelable("file_obj");
         playView_offset = 0;
         act = (MainActivity) getActivity();
-
     }
 
     @Override
@@ -99,8 +102,6 @@ public class FileInfo extends Fragment {
 
         mediaButton = view.findViewById(R.id.mediaButton);
         editButton = view.findViewById(R.id.fileinfo_edit_button);
-        shareButton = view.findViewById(R.id.button_share);
-        copyButton = view.findViewById(R.id.button_copy);
         viewSwitcher = view.findViewById(R.id.trans_view_switch);
 
         mSeekBar = view.findViewById(R.id.seekBar);
@@ -110,6 +111,7 @@ public class FileInfo extends Fragment {
         fileinfo_ed_title = view.findViewById(R.id.fileinfo_ed_title);
         playView = view.findViewById(R.id.playView);
         fileViewHolder = view.findViewById(R.id.file_holder);
+        opts_menu = view.findViewById(R.id.fileinfo_opts_menu);
         act.bottomNavigationView.setVisibility(View.INVISIBLE);
 
         toolbar = (Toolbar) view.findViewById(R.id.toolbar);
@@ -206,7 +208,7 @@ public class FileInfo extends Fragment {
                         if ((abs(dy) > MAX_CLICK_DIST) || (dt > MAX_CLICK_DUR)) {
 
                             float vel = ((float) dy) / ((float) dt);
-                            int dist = (int) vel * 5;
+                            int dist = (int) vel * 50;
                             int curr_scroll_y = tv_transtext.getScrollY();
                             Log.i("APP", " " + curr_scroll_y + " " + dist + " " + dy);
                             if (curr_scroll_y - dist < 0) {
@@ -255,6 +257,56 @@ public class FileInfo extends Fragment {
         if (text == null) {
             setFileFields();
         }
+
+        opts_menu.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                PopupMenu popup = new PopupMenu(act, v);
+                popup.inflate(R.menu.menu_fileinternal);
+                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        Log.i("APP", "inA");
+                        switch (item.getItemId()) {
+                            case R.id.IntShare:
+                                ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
+                                dialog.show(getFragmentManager(), "ShareDialog");
+                                return true;
+                            case R.id.IntCopy:
+                                Log.i("APP", "in");
+                                ClipboardManager clipboard = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
+                                String simpletext = ed_transtext.getText().toString();
+                                ClipData clip = ClipData.newPlainText("Transcript", simpletext);
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(getActivity(), "Copied", Toast.LENGTH_SHORT).show();
+                                return true;
+                            case R.id.IntDelete:
+                                AlertDialog.Builder builder = new AlertDialog.Builder(act);
+                                builder.setTitle("Confirm")
+                                        .setMessage("Are you sure?")
+                                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                delete(afile);
+                                            }
+                                        }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                dialog.dismiss();
+                                            }
+                                });
+                                AlertDialog alert = builder.create();
+                                alert.show();
+                                TextView tv = (TextView) alert.findViewById(android.R.id.message);
+                                tv.setTextSize(18);
+                                return true;
+                        }
+                        return false;
+                    }
+                });
+                popup.show();
+
+            }
+        });
 
     }
 
@@ -516,8 +568,6 @@ public class FileInfo extends Fragment {
             cursortick.animate().translationY(playView_offset);
             mSeekBar.animate().translationY(playView_offset);
             fileinfo_ed_title.setVisibility(View.INVISIBLE);
-            shareButton.setVisibility(View.INVISIBLE);
-            copyButton.setVisibility(View.INVISIBLE);
             editButton.animate().translationY(280);
             editButton.animate().translationX(18);
             fileViewHolder.animate().translationY(8);
@@ -541,8 +591,6 @@ public class FileInfo extends Fragment {
             fileViewHolder.animate().translationY(0);
             cursortick.animate().translationX(0);
             fileinfo_ed_title.setVisibility(View.VISIBLE);
-            shareButton.setVisibility(View.VISIBLE);
-            copyButton.setVisibility(View.VISIBLE);
 
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
@@ -571,7 +619,6 @@ public class FileInfo extends Fragment {
     }
 
     public void on_copy_click(View view) {
-
         ClipboardManager clipboard = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
         String simpletext = ed_transtext.getText().toString();
         ClipData clip = ClipData.newPlainText("Transcript", simpletext);

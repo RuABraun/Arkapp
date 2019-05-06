@@ -116,9 +116,7 @@ public class ManageFragment extends Fragment {
             outpath = outp;
         }
         public void run() {
-            Log.i("APP-MANAGEFRAG", "IN");
             int ret = act.recEngine.convert_audio(inpath, outpath);
-            Log.i("APP-MANAGEFRAG", "Done " + ret);
             if (ret != 0) {
                 act.runOnUiThread(new Runnable() {
                     @Override
