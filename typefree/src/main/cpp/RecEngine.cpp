@@ -127,6 +127,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
                                             tot_num_frames_decoded(0) {
+    start_logger();
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -170,7 +171,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     }
     // ! -- AM setup end, doing RNN setup
 
-    compose_opts = new ComposeLatticePrunedOptions(4.0, 500, 1.25, 75);
+    compose_opts = new ComposeLatticePrunedOptions(4.0, 900, 1.25, 75);
 
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
@@ -377,56 +378,22 @@ void RecEngine::recognition_loop() {
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
     while(recognition_on) {
-        bool did_rnn = false;
         if (do_recognition) {
             tt.Reset();
             decoder->AdvanceDecoding();
-
-            if (decoder->isPruneTime()) {
-                did_rnn = true;
-                CompactLattice clat_to_rescore, clat_rescored, clat_bestpath;
-                decoder->GetLattice(false, &clat_to_rescore);
-                TopSortCompactLatticeIfNeeded(&clat_to_rescore);
-
-                CompactLattice clat_composed;
-                fst::ScaleLattice(fst::GraphLatticeScale(0.), &clat_to_rescore);
-                ComposeCompactLatticeDeterministic(clat_to_rescore, carpa_lm_fst, &clat_composed);
-
-                Lattice lat_composed;
-                ConvertLattice(clat_composed, &lat_composed);
-                Invert(&lat_composed);
-                CompactLattice determinized_clat;
-                DeterminizeLattice(lat_composed, &determinized_clat);
-
-                TopSortCompactLatticeIfNeeded(&determinized_clat);
-
-                if (t_rnnlm.joinable()) t_rnnlm.join();
-                if (t_finishsegment.joinable()) t_finishsegment.join();
-//                timer_rnn.Reset();
-                ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
-                                             const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                             &clat_rescored, max_ngram_order, false);
-//                double tt = timer_rnn.Elapsed();
-//                KALDI_LOG << "RESCORE TIME TAKEN " << tt;
-                CompactLatticeShortestPath(clat_rescored, &clat_bestpath);
-                decoder->AdjustCostsWithClatCorrect(&clat_bestpath);
-                decoder->StrictPrune();
-            }
-
             if (decoder->isStopTime(silence_phones, trans_model, 3)) {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
                 tot_num_frames_decoded += num_frames_decoded;
-                LOGI("Stopped %d", num_frames_decoded);
+                LOGI("Stopped %f", num_frames_decoded * 3 / 100.f);
 
                 decoder->GetLattice(false, &finish_seg_clat);
 
-
-
+                if (t_rnnlm.joinable()) t_rnnlm.join();
                 if (t_finishsegment.joinable()) t_finishsegment.join();
 
                 t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
 
-                decoder->InitDecoding(true);
+                decoder->InitDecoding(tot_num_frames_decoded);
             }
 
             if (decoder->NumFramesDecoded() > 0) {
@@ -444,10 +411,6 @@ void RecEngine::recognition_loop() {
             LOGI("Decode time %f", tt.Elapsed());
             do_recognition = false;
         }
-        /*if (!did_rnn) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            did_rnn = false;
-        }*/
     }
 }
 
@@ -573,7 +536,6 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
         lm_to_add_orig->Clear();
     }  // TODO: check why ClearToContinue is worse
 
-
 }
 
 int32 RecEngine::run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos) {
@@ -606,6 +568,7 @@ int32 RecEngine::run_casing(std::vector<int32> casewords, std::vector<int32> cas
 }
 
 void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* casing) {
+    LOGI("Starting casing.");
     int32 sz = words->size();
     if (sz < 6) {
         casing->resize(sz, 0);
@@ -625,7 +588,7 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
     std::vector<int32> casewords(sz);
     for(int32 i = 0; i < sz; i++) {
         int32 id = nid_to_caseid[words_nosil[i]];
-        LOGI("Ids %d %d", words_nosil[i], id);
+        //LOGI("Ids %d %d", words_nosil[i], id);
         casewords[i] = id;
     }
 
@@ -647,14 +610,14 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
                 wid = case_zero_index;
                 pos = casepos_zero_index;
             }
-            LOGI("Ids %d %d", wid, pos);
+            //LOGI("Ids %d %d", wid, pos);
             casewords_sentence[k] = wid;
             casepos_sentence[k] = pos;
-            LOGI("SET");
         }
 
         (*casing)[i] = run_casing(casewords_sentence, casepos_sentence);
     }
+    LOGI("Done casing.");
 }
 
 std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
@@ -710,7 +673,6 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 }
 
 void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
-    start_logger();
 
     try {
         LOGI("Transcribing file");
@@ -722,7 +684,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
 
         BaseFloat chunk_length_secs = 0.72;
 
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 5.0, 40, 3.0);
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
