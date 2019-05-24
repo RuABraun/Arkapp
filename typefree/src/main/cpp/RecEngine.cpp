@@ -86,7 +86,7 @@ void RecEngine::setupLex(std::string wsyms, std::string align_lex) {
 
 void RecEngine::setupRnnlm(std::string modeldir) {
     rnn_ready = false;
-    std::string lm_to_subtract_fname = modeldir + "o3_1M.carpa",
+    std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa",
             word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
             word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
             word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
@@ -98,9 +98,9 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     BaseFloat rnn_scale = 0.9f;
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
-    carpa_lm_to_subtract_fst = new ConstArpaLmDeterministicFst(*const_arpa);
-    lm_to_subtract_det_scale = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
-                                                                      carpa_lm_to_subtract_fst);
+    carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
+    carpa_lm_fst_subtract = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
+                                                                   carpa_lm_fst);
 
     ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
     SetBatchnormTestMode(true, &(rnnlm));
@@ -110,13 +110,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
     std::vector<int32> ids;
     kaldi::readNumsFromFile(modeldir + "ids.int", ids);
-    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 149995, rnnlm_vocab_sz, modeldir);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 150005, rnnlm_vocab_sz, modeldir);
 
     rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
         word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
-    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(lm_to_subtract_det_scale, lm_to_add);
+    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(carpa_lm_fst_subtract, lm_to_add);
 
     LOGI("done setuprnnlm");
     rnn_ready = true;
@@ -170,7 +170,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     }
     // ! -- AM setup end, doing RNN setup
 
-    compose_opts = new ComposeLatticePrunedOptions(2.0, 200, 1.25, 75);
+    compose_opts = new ComposeLatticePrunedOptions(4.0, 500, 1.25, 75);
 
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
@@ -188,13 +188,15 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     tflite::ops::builtin::BuiltinOpResolver resolver;
     tflite::InterpreterBuilder builder(*flatbuffer_model.get(), resolver);
     builder(&interpreter);
-    std::vector<int32> dims = {1, 7};
+    std::vector<int32> dims = {1, CASE_INNUM};
     interpreter->ResizeInputTensor(0, dims);
+    //    interpreter->ResizeInputTensor(1, dims);
     if (interpreter->AllocateTensors() != kTfLiteOk) {
         LOGE("FAILED TO ALLOCATE");
     }
+    case_zero_index = 10295;  // TODO: remove constant!
+    nid_to_caseid.push_back(case_zero_index);
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
-    case_zero_index = 10422;
     casepos_zero_index = CASE_INNUM;
 
     t.join();
@@ -280,20 +282,12 @@ void RecEngine::transcribe_stream(std::string fpath){
         write_word(f, num_filechannels * bytes_perSample, 2);  // data block size (size of two integer samples, one for each channel, in bytes)
         int16_t bits_per_byte = 8;
         write_word(f, bytes_perSample * bits_per_byte, 2);  // number of bits per sample (use a multiple of 8)
-//        int16_t ext_size = 0;
-//        write_word(f, ext_size, 2);
-
-//        f << "fact";
-//        int32_t chk_sz = 4;
-//        write_word(f, chk_sz, 4);
-//        fact_chunk_pos = f.tellp();
-//        f << "----";
 
         data_chunk_pos = f.tellp();
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 5.0, 40, 3.0);
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -379,15 +373,14 @@ void RecEngine::write_to_wav(int32 num_frames) {
 
 void RecEngine::recognition_loop() {
 //    Timer timer_rnn;
-//    Timer tt;
+    Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
     while(recognition_on) {
         bool did_rnn = false;
         if (do_recognition) {
-//            tt.Reset();
+            tt.Reset();
             decoder->AdvanceDecoding();
-//            LOGI("Decode time %f", tt.Elapsed());
 
             if (decoder->isPruneTime()) {
                 did_rnn = true;
@@ -395,10 +388,22 @@ void RecEngine::recognition_loop() {
                 decoder->GetLattice(false, &clat_to_rescore);
                 TopSortCompactLatticeIfNeeded(&clat_to_rescore);
 
+                CompactLattice clat_composed;
+                fst::ScaleLattice(fst::GraphLatticeScale(0.), &clat_to_rescore);
+                ComposeCompactLatticeDeterministic(clat_to_rescore, carpa_lm_fst, &clat_composed);
+
+                Lattice lat_composed;
+                ConvertLattice(clat_composed, &lat_composed);
+                Invert(&lat_composed);
+                CompactLattice determinized_clat;
+                DeterminizeLattice(lat_composed, &determinized_clat);
+
+                TopSortCompactLatticeIfNeeded(&determinized_clat);
+
                 if (t_rnnlm.joinable()) t_rnnlm.join();
                 if (t_finishsegment.joinable()) t_finishsegment.join();
 //                timer_rnn.Reset();
-                ComposeCompactLatticePrunedB(*compose_opts, clat_to_rescore,
+                ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
                                              const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
                                              &clat_rescored, max_ngram_order, false);
 //                double tt = timer_rnn.Elapsed();
@@ -412,8 +417,12 @@ void RecEngine::recognition_loop() {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
                 tot_num_frames_decoded += num_frames_decoded;
                 LOGI("Stopped %d", num_frames_decoded);
-                if (t_finishsegment.joinable()) t_finishsegment.join();
+
                 decoder->GetLattice(false, &finish_seg_clat);
+
+
+
+                if (t_finishsegment.joinable()) t_finishsegment.join();
 
                 t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
 
@@ -432,7 +441,7 @@ void RecEngine::recognition_loop() {
 
                 outtext = tmpstr;
             }
-
+            LOGI("Decode time %f", tt.Elapsed());
             do_recognition = false;
         }
         /*if (!did_rnn) {
@@ -511,16 +520,28 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
     TopSortCompactLatticeIfNeeded(clat);
 
+    CompactLattice clat_composed;
+    fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
+    ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
+
+    Lattice lat_composed;
+    ConvertLattice(clat_composed, &lat_composed);
+    Invert(&lat_composed);
+    CompactLattice determinized_clat;
+    DeterminizeLattice(lat_composed, &determinized_clat);
+
+    TopSortCompactLatticeIfNeeded(&determinized_clat);
+
     CompactLattice best_path;
     if (num_out_frames > 100) {
         if (t_rnnlm.joinable()) t_rnnlm.join();
         CompactLattice clat_rescored;
-        ComposeCompactLatticePrunedB(*compose_opts, *clat,
+        ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
                                      const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
                                      &clat_rescored, max_ngram_order, true);
         CompactLatticeShortestPath(clat_rescored, &best_path);
     } else {
-        CompactLatticeShortestPath(*clat, &best_path);
+        CompactLatticeShortestPath(determinized_clat, &best_path);
     }
 
     CompactLattice aligned_clat;
@@ -594,9 +615,9 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
     std::vector<int32> words_nosil;
 
     words_nosil.reserve(sz);
-    for(int32 i = 0; i < sz; i++) {  // removes epsilon words
+    for(int32 i = 0; i < sz; i++) {  // removes epsilon and <sb> words
         int32 w = (*words)[i];
-        if (w != 0) words_nosil.push_back(w);
+        if (w != 0 && w != idx_sb) words_nosil.push_back(w);
     }
 
     // Convert ids
@@ -604,6 +625,7 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
     std::vector<int32> casewords(sz);
     for(int32 i = 0; i < sz; i++) {
         int32 id = nid_to_caseid[words_nosil[i]];
+        LOGI("Ids %d %d", words_nosil[i], id);
         casewords[i] = id;
     }
 
@@ -625,8 +647,10 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
                 wid = case_zero_index;
                 pos = casepos_zero_index;
             }
+            LOGI("Ids %d %d", wid, pos);
             casewords_sentence[k] = wid;
             casepos_sentence[k] = pos;
+            LOGI("SET");
         }
 
         (*casing)[i] = run_casing(casewords_sentence, casepos_sentence);
@@ -653,7 +677,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
     for(size_t j = 0; j < num_words; j++) {
 
         int32 w = words[j];
-        if (w == 0) continue;
+        if (w == 0 || w == idx_sb) continue;
 
         std::string word = word_syms->Find(w);
 

@@ -70,7 +70,6 @@ public class ManageFragment extends Fragment {
         RecyclerView recview = view.findViewById(R.id.rv_files);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
-        Log.i("APP", "bla");
         fviewmodel.getAllFiles().observe(act, new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
@@ -97,7 +96,6 @@ public class ManageFragment extends Fragment {
                 pb.setVisibility(View.INVISIBLE);
             }
         });
-        Log.i("APP", "bla2");
         return view;
     }
 

@@ -131,8 +131,8 @@ private:
     kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_med;
     kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_small;
     kaldi::ConstArpaLm* const_arpa = NULL;
-    fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_to_subtract_fst = NULL;
-    fst::ScaleDeterministicOnDemandFst* lm_to_subtract_det_scale = NULL;
+    fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_fst = NULL;
+    fst::ScaleDeterministicOnDemandFst* carpa_lm_fst_subtract = NULL;
     kaldi::nnet3::Nnet rnnlm;
     kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts;
     kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info;
