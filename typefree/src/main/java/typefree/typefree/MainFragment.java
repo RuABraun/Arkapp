@@ -1,6 +1,9 @@
 package typefree.typefree;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Fragment;
@@ -64,6 +67,7 @@ public class MainFragment extends Fragment {
     private boolean showingKeyboard = false;
     private boolean hidingKeyboard = false;
     private View fview;
+    ObjectAnimator pulse;
 
     public MainFragment() {
         // Required empty public constructor
@@ -135,6 +139,36 @@ public class MainFragment extends Fragment {
                     fab_rec.setVisibility(View.VISIBLE);
                     spinner.setVisibility(View.INVISIBLE);
                     act.h_main.removeCallbacks(runnable);
+                    pulse = ObjectAnimator.ofPropertyValuesHolder(fab_rec,
+                            PropertyValuesHolder.ofFloat("scaleX", 1.1f),
+                            PropertyValuesHolder.ofFloat("scaleY", 1.1f));
+                    pulse.setDuration(300);
+                    pulse.setStartDelay(1000);
+                    pulse.setRepeatCount(1);
+                    pulse.setRepeatMode(ObjectAnimator.REVERSE);
+                    pulse.addListener(new Animator.AnimatorListener() {
+                        @Override
+                        public void onAnimationStart(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            pulse.setStartDelay(2000);
+                            pulse.start();
+                        }
+
+                        @Override
+                        public void onAnimationCancel(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationRepeat(Animator animation) {
+
+                        }
+                    });
+                    pulse.start();
                 }
             }
         }, 100);
@@ -293,6 +327,7 @@ public class MainFragment extends Fragment {
             fab_share.animate().translationX(128f);
             fab_del.animate().translationX(-128f);
             float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
+            pulse.cancel();
             fab_rec.animate().translationX(offset);
             fab_rec.setImageResource(R.drawable.stop);
 
@@ -328,6 +363,7 @@ public class MainFragment extends Fragment {
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
                         fab_rec.setImageResource(R.drawable.mic_full_inv);
+                        pulse.start();
                         spinner.setVisibility(View.INVISIBLE);
                         act.h_main.removeCallbacks(trans_done_runnable);
                     }
@@ -504,8 +540,6 @@ public class MainFragment extends Fragment {
     }
 
     public void on_delete_click(View view) {
-        ed_transtext.setText("", TextView.BufferType.EDITABLE);
-        ed_transtext.setSelection(0);
         edited_title = true;
         ed_title.setText("", TextView.BufferType.EDITABLE);
         act.f_repo.delete(curr_afile);
@@ -514,6 +548,8 @@ public class MainFragment extends Fragment {
         fab_copy.animate().translationX(128f);
         fab_share.animate().translationX(128f);
         fab_del.animate().translationX(-128f);
+        ed_transtext.setText("", TextView.BufferType.EDITABLE);
+        ed_transtext.setSelection(0);
         edited_title = false;
     }
 

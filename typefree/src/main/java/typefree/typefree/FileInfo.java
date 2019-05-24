@@ -184,7 +184,7 @@ public class FileInfo extends Fragment {
                         }
                         int size_text_y = tv_transtext.getLineCount() * tv_transtext.getLineHeight();
                         int tv_height = tv_transtext.getHeight();
-//                        Log.i("APP", "dy " + dy + " " + curr_scroll_y + " " + size_text_y + " " + tv_height);
+
                         // for when text is smaller than textview
                         if (size_text_y < tv_height) {
                             dy = 0;
@@ -193,7 +193,7 @@ public class FileInfo extends Fragment {
                             dy = curr_scroll_y - (size_text_y - tv_height);
                             new_y = y + dy;
                         }
-//                        Log.i("APP", "scroll " + dy);
+
                         tv_transtext.scrollBy(0, -dy);
                         y = new_y;
                         click_last_time = System.currentTimeMillis();
@@ -204,7 +204,7 @@ public class FileInfo extends Fragment {
                         long dt = cur_time - click_start_time;
                         int new_y = (int) event.getY();
                         int dy = new_y - start_y;
-//                        Log.i("APP", "UP + " + dy + " " + dt);
+
                         if ((abs(dy) > MAX_CLICK_DIST) || (dt > MAX_CLICK_DUR)) {
 
                             float vel = ((float) dy) / ((float) dt);
@@ -232,7 +232,7 @@ public class FileInfo extends Fragment {
                             // if the line idx is the same it means the click position is far below
                             // the text and we don't want to play
                             int lineidx_check = layout.getLineForVertical(y + yscroll - 50);
-                            if (lineidx != lineidx_check) {
+                            if (lineidx != lineidx_check || lineidx == 0) {
                                 Log.i("APP", "PLAY");
                                 int offset = layout.getOffsetForHorizontal(lineidx, x);
                                 int i = getIdxForCharOffset(offset);
