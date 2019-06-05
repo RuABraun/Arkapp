@@ -45,7 +45,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class MainActivity extends Base {
+public class MainActivity extends Base implements KeyboardHeightObserver {
 
     protected BottomNavigationView bottomNavigationView;
     protected RecEngine recEngine;
@@ -53,6 +53,8 @@ public class MainActivity extends Base {
     Handler h_main = new Handler(Looper.getMainLooper());
     HandlerThread handlerThread;
     Handler h_background;
+    private KeyboardHeightProvider keyboardHeightProvider;
+    protected int keyboard_height;
 
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin");
     protected FragmentManager fragmentManager;
@@ -173,6 +175,14 @@ public class MainActivity extends Base {
             perm_granted = true;
         }
 
+        keyboardHeightProvider = new KeyboardHeightProvider(this);
+        View popupview = findViewById(R.id.main_root_view);
+        popupview.post(new Runnable() {
+            public void run() {
+                keyboardHeightProvider.start();
+            }
+        });
+
         f_repo = new FileRepository(getApplication());
     }
 
@@ -209,7 +219,7 @@ public class MainActivity extends Base {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(6);
+            t.setPriority(7);
             t.start();
         }
     }
@@ -221,12 +231,13 @@ public class MainActivity extends Base {
             finish();
             return;
         }
+        handlerThread = new HandlerThread("BackgroundHandlerThread");
+        handlerThread.start();
+
         do_asr_setup();
         MainFragment frag = new MainFragment();
         fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").commit();
 
-        handlerThread = new HandlerThread("BackgroundHandlerThread");
-        handlerThread.start();
         h_background = new Handler(handlerThread.getLooper());
     }
 
@@ -234,6 +245,7 @@ public class MainActivity extends Base {
     protected void onStop() {
         super.onStop();
         handlerThread.quit();
+        keyboardHeightProvider.close();
     }
 
 
@@ -358,6 +370,28 @@ public class MainActivity extends Base {
         return ret;
     }
 
+    @Override
+    public void onPause() {
+        super.onPause();
+        keyboardHeightProvider.setKeyboardHeightObserver(null);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        keyboardHeightProvider.setKeyboardHeightObserver(this);
+    }
+
+    @Override
+    public void onKeyboardHeightChanged(int height, int orientation) {
+        Log.i("APP", "keyboard height " + height);
+        keyboard_height = height;
+        MainFragment frag = (MainFragment) fragmentManager.findFragmentByTag("main");
+        if (frag != null && frag.isVisible()) {
+            frag.resize_views(height);
+            return;
+        }
+    }
 }
 
 

@@ -1,5 +1,6 @@
 package typefree.typefree;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.content.Context;
@@ -31,71 +32,131 @@ import android.widget.Toast;
 import org.w3c.dom.Text;
 
 import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
 import typefree.typefree.Base;
 
 import static typefree.typefree.Base.rmodeldir;
 
-public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.ViewHolder> implements Filterable {
-    private List<AFile> data_;
+
+
+public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> implements Filterable {
+    private volatile List<AFile> data_;
+    private List<ListItem> data_grouped_ = new ArrayList<>();
     private List<AFile> data_filtered_;
     private LayoutInflater mInflater;
-    private Context context;
+    private MainActivity context;
     private FileRepository f_repo;
     private FragmentManager fragmentManager;
-    Handler h_main = new Handler(Looper.getMainLooper());
     private Thread t;
     private boolean recog_done = false;
+    public boolean init_done = false;
     private Runnable runnable;
+    private Runnable runnable_b;
 
     MyRecyclerAdapter(Context ctx, FileRepository f_repo, FragmentManager fragmentManager) {
-        this.context = ctx;
+        this.context = (MainActivity) ctx;
         this.mInflater = LayoutInflater.from(ctx);
         this.f_repo = f_repo;
         this.fragmentManager = fragmentManager;
     }
 
     @Override
-    public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = mInflater.inflate(R.layout.recyclerview_row, parent, false);
-        return new ViewHolder(view);
+    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        switch (viewType) {
+            case ListItem.TYPE_AFILE: {
+                View view = mInflater.inflate(R.layout.recyclerview_row, parent, false);
+                return new AFileViewHolder(view);
+            }
+            case ListItem.TYPE_HEADER: {
+                View view = mInflater.inflate(R.layout.divider, parent, false);
+                return new DivViewHolder(view);
+            }
+            default:
+                throw new IllegalStateException("unsupported item type");
+        }
     }
 
     @Override
-    public void onBindViewHolder(ViewHolder holder, int pos) {
-        AFile elem = getItem(pos);
-        holder.tv_fname.setText(elem.title);
-        holder.tv_date.setText(elem.date + " \u2022 ");
-        String duration = Base.sec_to_timestr(elem.len_s);
-        holder.tv_flen.setText(duration);
-        holder.curr_pos = pos;
+    public void onBindViewHolder(RecyclerView.ViewHolder viewHolder, int pos) {
+        int itemType = getItemType(pos);
+        switch (itemType ) {
+            case ListItem.TYPE_AFILE: {
+                AFile elem = (AFile) getItem(pos);
+                AFileViewHolder holder = (AFileViewHolder) viewHolder;
+                holder.tv_fname.setText(elem.title);
+                holder.tv_date.setText(elem.date + " \u2022 ");
+                String duration = Base.sec_to_timestr(elem.len_s);
+                holder.tv_flen.setText(duration);
+                holder.curr_pos = pos;
 
-        File txt_file = new File(Base.filesdir + elem.fname + Base.file_suffixes.get("text"));
-        if (txt_file.exists()) {
-            holder.button_trans.setImageResource(R.drawable.textfile);
-        } else {
-            holder.button_trans.setImageResource(R.drawable.mic_full);
+                File txt_file = new File(Base.filesdir + elem.fname + Base.file_suffixes.get("text"));
+                if (txt_file.exists()) {
+                    holder.button_trans.setImageResource(R.drawable.textfile);
+                } else {
+                    holder.button_trans.setImageResource(R.drawable.mic_full);
+                }
+                break;
+            }
+            case ListItem.TYPE_HEADER: {
+                DivItem div = (DivItem) getItem(pos);
+                DivViewHolder holder = (DivViewHolder) viewHolder;
+                holder.tv_div.setText(div.getDatestr());
+                break;
+            }
+            default:
+                throw new IllegalStateException("unsupported item type");
         }
+    }
+
+    public ListItem getItem(int pos) {
+        return data_grouped_.get(pos);
     }
 
     @Override
     public int getItemCount() {
         if (data_filtered_ != null) {
-            return data_filtered_.size();
+            return data_grouped_.size();
         } else {
             return 0;
         }
     }
 
-    public class ViewHolder extends RecyclerView.ViewHolder {
+    public int getItemType(int position) {
+        return data_grouped_.get(position).getType();
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        return data_grouped_.get(position).getType();
+    }
+
+    public class DivViewHolder extends RecyclerView.ViewHolder {
+        TextView tv_div;
+        DivViewHolder(View v) {
+            super(v);
+            tv_div = v.findViewById(R.id.div_date);
+        }
+    }
+
+    public class AFileViewHolder extends RecyclerView.ViewHolder {
         TextView tv_fname, tv_flen, tv_date;
         ImageButton button_opts, button_trans, button_img;
         final ProgressBar spinner;
         public View itemView;
         public int curr_pos;
 
-        ViewHolder(View v) {
+        AFileViewHolder(View v) {
             super(v);
             tv_fname = v.findViewById(R.id.Row_Filename);
             tv_flen = v.findViewById(R.id.Row_Audiolength);
@@ -134,9 +195,9 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                             recog_done = true;
                                         }
                                     });
-                                    t.setPriority(6);
+                                    t.setPriority(7);
                                     t.start();
-                                    h_main.post(new Runnable() {
+                                    context.h_main.post(new Runnable() {
                                         @Override
                                         public void run() {
                                             runnable = this;
@@ -145,7 +206,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
                                                 button_trans.setImageResource(R.drawable.textfile);
                                                 button_trans.setVisibility(View.VISIBLE);
                                             } else {
-                                                h_main.postDelayed(runnable, 100);
+                                                context.h_main.postDelayed(runnable, 100);
                                             }
                                         }
                                     });
@@ -259,17 +320,108 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<MyRecyclerAdapter.Vi
             }
         }
         data_ = all_data;
+        setData(data_);
         Toast.makeText(context, afile.title + " deleted.", Toast.LENGTH_SHORT).show();
     }
 
-    void setData(List<AFile> data) {
-        data_ = data;
-        data_filtered_ = data;
-        notifyDataSetChanged();
-    }
 
-    public AFile getItem(int pos) {
-        return data_filtered_.get(pos);
+    void setData(final List<AFile> data) {
+
+        context.h_background.post(new Runnable() {
+            @Override
+            public void run() {
+                Collections.sort(data, new Comparator<AFile>() {
+                    @Override
+                    public int compare(AFile lhs, AFile rhs) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
+                        Date left_date = null;
+                        try {
+                            left_date = sdf.parse(lhs.date);
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        Date right_date = null;
+                        try {
+                            right_date = sdf.parse(rhs.date);
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        return right_date.compareTo(left_date);
+                    }
+                });
+                data_ = data;
+                data_filtered_ = data;
+
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
+                boolean passedmonday = false;
+                if (data_filtered_ != null) {
+                    //data_grouped_ = new ArrayList<>();
+                    Date lastdate = null;
+                    for (int i = 0; i < data_filtered_.size(); i++) {
+                        Date date = null;
+                        AFile afile = data_filtered_.get(i);
+                        try {
+                            date = sdf.parse(afile.date);
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+
+                        if (i > 0) {
+                            Calendar c = Calendar.getInstance();
+                            c.setTime(date);
+                            int n = c.get(Calendar.WEEK_OF_YEAR);
+                            Calendar clast = Calendar.getInstance();
+                            clast.setTime(lastdate);
+                            int lastn = clast.get(Calendar.WEEK_OF_YEAR);
+
+                            if (n != lastn) {
+                                Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
+                                mondayDate.setTime(lastdate);
+                                while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                                    mondayDate.add(Calendar.DATE, -1);
+                                }
+                                Date divdate = mondayDate.getTime();
+                                SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
+                                String str_divdate = sdf_.format(divdate);
+                                DivItem div = new DivItem(str_divdate);
+                                data_grouped_.add(div);
+
+                                if (n - 2 >= lastn) {
+                                    Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
+                                    mondayDate2.setTime(date);
+                                    while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                                        mondayDate2.add(Calendar.DATE, 1);
+                                    }
+                                    Date divdate2 = mondayDate2.getTime();
+                                    String str_divdate2 = sdf_.format(divdate2);
+                                    DivItem div2 = new DivItem(str_divdate2);
+                                    data_grouped_.add(div2);
+                                }
+                            }
+                        }
+
+                        data_grouped_.add(afile);
+                        lastdate = date;
+                    }
+                } else {
+                    data_grouped_ = null;
+                }
+                init_done = true;
+            }
+        });
+
+        context.h_main.post(new Runnable() {
+            @Override
+            public void run() {
+                runnable_b = this;
+                if (!init_done) {
+                    context.h_main.postDelayed(runnable_b, 50);
+                } else {
+                    notifyDataSetChanged();
+                    data_filtered_ = data_;
+                }
+            }
+        });
     }
 
     @Override

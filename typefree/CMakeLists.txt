@@ -1,6 +1,6 @@
 # For more information about using CMake with Android Studio, read the
 # documentation: https://d.android.com/studio/projects/add-native-code.html
-
+message("HELLLO")
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
@@ -17,6 +17,8 @@ set(OBOE_DIR /home/seni/git/oboe)
 add_subdirectory (${OBOE_DIR} ./oboe)
 include_directories (${OBOE_DIR}/include)
 
+message(${ANDROID_ABI})
+message("HEEELLLOOOO")
 
 set (DEBUG_UTILS_PATH "../debug-utils")
 include_directories(${DEBUG_UTILS_PATH})
@@ -56,31 +58,42 @@ add_library(flatbuffer ${flatb_src})
 # tensorflow #
 include_directories(/home/seni/git/tensorflow-android )
 
-add_library(libtensorflowlite SHARED IMPORTED)
-set_target_properties(libtensorflowlite PROPERTIES IMPORTED_LOCATION /home/seni/AndroidStudioProjects/typefree/typefree/src/main/jniLibs/armeabi-v7a/libtensorflowlite.so)
+add_library(libtensorflowLite SHARED IMPORTED)
+set_target_properties(libtensorflowLite PROPERTIES IMPORTED_LOCATION /home/seni/AndroidStudioProjects/typefree/typefree/src/main/jniLibs/${ANDROID_ABI}/libtensorflowlite.so)
 
 
 
 # ffmpeg
-include_directories(/home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/include )
+include_directories(/home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/include )
 
 
 # kaldi
-set (KALDIPATH "/home/seni/androidkaldi/kaldi/src")
+set (KALDIPATH "/home/seni/androidkaldi/${ANDROID_ABI}/kaldi/src")
 include_directories(${KALDIPATH})
 
-link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
+#link_directories(/home/seni/androidkaldi/android-toolchain/arm-linux-androideabi/lib/armv7-a/)
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
+# openblas
+set (BLASPATH "/home/seni/androidkaldi/${ANDROID_ABI}/OpenBLAS/install/")
+if ( ${ANDROID_ABI} STREQUAL arm64-v8a)
+    set (EXTRAF "${BLASPATH}/lib/libopenblas_armv8p-r0.3.7.dev.a")
+else()
+    set (EXTRAF "${BLASPATH}/lib/libopenblas_armv7-r0.3.0.dev.a")
+endif()
 
-include_directories("/home/seni/git/prebuilt-libz/android-armeabi-v7a/include")
+# qnnpack
+set (QNNPATH "/home/seni/git/QNNPACK/build/android/${ANDROID_ABI}/")
+
+
+include_directories("/home/seni/git/prebuilt-libz/android-${ANDROID_ABI}/include")
 
 include_directories(/home/seni/git/QNNPACK/include /home/seni/git/QNNPACK/deps/clog/include /home/seni/git/QNNPACK/deps/pthreadpool/include /home/seni/git/QNNPACK/deps/cpuinfo/include)
 
 target_link_libraries( # Specifies the target library.
-                       rec-engine android oboe libtensorflowlite flatbuffer
+                       rec-engine android oboe libtensorflowLite flatbuffer
                        ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/util/kaldi-util.a
                        ${KALDIPATH}/lat/kaldi-lat.a ${KALDIPATH}/decoder/kaldi-decoder.a ${KALDIPATH}/matrix/kaldi-matrix.a
                        ${KALDIPATH}/hmm/kaldi-hmm.a ${KALDIPATH}/base/kaldi-base.a ${KALDIPATH}/../tools/openfst/lib/libfst.a
@@ -89,19 +102,19 @@ target_link_libraries( # Specifies the target library.
                        ${KALDIPATH}/feat/kaldi-feat.a ${KALDIPATH}/online2/kaldi-online2.a ${KALDIPATH}/transform/kaldi-transform.a
                        ${KALDIPATH}/rnnlm/kaldi-rnnlm.a ${KALDIPATH}/lm/kaldi-lm.a
 
-                       /home/seni/androidkaldi/OpenBLAS/install/lib/libopenblas_armv7-r0.3.0.dev.a /home/seni/androidkaldi/OpenBLAS/install/lib/libclapack.a
-                       /home/seni/androidkaldi/OpenBLAS/install/lib/libblas.a /home/seni/androidkaldi/OpenBLAS/install/lib/liblapack.a
-                       /home/seni/androidkaldi/OpenBLAS/install/lib/libf2c.a
+                       ${EXTRAF} ${BLASPATH}/lib/libclapack.a
+                       ${BLASPATH}/lib/libblas.a ${BLASPATH}/lib/liblapack.a
+                       ${BLASPATH}/lib/libf2c.a
 
-                       /home/seni/git/QNNPACK/build/android/armeabi-v7a/libqnnpack.a /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/pthreadpool/libpthreadpool.a
-                       /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/cpuinfo/libcpuinfo.a /home/seni/git/QNNPACK/build/android/armeabi-v7a/deps/clog/libclog.a
+                       ${QNNPATH}/libqnnpack.a ${QNNPATH}/deps/pthreadpool/libpthreadpool.a
+                       ${QNNPATH}/deps/cpuinfo/libcpuinfo.a ${QNNPATH}/deps/clog/libclog.a
 
-                        /home/seni/git/prebuilt-libz/android-armeabi-v7a/lib/libz.a
+                        /home/seni/git/prebuilt-libz/android-${ANDROID_ABI}/lib/libz.a
 
-                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavutil.a
-                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavcodec.a
-                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libavformat.a
-                        /home/seni/androidffmpeg/android/home/seni/androidffmpeg/android/lib/libswresample.a
+                        /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libavutil.a
+                        /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libavcodec.a
+                        /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libavformat.a
+                        /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libswresample.a
 
                        # Links the target library to the log library
                        # included in the NDK.

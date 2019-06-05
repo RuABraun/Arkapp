@@ -123,7 +123,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
                                             tot_num_frames_decoded(0) {

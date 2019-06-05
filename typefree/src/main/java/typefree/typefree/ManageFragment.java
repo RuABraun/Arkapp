@@ -47,6 +47,7 @@ public class ManageFragment extends Fragment {
     private FileViewModel fviewmodel;
     private MainActivity act;
     private ProgressBar pb;
+    private Runnable runnable;
     Runnable r;
 
     public ManageFragment() {
@@ -70,30 +71,22 @@ public class ManageFragment extends Fragment {
         RecyclerView recview = view.findViewById(R.id.rv_files);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
+        recview.setHasFixedSize(true);
         fviewmodel.getAllFiles().observe(act, new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
-                Collections.sort(aFiles, new Comparator<AFile>() {
+                adapter.setData(aFiles);
+                act.h_main.post(new Runnable() {
                     @Override
-                    public int compare(AFile lhs, AFile rhs) {
-                        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
-                        Date left_date = null;
-                        try {
-                            left_date = sdf.parse(lhs.date);
-                        } catch (ParseException e) {
-                            e.printStackTrace();
+                    public void run() {
+                        runnable = this;
+                        if (adapter.init_done) {
+                            pb.setVisibility(View.INVISIBLE);
+                        } else {
+                            act.h_main.postDelayed(runnable, 50);
                         }
-                        Date right_date = null;
-                        try {
-                            right_date = sdf.parse(rhs.date);
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        return right_date.compareTo(left_date);
                     }
                 });
-                adapter.setData(aFiles);
-                pb.setVisibility(View.INVISIBLE);
             }
         });
         return view;

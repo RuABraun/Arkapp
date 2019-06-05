@@ -33,6 +33,8 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static typefree.typefree.Base.filesdir;
 
@@ -42,7 +44,7 @@ public class MainFragment extends Fragment {
 
     public boolean is_recording = false;
     Runnable title_runnable;
-    Runnable runnable;
+    Runnable runnable, trans_update_runnable;
     Runnable trans_done_runnable;
     Runnable trans_edit_runnable;
     private EditText ed_transtext;
@@ -59,7 +61,7 @@ public class MainFragment extends Fragment {
     private float ed_trans_to_edit_button_distance;
     private boolean is_editing = false, just_closed = false;
     private ProgressBar pb_init;
-    private TextView tv_init;
+    private TextView tv_init, tv_counter;
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
@@ -68,6 +70,7 @@ public class MainFragment extends Fragment {
     private boolean hidingKeyboard = false;
     private View fview;
     ObjectAnimator pulse;
+    Timer time_counter;
 
     public MainFragment() {
         // Required empty public constructor
@@ -85,6 +88,8 @@ public class MainFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         pb_init = view.findViewById(R.id.progressBar_init_setup);
         tv_init = view.findViewById(R.id.textview_init_setup);
+        tv_counter = view.findViewById(R.id.tv_counter);
+        tv_counter.setVisibility(View.INVISIBLE);
 
         spinner = view.findViewById(R.id.progressBar);
         ed_title = view.findViewById(R.id.ed_title);
@@ -115,14 +120,14 @@ public class MainFragment extends Fragment {
         spinner.setVisibility(View.VISIBLE);
 
         fab_edit = view.findViewById(R.id.button_edit);
-        fab_edit.setTranslationX(128f);
+        fab_edit.setTranslationX(256f);
 
         fab_copy = view.findViewById(R.id.button_copy);
         fab_share = view.findViewById(R.id.button_share);
         fab_del = view.findViewById(R.id.button_delete);
-        fab_copy.setTranslationX(128f);
-        fab_share.setTranslationX(128f);
-        fab_del.setTranslationX(-128f);
+        fab_copy.setTranslationX(256f);
+        fab_share.setTranslationX(256f);
+        fab_del.setTranslationX(-256f);
         this.fview = view;
         return view;
     }
@@ -232,11 +237,12 @@ public class MainFragment extends Fragment {
                 fview.getWindowVisibleDisplayFrame(r);
                 int screenheight = fview.getRootView().getHeight();
                 int height_diff = screenheight - (r.bottom - r.top);
+                Log.i("APP", "heightdiff " + height_diff);
                 if (height_diff > 120 && !hidingKeyboard) {
                     if (!showingKeyboard) {
                         ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
                         showingKeyboard = true;
-                        mainview_layout.bottomMargin = height_diff - 56  * 2;
+                        mainview_layout.bottomMargin = act.keyboard_height;
                         img_view.invalidate();
                         img_view.requestLayout();
                     }
@@ -262,6 +268,9 @@ public class MainFragment extends Fragment {
             act.h_background.removeCallbacks(trans_edit_runnable);
             trans_edit_runnable.run();
         }
+        if (trans_update_runnable != null) {
+            act.h_main.removeCallbacks(trans_update_runnable);
+        }
         ed_title.removeTextChangedListener(title_textWatcher);
         fview.getViewTreeObserver().removeOnGlobalLayoutListener(layoutListener);
     }
@@ -285,7 +294,7 @@ public class MainFragment extends Fragment {
         long id = act.f_repo.insert(afile);
         curr_afile = act.f_repo.getById(id);  // has correct ID
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
-        act.h_main.removeCallbacks(runnable);
+        act.h_main.removeCallbacks(trans_update_runnable);
         act.h_main.post(new Runnable() {
             @Override
             public void run() {
@@ -322,10 +331,10 @@ public class MainFragment extends Fragment {
             }
 
             recognition_done = false;
-            fab_edit.animate().translationX(128f);
-            fab_copy.animate().translationX(128f);
-            fab_share.animate().translationX(128f);
-            fab_del.animate().translationX(-128f);
+            fab_edit.animate().translationX(256f);
+            fab_copy.animate().translationX(256f);
+            fab_share.animate().translationX(256f);
+            fab_del.animate().translationX(-256f);
             float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
             pulse.cancel();
             fab_rec.animate().translationX(offset);
@@ -339,20 +348,41 @@ public class MainFragment extends Fragment {
                     act.recEngine.transcribe_stream(fpath);
                 }
             });
-            t_starttrans.setPriority(7);
+            t_starttrans.setPriority(8);
             t_starttrans.start();
 
             is_recording = true;
 
             act.h_main.postDelayed(new Runnable() {
                 public void run() {
-                    runnable=this;
+                    trans_update_runnable=this;
                     update_text();
-                    act.h_main.postDelayed(runnable, 25);
+                    act.h_main.postDelayed(trans_update_runnable, 25);
                 }
             }, 25);
-
+            time_counter = new Timer();
+            time_counter.scheduleAtFixedRate(new TimerTask() {
+                int min = 0;
+                int sec = 0;
+                @Override
+                public void run() {
+                    sec++;
+                    if (sec == 60) {
+                        min++;
+                        sec = 0;
+                    }
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            tv_counter.setText(String.valueOf(min) + ":" + String.valueOf(sec));
+                        }
+                    });
+                }
+            }, 0, 1000);
+            tv_counter.setVisibility(View.VISIBLE);
         } else {
+            time_counter.cancel();
+            tv_counter.setVisibility(View.INVISIBLE);
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
 
@@ -479,8 +509,8 @@ public class MainFragment extends Fragment {
 
             fab_edit.setImageResource(R.drawable.done);
             fab_rec.setVisibility(View.INVISIBLE);
-            Log.i("APP", "IN TRANSEDIT EDIT PRESS " + ed_trans_to_edit_button_distance);
-            fab_edit.animate().translationY(-(int)ed_trans_to_edit_button_distance*0.5f);
+            Log.i("APP", "IN TRANSEDIT EDIT PRESS " + act.keyboard_height);
+            fab_edit.animate().translationY(-act.keyboard_height);
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
 
@@ -551,6 +581,18 @@ public class MainFragment extends Fragment {
         ed_transtext.setText("", TextView.BufferType.EDITABLE);
         ed_transtext.setSelection(0);
         edited_title = false;
+    }
+
+    public void resize_views(int height) {
+        DisplayMetrics dm = new DisplayMetrics();
+        act.getWindowManager().getDefaultDisplay().getMetrics(dm);
+        int dp = (int) (height / dm.density);
+        fab_edit.animate().translationY(-dp);
+        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+        showingKeyboard = true;
+        mainview_layout.bottomMargin = height - 100;
+        img_view.invalidate();
+        img_view.requestLayout();
     }
 
 }

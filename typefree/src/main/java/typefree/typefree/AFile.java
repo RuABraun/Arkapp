@@ -7,7 +7,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 @Entity
-public class AFile implements Parcelable {
+public class AFile extends ListItem implements Parcelable  {
 
     @PrimaryKey(autoGenerate = true)
     private int id;
@@ -74,6 +74,8 @@ public class AFile implements Parcelable {
     public void setDate(String date) {
         this.date = date;
     }
+
+    public int getType() { return TYPE_AFILE; }
 
     @Override
     public int describeContents() {
