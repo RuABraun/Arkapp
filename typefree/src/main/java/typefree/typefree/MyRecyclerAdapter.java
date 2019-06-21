@@ -169,7 +169,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 @Override
                 public void onClick(View v) {
 
-                    final AFile afile_to_use = data_filtered_.get(curr_pos);
+                    final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);
                     String fname = afile_to_use.fname;
                     final String fpath = Base.filesdir + fname;
                     final String wavpath = Base.filesdir + fname + ".wav";
@@ -233,7 +233,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         @Override
                         public boolean onMenuItemClick(MenuItem item) {
-                            final AFile afile_to_use = data_filtered_.get(curr_pos);
+                            final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);;
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
@@ -261,7 +261,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                             .setMessage("Are you sure?")
                                             .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
                                                 public void onClick(DialogInterface dialog, int which) {
-                                                    delete(afile_to_use, curr_pos);
+                                                    delete(afile_to_use);
                                                     dialog.dismiss();
                                                 }
                                             }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -289,12 +289,13 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    final AFile afile_to_use = data_filtered_.get(curr_pos);
+
+                    final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);
                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
                     if (!f.exists()) {
                         Log.i("APP", "File does not exist, title: " +
                                 afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
-                        Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "File does not exist! Contact support for help.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
@@ -310,23 +311,26 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     }
 
-    void delete(AFile afile, int pos) {
+    void delete(AFile afile) {
         f_repo.delete(afile);
-        data_filtered_.remove(pos);
         ArrayList<AFile> all_data = new ArrayList<>();
         for (AFile a_afile : data_) {
-            if (!a_afile.fname.equals(afile)) {
+            if (!a_afile.fname.equals(afile.fname)) {
+                Log.i("APP", "fname " + a_afile.fname);
                 all_data.add(a_afile);
             }
         }
         data_ = all_data;
+        Log.i("APP", "delete: data has size " + data_.size());
         setData(data_);
         Toast.makeText(context, afile.title + " deleted.", Toast.LENGTH_SHORT).show();
     }
 
 
     void setData(final List<AFile> data) {
-
+        if (data_ != null) {
+            Log.i("APP", "data has size " + data_.size());
+        }
         context.h_background.post(new Runnable() {
             @Override
             public void run() {
@@ -354,58 +358,59 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
                 boolean passedmonday = false;
-                if (data_filtered_ != null) {
-                    //data_grouped_ = new ArrayList<>();
-                    Date lastdate = null;
-                    for (int i = 0; i < data_filtered_.size(); i++) {
-                        Date date = null;
-                        AFile afile = data_filtered_.get(i);
-                        try {
-                            date = sdf.parse(afile.date);
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
+                if (data_filtered_ == null) {
+                    data_grouped_ = null;
+                    return;
+                }
+                data_grouped_.clear();
+                Date lastdate = null;
+                for (int i = 0; i < data_filtered_.size(); i++) {
+                    Date date = null;
+                    AFile afile = data_filtered_.get(i);
+                    try {
+                        date = sdf.parse(afile.date);
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
 
-                        if (i > 0) {
-                            Calendar c = Calendar.getInstance();
-                            c.setTime(date);
-                            int n = c.get(Calendar.WEEK_OF_YEAR);
-                            Calendar clast = Calendar.getInstance();
-                            clast.setTime(lastdate);
-                            int lastn = clast.get(Calendar.WEEK_OF_YEAR);
+                    if (i > 0) {
+                        Calendar c = Calendar.getInstance();
+                        c.setTime(date);
+                        int n = c.get(Calendar.WEEK_OF_YEAR);
+                        Calendar clast = Calendar.getInstance();
+                        clast.setTime(lastdate);
+                        int lastn = clast.get(Calendar.WEEK_OF_YEAR);
 
-                            if (n != lastn) {
-                                Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
-                                mondayDate.setTime(lastdate);
-                                while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                                    mondayDate.add(Calendar.DATE, -1);
+                        if (n != lastn) {
+                            Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
+                            mondayDate.setTime(lastdate);
+                            while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                                mondayDate.add(Calendar.DATE, -1);
+                            }
+                            Date divdate = mondayDate.getTime();
+                            SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
+                            String str_divdate = sdf_.format(divdate);
+                            DivItem div = new DivItem(str_divdate);
+                            data_grouped_.add(div);
+
+                            if (n - 2 >= lastn) {
+                                Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
+                                mondayDate2.setTime(date);
+                                while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                                    mondayDate2.add(Calendar.DATE, 1);
                                 }
-                                Date divdate = mondayDate.getTime();
-                                SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
-                                String str_divdate = sdf_.format(divdate);
-                                DivItem div = new DivItem(str_divdate);
-                                data_grouped_.add(div);
-
-                                if (n - 2 >= lastn) {
-                                    Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
-                                    mondayDate2.setTime(date);
-                                    while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                                        mondayDate2.add(Calendar.DATE, 1);
-                                    }
-                                    Date divdate2 = mondayDate2.getTime();
-                                    String str_divdate2 = sdf_.format(divdate2);
-                                    DivItem div2 = new DivItem(str_divdate2);
-                                    data_grouped_.add(div2);
-                                }
+                                Date divdate2 = mondayDate2.getTime();
+                                String str_divdate2 = sdf_.format(divdate2);
+                                DivItem div2 = new DivItem(str_divdate2);
+                                data_grouped_.add(div2);
                             }
                         }
-
-                        data_grouped_.add(afile);
-                        lastdate = date;
                     }
-                } else {
-                    data_grouped_ = null;
+                    Log.i("APP", "group fname " + afile.fname);
+                    data_grouped_.add(afile);
+                    lastdate = date;
                 }
+
                 init_done = true;
             }
         });
@@ -418,7 +423,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     context.h_main.postDelayed(runnable_b, 50);
                 } else {
                     notifyDataSetChanged();
-                    data_filtered_ = data_;
                 }
             }
         });

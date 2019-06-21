@@ -31,6 +31,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Timer;
@@ -229,30 +230,30 @@ public class MainFragment extends Fragment {
             };
             ed_title.addTextChangedListener(title_textWatcher);
         }
-        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-
-                Rect r = new Rect();
-                fview.getWindowVisibleDisplayFrame(r);
-                int screenheight = fview.getRootView().getHeight();
-                int height_diff = screenheight - (r.bottom - r.top);
-                Log.i("APP", "heightdiff " + height_diff);
-                if (height_diff > 120 && !hidingKeyboard) {
-                    if (!showingKeyboard) {
-                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-                        showingKeyboard = true;
-                        mainview_layout.bottomMargin = act.keyboard_height;
-                        img_view.invalidate();
-                        img_view.requestLayout();
-                    }
-                } else {
-                    hidingKeyboard = false;
-                }
-
-            }
-        };
-        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
+//        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
+//            @Override
+//            public void onGlobalLayout() {
+//
+//                Rect r = new Rect();
+//                fview.getWindowVisibleDisplayFrame(r);
+//                int screenheight = fview.getRootView().getHeight();
+//                int height_diff = screenheight - (r.bottom - r.top);
+//                Log.i("APP", "heightdiff " + height_diff);
+//                if (height_diff > 120 && !hidingKeyboard) {
+//                    if (!showingKeyboard) {
+//                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+//                        showingKeyboard = true;
+//                        mainview_layout.bottomMargin = act.keyboard_height;
+//                        img_view.invalidate();
+//                        img_view.requestLayout();
+//                    }
+//                } else {
+//                    hidingKeyboard = false;
+//                }
+//
+//            }
+//        };
+//        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
     }
 
     @Override
@@ -264,7 +265,7 @@ public class MainFragment extends Fragment {
             act.h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
-        if (trans_edit_runnable != null) {
+        if (trans_edit_runnable != null && curr_afile != null) {
             act.h_background.removeCallbacks(trans_edit_runnable);
             trans_edit_runnable.run();
         }
@@ -348,7 +349,7 @@ public class MainFragment extends Fragment {
                     act.recEngine.transcribe_stream(fpath);
                 }
             });
-            t_starttrans.setPriority(8);
+            t_starttrans.setPriority(9);
             t_starttrans.start();
 
             is_recording = true;
@@ -359,7 +360,7 @@ public class MainFragment extends Fragment {
                     update_text();
                     act.h_main.postDelayed(trans_update_runnable, 25);
                 }
-            }, 25);
+            }, 100);
             time_counter = new Timer();
             time_counter.scheduleAtFixedRate(new TimerTask() {
                 int min = 0;
@@ -407,7 +408,7 @@ public class MainFragment extends Fragment {
                     Log.i("APP", "Finished recording.");
                 }
             });
-            t_stoptrans.setPriority(7);
+            t_stoptrans.setPriority(8);
             t_stoptrans.start();
 
         }
@@ -437,8 +438,6 @@ public class MainFragment extends Fragment {
                 }
                 imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
                 fab_edit.animate().translationY(0.f);
-                fab_share.setVisibility(View.VISIBLE);
-                fab_copy.setVisibility(View.VISIBLE);
                 ed_transtext.clearFocus();
                 ed_transtext.setFocusableInTouchMode(false);
                 is_editing = false;
@@ -513,6 +512,7 @@ public class MainFragment extends Fragment {
             fab_edit.animate().translationY(-act.keyboard_height);
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
+            fab_del.setVisibility(View.INVISIBLE);
 
             text_textWatcher = new TextWatcher() {
                 @Override
@@ -558,7 +558,9 @@ public class MainFragment extends Fragment {
             }
             ed_transtext.removeTextChangedListener(text_textWatcher);
             fab_edit.setImageResource(R.drawable.edit);
-            fab_rec.setVisibility(View.VISIBLE);
+            fab_share.setVisibility(View.VISIBLE);
+            fab_copy.setVisibility(View.VISIBLE);
+            fab_del.setVisibility(View.VISIBLE);
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
             lay_params.bottomMargin = 0;
@@ -574,10 +576,10 @@ public class MainFragment extends Fragment {
         ed_title.setText("", TextView.BufferType.EDITABLE);
         act.f_repo.delete(curr_afile);
         curr_afile = null;
-        fab_edit.animate().translationX(128f);
-        fab_copy.animate().translationX(128f);
-        fab_share.animate().translationX(128f);
-        fab_del.animate().translationX(-128f);
+        fab_edit.animate().translationX(256f);
+        fab_copy.animate().translationX(256f);
+        fab_share.animate().translationX(256f);
+        fab_del.animate().translationX(-256f);
         ed_transtext.setText("", TextView.BufferType.EDITABLE);
         ed_transtext.setSelection(0);
         edited_title = false;

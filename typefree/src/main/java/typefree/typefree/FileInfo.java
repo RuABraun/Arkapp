@@ -266,14 +266,12 @@ public class FileInfo extends Fragment {
                 popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                     @Override
                     public boolean onMenuItemClick(MenuItem item) {
-                        Log.i("APP", "inA");
                         switch (item.getItemId()) {
                             case R.id.IntShare:
                                 ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
-                                dialog.show(getFragmentManager(), "ShareDialog");
+                                dialog.show(act.fragmentManager, "ShareDialog");
                                 return true;
                             case R.id.IntCopy:
-                                Log.i("APP", "in");
                                 ClipboardManager clipboard = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
                                 String simpletext = ed_transtext.getText().toString();
                                 ClipData clip = ClipData.newPlainText("Transcript", simpletext);
@@ -287,6 +285,7 @@ public class FileInfo extends Fragment {
                                         .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
                                             public void onClick(DialogInterface dialog, int which) {
                                                 delete(afile);
+                                                act.fragmentManager.popBackStack();
                                             }
                                         }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                                             @Override
@@ -616,39 +615,6 @@ public class FileInfo extends Fragment {
             viewSwitcher.showNext();
         }
         ed_transtext.setFocusableInTouchMode(false);
-    }
-
-    public void on_copy_click(View view) {
-        ClipboardManager clipboard = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
-        String simpletext = ed_transtext.getText().toString();
-        ClipData clip = ClipData.newPlainText("Transcript", simpletext);
-        clipboard.setPrimaryClip(clip);
-        Toast.makeText(act.getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
-    }
-
-    public void on_share_click(View view) {
-        ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
-        dialog.show(getFragmentManager(), "ShareDialog");
-    }
-
-    public void on_delete_click(View view) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(act);
-        builder.setTitle("Confirm")
-                .setMessage("Are you sure?")
-                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        delete(afile);
-                    }
-                }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-        });
-        AlertDialog alert = builder.create();
-        alert.show();
-        TextView tv = (TextView) alert.findViewById(android.R.id.message);
-        tv.setTextSize(18);
     }
 
     public void delete(AFile afile) {

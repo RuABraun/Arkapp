@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.app.Fragment;
+import android.os.PowerManager;
 import android.support.annotation.NonNull;
 import android.support.constraint.ConstraintLayout;
 import android.support.constraint.Constraints;
@@ -38,6 +39,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,6 +65,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
+    protected PowerManager pm;
+    protected PowerManager.WakeLock wl;
     final String PREFS_NAME = "MyPrefsFile";
 
     static {
@@ -227,6 +231,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     @Override
     protected void onStart() {
         super.onStart();
+
         if (!perm_granted) {
             finish();
             return;
@@ -239,6 +244,17 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").commit();
 
         h_background = new Handler(handlerThread.getLooper());
+
+        pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm.isSustainedPerformanceModeSupported()) {
+            getWindow().setSustainedPerformanceMode(true);
+        }
+//        int exclusiveCores[] = {};
+//        exclusiveCores = android.os.Process.getExclusiveCores();
+//        Log.i("APP", "numcore " + exclusiveCores.length);
+//        for(int i = 0; i < exclusiveCores.length; i++) {
+//            Log.i("APP", "core " + exclusiveCores[i]);
+//        }
     }
 
     @Override
@@ -246,6 +262,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         super.onStop();
         handlerThread.quit();
         keyboardHeightProvider.close();
+        if (pm.isSustainedPerformanceModeSupported()) {
+            getWindow().setSustainedPerformanceMode(false);
+        }
     }
 
 
@@ -304,22 +323,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
         frag.on_edit_click(view);
     }
-    public void onCopyClickFI(View view) {
-        if (is_spamclick()) return;
-        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
-        frag.on_copy_click(view);
-    }
-    public void onShareClickFI(View view) {
-        if (is_spamclick()) return;
-        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
-        frag.on_share_click(view);
-    }
-    public void onDeleteClickFI(View view) {
-        if (is_spamclick()) return;
-        FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
-        frag.on_delete_click(view);
-    }
-
 
     public static String getFileName(String cname, final FileRepository f_repo_) {
         final AtomicInteger fcount = new AtomicInteger();

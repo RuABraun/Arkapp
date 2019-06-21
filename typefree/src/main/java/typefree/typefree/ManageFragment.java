@@ -48,6 +48,7 @@ public class ManageFragment extends Fragment {
     private MainActivity act;
     private ProgressBar pb;
     private Runnable runnable;
+    private Observer<List<AFile>> observer;
     Runnable r;
 
     public ManageFragment() {
@@ -72,7 +73,13 @@ public class ManageFragment extends Fragment {
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
         recview.setHasFixedSize(true);
-        fviewmodel.getAllFiles().observe(act, new Observer<List<AFile>>() {
+        return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        observer = new Observer<List<AFile>>() {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
                 adapter.setData(aFiles);
@@ -88,13 +95,15 @@ public class ManageFragment extends Fragment {
                     }
                 });
             }
-        });
-        return view;
+        };
+        fviewmodel.getAllFiles().observe(act, observer);
+
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public void onStop() {
+        super.onStop();
+        fviewmodel.getAllFiles().removeObserver(observer);
     }
 
     class ConvertAudioRunnable implements Runnable {
