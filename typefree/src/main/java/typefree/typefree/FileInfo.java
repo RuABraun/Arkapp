@@ -21,6 +21,7 @@ import android.text.Layout;
 import android.text.Spannable;
 import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -73,17 +74,15 @@ public class FileInfo extends Fragment {
     private TextWatcher title_textWatcher, text_textWatcher;
     private ImageView playView, fileViewHolder;
     private int playView_offset;
-    private int ed_transtext_bottom_margin;
+    private int fileholder_bottom_margin;
     private int vs_top_margin;
     private MainActivity act;
     private View fview;
-    private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
     private ImageView cursortick, opts_menu;
     private boolean showingKeyboard = false;
     private boolean hidingKeyboard = false;
     private Toolbar toolbar;
     private boolean title_in_focus = false;
-
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -456,6 +455,7 @@ public class FileInfo extends Fragment {
                 act.h_main.removeCallbacks(seekbar_runnable);
             }
         });
+        mPlayer.setVolume(1.0f, 1.0f);
         mPlayer.start();
     }
 
@@ -505,7 +505,7 @@ public class FileInfo extends Fragment {
             imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
 
             ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-            fv_lay_params.bottomMargin = ed_transtext_bottom_margin;
+            fv_lay_params.bottomMargin = fileholder_bottom_margin;
             fileViewHolder.invalidate();
             fileViewHolder.requestLayout();
         }
@@ -567,13 +567,7 @@ public class FileInfo extends Fragment {
             cursortick.animate().translationY(playView_offset);
             mSeekBar.animate().translationY(playView_offset);
             fileinfo_ed_title.setVisibility(View.INVISIBLE);
-            editButton.animate().translationY(280);
-            editButton.animate().translationX(18);
-            fileViewHolder.animate().translationY(8);
-//            viewSwitcher.animate().translationY(fileViewHolder.getTop() - viewSwitcher.getTop() + 44);
 
-            viewSwitcher.invalidate();
-            viewSwitcher.requestLayout();
 
         } else {
             // TODO: crashes when called on text that was edited!!
@@ -584,8 +578,6 @@ public class FileInfo extends Fragment {
             mediaButton.animate().translationY(0);
             tv_fduration.animate().translationY(0);
             mSeekBar.animate().translationY(0);
-            editButton.animate().translationY(0);
-            editButton.animate().translationX(0);
             cursortick.animate().translationY(0);
             fileViewHolder.animate().translationY(0);
             cursortick.animate().translationX(0);
@@ -598,7 +590,8 @@ public class FileInfo extends Fragment {
             hidingKeyboard = true;
 
             ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-            fv_lay_params.bottomMargin = ed_transtext_bottom_margin;
+            Log.i("APP", "length " + fileholder_bottom_margin);
+            fv_lay_params.bottomMargin = fileholder_bottom_margin;
             fileViewHolder.invalidate();
             fileViewHolder.requestLayout();
 
@@ -683,31 +676,31 @@ public class FileInfo extends Fragment {
         };
         fileinfo_ed_title.addTextChangedListener(title_textWatcher);
 
-        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-
-                Rect r = new Rect();
-                fview.getWindowVisibleDisplayFrame(r);
-                int screenheight = fview.getRootView().getHeight();
-                int height_diff = screenheight - (r.bottom - r.top);
-                if (height_diff > 120 && !hidingKeyboard) {
-                    if (!showingKeyboard) {
-                        ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-                        ConstraintLayout.LayoutParams pv_lay_params = (ConstraintLayout.LayoutParams) playView.getLayoutParams();
-                        showingKeyboard = true;
-                        ed_transtext_bottom_margin = fv_lay_params.bottomMargin;
-                        fv_lay_params.bottomMargin = height_diff - pv_lay_params.height;
-                        fileViewHolder.invalidate();
-                        fileViewHolder.requestLayout();
-                    }
-                } else {
-                    hidingKeyboard = false;
-                }
-
-            }
-        };
-        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
+//        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
+//            @Override
+//            public void onGlobalLayout() {
+//
+//                Rect r = new Rect();
+//                fview.getWindowVisibleDisplayFrame(r);
+//                int screenheight = fview.getRootView().getHeight();
+//                int height_diff = screenheight - (r.bottom - r.top);
+//                if (height_diff > 120 && !hidingKeyboard) {
+//                    if (!showingKeyboard) {
+//                        ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+//                        ConstraintLayout.LayoutParams pv_lay_params = (ConstraintLayout.LayoutParams) playView.getLayoutParams();
+//                        showingKeyboard = true;
+//                        ed_transtext_bottom_margin = fv_lay_params.bottomMargin;
+//                        fv_lay_params.bottomMargin = height_diff - pv_lay_params.height;
+//                        fileViewHolder.invalidate();
+//                        fileViewHolder.requestLayout();
+//                    }
+//                } else {
+//                    hidingKeyboard = false;
+//                }
+//
+//            }
+//        };
+//        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
     }
 
     @Override
@@ -723,8 +716,20 @@ public class FileInfo extends Fragment {
             ed_trans_runnable.run();
         }
         fileinfo_ed_title.removeTextChangedListener(title_textWatcher);
-        fview.getViewTreeObserver().removeOnGlobalLayoutListener(layoutListener);
     }
 
+    public void resize_views(int height) {
+        // is called twice per action for some reason
+        if (height > 100) {
+            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+            if (mainview_layout.bottomMargin < 100) {
+                fileholder_bottom_margin = mainview_layout.bottomMargin;
+            }
+            Log.i("APP", "setlength " + fileholder_bottom_margin + " height " + height);
+            mainview_layout.bottomMargin = height - 100;
+            fileViewHolder.invalidate();
+            fileViewHolder.requestLayout();
+        }
+    }
 }
 

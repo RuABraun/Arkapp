@@ -9,16 +9,16 @@
     android:focusable="false"
     android:focusableInTouchMode="true"
     tools:context="typefree.typefree.MainActivity"
-    android:background="@color/colorPrimary" >
+    android:background="@color/colorPrimary">
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
         android:layout_marginEnd="28dp"
         android:layout_marginStart="28dp"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="0dp"
         android:src="@drawable/transtext"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -88,11 +88,11 @@
         android:focusable="true"
         android:onClick="recordSwitch"
         android:scaleType="center"
+        android:src="@drawable/mic_full_inv"
         app:borderWidth="2dp"
         app:layout_constraintBottom_toBottomOf="@+id/imageView"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:srcCompat="@drawable/mic_full_inv" />
+        app:layout_constraintStart_toStartOf="parent" />
 
 
     <android.support.design.widget.FloatingActionButton
@@ -111,7 +111,7 @@
         app:layout_constraintBottom_toBottomOf="@+id/button_rec"
         app:layout_constraintEnd_toEndOf="parent"
         app:pressedTranslationZ="12dp"
-        app:srcCompat="@drawable/edit" />
+        android:src="@drawable/edit" />
 
 
     <android.support.design.widget.FloatingActionButton
@@ -129,7 +129,7 @@
         app:borderWidth="1dp"
         app:layout_constraintBottom_toTopOf="@+id/progressBar"
         app:layout_constraintEnd_toEndOf="@+id/button_edit"
-        app:srcCompat="@drawable/copy_c" />
+        android:src="@drawable/copy_c" />
 
 
     <ProgressBar
@@ -157,7 +157,7 @@
         app:borderWidth="1dp"
         app:layout_constraintBottom_toTopOf="@+id/button_copy"
         app:layout_constraintEnd_toEndOf="@+id/button_copy"
-        app:srcCompat="@drawable/share_c" />
+        android:src="@drawable/share_c" />
 
     <TextView
         android:id="@+id/textview_init_setup"
@@ -202,7 +202,7 @@
         app:borderWidth="1dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/button_edit"
-        app:srcCompat="@drawable/delete_c" />
+        android:src="@drawable/delete_c" />
 
     <TextView
         android:id="@+id/tv_counter"

@@ -50,19 +50,16 @@ import static typefree.typefree.Base.rmodeldir;
 
 
 
-public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> implements Filterable {
+public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private volatile List<AFile> data_;
-    private List<ListItem> data_grouped_ = new ArrayList<>();
-    private List<AFile> data_filtered_;
+    private volatile List<ListItem> data_grouped_ = new ArrayList<>();
     private LayoutInflater mInflater;
     private MainActivity context;
     private FileRepository f_repo;
     private FragmentManager fragmentManager;
     private Thread t;
     private boolean recog_done = false;
-    public boolean init_done = false;
     private Runnable runnable;
-    private Runnable runnable_b;
 
     MyRecyclerAdapter(Context ctx, FileRepository f_repo, FragmentManager fragmentManager) {
         this.context = (MainActivity) ctx;
@@ -89,6 +86,8 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder viewHolder, int pos) {
+        int oldpos = pos;
+        pos = viewHolder.getAdapterPosition();
         int itemType = getItemType(pos);
         switch (itemType ) {
             case ListItem.TYPE_AFILE: {
@@ -125,7 +124,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public int getItemCount() {
-        if (data_filtered_ != null) {
+        if (data_ != null) {
             return data_grouped_.size();
         } else {
             return 0;
@@ -233,7 +232,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                         @Override
                         public boolean onMenuItemClick(MenuItem item) {
-                            final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);;
+                            final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
@@ -261,7 +260,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                             .setMessage("Are you sure?")
                                             .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
                                                 public void onClick(DialogInterface dialog, int which) {
-                                                    delete(afile_to_use);
+                                                    delete(afile_to_use, curr_pos);
                                                     dialog.dismiss();
                                                 }
                                             }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -311,151 +310,128 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     }
 
-    void delete(AFile afile) {
+    void delete(AFile afile, int idx) {
         f_repo.delete(afile);
-        ArrayList<AFile> all_data = new ArrayList<>();
-        for (AFile a_afile : data_) {
-            if (!a_afile.fname.equals(afile.fname)) {
-                Log.i("APP", "fname " + a_afile.fname);
-                all_data.add(a_afile);
-            }
-        }
-        data_ = all_data;
-        Log.i("APP", "delete: data has size " + data_.size());
+        data_.remove(idx);
         setData(data_);
+        Log.i("APP", "delete: data has size " + data_.size());
+        notifyDataSetChanged();
         Toast.makeText(context, afile.title + " deleted.", Toast.LENGTH_SHORT).show();
     }
 
 
     void setData(final List<AFile> data) {
-        if (data_ != null) {
-            Log.i("APP", "data has size " + data_.size());
+        if (data != null) {
+            Log.i("APP", "data has size " + data.size());
         }
-        context.h_background.post(new Runnable() {
-            @Override
-            public void run() {
-                Collections.sort(data, new Comparator<AFile>() {
-                    @Override
-                    public int compare(AFile lhs, AFile rhs) {
-                        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
-                        Date left_date = null;
-                        try {
-                            left_date = sdf.parse(lhs.date);
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        Date right_date = null;
-                        try {
-                            right_date = sdf.parse(rhs.date);
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        return right_date.compareTo(left_date);
-                    }
-                });
-                data_ = data;
-                data_filtered_ = data;
 
+        Collections.sort(data, new Comparator<AFile>() {
+            @Override
+            public int compare(AFile lhs, AFile rhs) {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
-                boolean passedmonday = false;
-                if (data_filtered_ == null) {
-                    data_grouped_ = null;
-                    return;
+                Date left_date = null;
+                try {
+                    left_date = sdf.parse(lhs.date);
+                } catch (ParseException e) {
+                    e.printStackTrace();
                 }
-                data_grouped_.clear();
-                Date lastdate = null;
-                for (int i = 0; i < data_filtered_.size(); i++) {
-                    Date date = null;
-                    AFile afile = data_filtered_.get(i);
-                    try {
-                        date = sdf.parse(afile.date);
-                    } catch (ParseException e) {
-                        e.printStackTrace();
-                    }
-
-                    if (i > 0) {
-                        Calendar c = Calendar.getInstance();
-                        c.setTime(date);
-                        int n = c.get(Calendar.WEEK_OF_YEAR);
-                        Calendar clast = Calendar.getInstance();
-                        clast.setTime(lastdate);
-                        int lastn = clast.get(Calendar.WEEK_OF_YEAR);
-
-                        if (n != lastn) {
-                            Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
-                            mondayDate.setTime(lastdate);
-                            while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                                mondayDate.add(Calendar.DATE, -1);
-                            }
-                            Date divdate = mondayDate.getTime();
-                            SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
-                            String str_divdate = sdf_.format(divdate);
-                            DivItem div = new DivItem(str_divdate);
-                            data_grouped_.add(div);
-
-                            if (n - 2 >= lastn) {
-                                Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
-                                mondayDate2.setTime(date);
-                                while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                                    mondayDate2.add(Calendar.DATE, 1);
-                                }
-                                Date divdate2 = mondayDate2.getTime();
-                                String str_divdate2 = sdf_.format(divdate2);
-                                DivItem div2 = new DivItem(str_divdate2);
-                                data_grouped_.add(div2);
-                            }
-                        }
-                    }
-                    Log.i("APP", "group fname " + afile.fname);
-                    data_grouped_.add(afile);
-                    lastdate = date;
+                Date right_date = null;
+                try {
+                    right_date = sdf.parse(rhs.date);
+                } catch (ParseException e) {
+                    e.printStackTrace();
                 }
-
-                init_done = true;
+                return right_date.compareTo(left_date);
             }
         });
+        data_ = data;
 
-        context.h_main.post(new Runnable() {
-            @Override
-            public void run() {
-                runnable_b = this;
-                if (!init_done) {
-                    context.h_main.postDelayed(runnable_b, 50);
-                } else {
-                    notifyDataSetChanged();
-                }
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE dd/MM/yyyy HH:mm", Locale.getDefault());
+        if (data_ == null) {
+            data_grouped_ = null;
+            return;
+        }
+        Date lastdate = null;
+        ArrayList<ListItem> data_buffer = new ArrayList<>();
+        for (int i = 0; i < data_.size(); i++) {
+            Date date = null;
+            AFile afile = data_.get(i);
+            try {
+                date = sdf.parse(afile.date);
+            } catch (ParseException e) {
+                e.printStackTrace();
             }
-        });
-    }
 
-    @Override
-    public Filter getFilter() {
-        return new Filter() {
-            @Override
-            protected FilterResults performFiltering(CharSequence char_seq) {
-                String cString = char_seq.toString();
-                if (cString.isEmpty()) {
-                    data_filtered_ = data_;
-                } else {
-                    ArrayList<AFile> filtered_list = new ArrayList<AFile>();
-                    for (AFile afile : data_) {
-                        if (afile.title.contains(cString)) {
-                            filtered_list.add(afile);
-                        }
+            if (i > 0) {
+                Calendar c = Calendar.getInstance();
+                c.setTime(date);
+                int n = c.get(Calendar.WEEK_OF_YEAR);
+                Calendar clast = Calendar.getInstance();
+                clast.setTime(lastdate);
+                int lastn = clast.get(Calendar.WEEK_OF_YEAR);
+
+                if (n != lastn) {
+                    Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
+                    mondayDate.setTime(lastdate);
+                    while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                        mondayDate.add(Calendar.DATE, -1);
                     }
-                    data_filtered_ = filtered_list;
+                    Date divdate = mondayDate.getTime();
+                    SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
+                    String str_divdate = sdf_.format(divdate);
+                    DivItem div = new DivItem(str_divdate);
+                    data_buffer.add(div);
+
+                    if (n - 2 >= lastn) {
+                        Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
+                        mondayDate2.setTime(date);
+                        while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                            mondayDate2.add(Calendar.DATE, 1);
+                        }
+                        Date divdate2 = mondayDate2.getTime();
+                        String str_divdate2 = sdf_.format(divdate2);
+                        DivItem div2 = new DivItem(str_divdate2);
+                        data_buffer.add(div2);
+                    }
                 }
-
-                FilterResults filterResults = new FilterResults();
-                filterResults.values = data_filtered_;
-                return filterResults;
             }
+            data_buffer.add(afile);
+            lastdate = date;
+        }
+        data_grouped_ = data_buffer;
 
-            @Override
-            protected void publishResults(CharSequence char_seq, FilterResults filterResults) {
-                data_filtered_ = (ArrayList<AFile>) filterResults.values;
-                notifyDataSetChanged();
-            }
-        };
+        notifyDataSetChanged();
+
     }
+
+//    @Override
+//    public Filter getFilter() {
+//        return new Filter() {
+//            @Override
+//            protected FilterResults performFiltering(CharSequence char_seq) {
+//                String cString = char_seq.toString();
+//                if (cString.isEmpty()) {
+//                    data_filtered_ = data_;
+//                } else {
+//                    ArrayList<AFile> filtered_list = new ArrayList<AFile>();
+//                    for (AFile afile : data_) {
+//                        if (afile.title.contains(cString)) {
+//                            filtered_list.add(afile);
+//                        }
+//                    }
+//                    data_filtered_ = filtered_list;
+//                }
+//
+//                FilterResults filterResults = new FilterResults();
+//                filterResults.values = data_filtered_;
+//                return filterResults;
+//            }
+//
+//            @Override
+//            protected void publishResults(CharSequence char_seq, FilterResults filterResults) {
+//                data_filtered_ = (ArrayList<AFile>) filterResults.values;
+//                notifyDataSetChanged();
+//            }
+//        };
+//    }
 }

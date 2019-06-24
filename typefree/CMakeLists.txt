@@ -92,12 +92,6 @@ include_directories("/home/seni/git/prebuilt-libz/android-${ANDROID_ABI}/include
 
 include_directories(/home/seni/git/QNNPACK/include /home/seni/git/QNNPACK/deps/clog/include /home/seni/git/QNNPACK/deps/pthreadpool/include /home/seni/git/QNNPACK/deps/cpuinfo/include)
 
-# pytorch
-set (TORCHPATH "/home/seni/git/pytorch-android/build_android/${ANDROID_ABI}")
-include_directories(${TORCHPATH}/include)
-include_directories("/home/seni/git/pytorch-android/aten/src")
-include_directories("/home/seni/git/pytorch-android")
-
 
 target_link_libraries( # Specifies the target library.
                        rec-engine android oboe libtensorflowLite flatbuffer
@@ -122,9 +116,6 @@ target_link_libraries( # Specifies the target library.
                         /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libavcodec.a
                         /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libavformat.a
                         /home/seni/androidffmpeg/android/${ANDROID_ABI}/home/seni/androidffmpeg/android/${ANDROID_ABI}/lib/libswresample.a
-
-                        ${TORCHPATH}/lib/libtorch.a ${TORCHPATH}/lib/libc10.a ${TORCHPATH}/lib/libprotobuf.a ${TORCHPATH}/lib/libnnpack.a
-                        ${TORCHPATH}/lib/libonnx.a ${TORCHPATH}/lib/libonnxifi_loader.a ${TORCHPATH}/lib/libonnx_proto.a ${TORCHPATH}/lib/libcaffe2_protos.a
 
                        # Links the target library to the log library
                        # included in the NDK.

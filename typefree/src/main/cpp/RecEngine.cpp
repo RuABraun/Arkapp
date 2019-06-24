@@ -123,11 +123,11 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 30, 3),
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
                                             tot_num_frames_decoded(0) {
-    start_logger();
+    //start_logger();
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -288,7 +288,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 30, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -373,14 +373,16 @@ void RecEngine::write_to_wav(int32 num_frames) {
 }
 
 void RecEngine::recognition_loop() {
-//    Timer timer_rnn;
+
     Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
     while(recognition_on) {
+        double timetaken;
         if (do_recognition) {
             tt.Reset();
             decoder->AdvanceDecoding();
+            LOGI("adv dec time %f", tt.Elapsed());
             if (decoder->isStopTime(silence_phones, trans_model, 3)) {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
                 tot_num_frames_decoded += num_frames_decoded;
@@ -408,8 +410,12 @@ void RecEngine::recognition_loop() {
 
                 outtext = tmpstr;
             }
-            LOGI("Decode time %f", tt.Elapsed());
+            timetaken = tt.Elapsed();
+            LOGI("Total decode time %f", timetaken);
             do_recognition = false;
+        }
+        if (timetaken < 0.1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
     }
 }
@@ -451,13 +457,12 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     do_recognition = false;  // this is to prevent recognition from starting while appending data
     SubVector<float> data(fp_audio, numFrames);
     feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
-    do_recognition = true;
 
     for (int i = 0; i < numFrames; i++) {
         val = fp_audio[i];
         int_audio[i] = static_cast<int16_t>(val + 0.5f);
     }
-
+    do_recognition = true;
     f.write((char*) &int_audio[0], numFrames * 2);
 
 //    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
@@ -518,7 +523,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::string text = prettify_text(words, words_split, indcs_kept, true);
 
     outtext = "";
-    const_outtext = const_outtext + text;
+    const_outtext = const_outtext + "\n" + text;
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();

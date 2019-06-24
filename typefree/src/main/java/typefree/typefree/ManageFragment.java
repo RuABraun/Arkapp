@@ -46,7 +46,6 @@ public class ManageFragment extends Fragment {
     MyRecyclerAdapter adapter;
     private FileViewModel fviewmodel;
     private MainActivity act;
-    private ProgressBar pb;
     private Runnable runnable;
     private Observer<List<AFile>> observer;
     Runnable r;
@@ -68,11 +67,9 @@ public class ManageFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_manage, container, false);
-        pb = view.findViewById(R.id.load_manage);
         RecyclerView recview = view.findViewById(R.id.rv_files);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
-        recview.setHasFixedSize(true);
         return view;
     }
 
@@ -83,17 +80,6 @@ public class ManageFragment extends Fragment {
             @Override
             public void onChanged(@Nullable List<AFile> aFiles) {
                 adapter.setData(aFiles);
-                act.h_main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        runnable = this;
-                        if (adapter.init_done) {
-                            pb.setVisibility(View.INVISIBLE);
-                        } else {
-                            act.h_main.postDelayed(runnable, 50);
-                        }
-                    }
-                });
             }
         };
         fviewmodel.getAllFiles().observe(act, observer);

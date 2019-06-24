@@ -59,19 +59,16 @@ public class MainFragment extends Fragment {
     private ProgressBar spinner;
     Thread t_stoptrans, t_starttrans;
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
-    private float ed_trans_to_edit_button_distance;
     private boolean is_editing = false, just_closed = false;
     private ProgressBar pb_init;
     private TextView tv_init, tv_counter;
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
-    private ViewTreeObserver.OnGlobalLayoutListener layoutListener;
-    private boolean showingKeyboard = false;
-    private boolean hidingKeyboard = false;
     private View fview;
     ObjectAnimator pulse;
     Timer time_counter;
+    int fab_rec_botmargin;
 
     public MainFragment() {
         // Required empty public constructor
@@ -184,7 +181,6 @@ public class MainFragment extends Fragment {
         int screenHeight = dm.heightPixels;
 
         Log.i("APP", "height " + screenHeight + " " + dm.density);
-        ed_trans_to_edit_button_distance = (screenHeight / dm.density) - 2 * ed_title.getMeasuredHeight();
     }
 
 
@@ -230,30 +226,6 @@ public class MainFragment extends Fragment {
             };
             ed_title.addTextChangedListener(title_textWatcher);
         }
-//        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-//            @Override
-//            public void onGlobalLayout() {
-//
-//                Rect r = new Rect();
-//                fview.getWindowVisibleDisplayFrame(r);
-//                int screenheight = fview.getRootView().getHeight();
-//                int height_diff = screenheight - (r.bottom - r.top);
-//                Log.i("APP", "heightdiff " + height_diff);
-//                if (height_diff > 120 && !hidingKeyboard) {
-//                    if (!showingKeyboard) {
-//                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-//                        showingKeyboard = true;
-//                        mainview_layout.bottomMargin = act.keyboard_height;
-//                        img_view.invalidate();
-//                        img_view.requestLayout();
-//                    }
-//                } else {
-//                    hidingKeyboard = false;
-//                }
-//
-//            }
-//        };
-//        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
     }
 
     @Override
@@ -273,7 +245,6 @@ public class MainFragment extends Fragment {
             act.h_main.removeCallbacks(trans_update_runnable);
         }
         ed_title.removeTextChangedListener(title_textWatcher);
-        fview.getViewTreeObserver().removeOnGlobalLayoutListener(layoutListener);
     }
 
 
@@ -296,16 +267,6 @@ public class MainFragment extends Fragment {
         curr_afile = act.f_repo.getById(id);  // has correct ID
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
         act.h_main.removeCallbacks(trans_update_runnable);
-        act.h_main.post(new Runnable() {
-            @Override
-            public void run() {
-                update_text();
-                fab_edit.animate().translationX(0f);
-                fab_copy.animate().translationX(0f);
-                fab_share.animate().translationX(0f);
-                fab_del.animate().translationX(0f);
-            }
-        });
         recognition_done = true;
     }
 
@@ -340,6 +301,10 @@ public class MainFragment extends Fragment {
             pulse.cancel();
             fab_rec.animate().translationX(offset);
             fab_rec.setImageResource(R.drawable.stop);
+            ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
+            fab_rec_botmargin = layoutParams.bottomMargin;
+            Log.i("APP", "set margin " + fab_rec_botmargin);
+            layoutParams.bottomMargin = layoutParams.bottomMargin + act.bottomNavigationView.getMeasuredHeight();
 
             ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
             final String fpath = filesdir + "tmpfile";
@@ -381,22 +346,35 @@ public class MainFragment extends Fragment {
                 }
             }, 0, 1000);
             tv_counter.setVisibility(View.VISIBLE);
+            act.bottomNavigationView.setVisibility(View.GONE);
         } else {
             time_counter.cancel();
-            tv_counter.setVisibility(View.INVISIBLE);
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
 
             act.h_main.postDelayed(new Runnable() {
                 public void run() {
                     trans_done_runnable=this;
-                    act.h_main.postDelayed(trans_done_runnable, 100);
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
                         fab_rec.setImageResource(R.drawable.mic_full_inv);
                         pulse.start();
                         spinner.setVisibility(View.INVISIBLE);
                         act.h_main.removeCallbacks(trans_done_runnable);
+                        fab_edit.animate().translationX(0f);
+                        fab_copy.animate().translationX(0f);
+                        fab_share.animate().translationX(0f);
+                        fab_del.animate().translationX(0f);
+                        update_text();
+                        tv_counter.setVisibility(View.INVISIBLE);
+                        act.bottomNavigationView.setVisibility(View.VISIBLE);
+                        ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
+                        Log.i("APP", "use margin " + fab_rec_botmargin + " old " + layoutParams.bottomMargin);
+                        layoutParams.bottomMargin = fab_rec_botmargin;
+                        fab_rec.invalidate();
+                        fab_rec.requestLayout();
+                    } else {
+                        act.h_main.postDelayed(trans_done_runnable, 100);
                     }
                 }
             }, 100);
@@ -549,8 +527,6 @@ public class MainFragment extends Fragment {
 
         } else {
             just_closed = false;
-            hidingKeyboard = true;
-            showingKeyboard = false;
             Log.i("APP", "DONE EDIT");
             act.h_background.removeCallbacks(trans_edit_runnable);
             if (trans_edit_runnable != null) {
@@ -591,7 +567,6 @@ public class MainFragment extends Fragment {
         int dp = (int) (height / dm.density);
         fab_edit.animate().translationY(-dp);
         ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-        showingKeyboard = true;
         mainview_layout.bottomMargin = height - 100;
         img_view.invalidate();
         img_view.requestLayout();

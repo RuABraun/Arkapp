@@ -394,6 +394,12 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             frag.resize_views(height);
             return;
         }
+        FileInfo fragb = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
+        if (fragb != null && fragb.isVisible()) {
+            fragb.resize_views(height);
+            return;
+        }
+
     }
 }
 
