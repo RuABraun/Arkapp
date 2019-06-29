@@ -86,7 +86,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder viewHolder, int pos) {
-        int oldpos = pos;
         pos = viewHolder.getAdapterPosition();
         int itemType = getItemType(pos);
         switch (itemType ) {

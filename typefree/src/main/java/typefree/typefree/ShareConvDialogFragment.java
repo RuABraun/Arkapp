@@ -12,7 +12,7 @@ import java.util.Arrays;
 
 public class ShareConvDialogFragment extends DialogFragment {
     private static String[] files_to_share = {"Transcript", "Audio file", "Timed transcript"};
-    ArrayList mSelectedItems;
+    ArrayList<Integer> mSelectedItems;
 
     public static ShareConvDialogFragment newInstance(String fname) {
         ShareConvDialogFragment frag = new ShareConvDialogFragment();
@@ -27,16 +27,20 @@ public class ShareConvDialogFragment extends DialogFragment {
         final String fname = getArguments().getString("fname");
 
         final boolean[] checked = {true, false, false};
-        mSelectedItems = new ArrayList<>(Arrays.asList(0));
+        mSelectedItems = new ArrayList<>(3);
+        while(mSelectedItems.size() < 3) mSelectedItems.add(0);
+        mSelectedItems.set(0, 1);
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Choose files to share").setMultiChoiceItems(files_to_share, checked ,
+        builder.setTitle("Choose files to share").setMultiChoiceItems(files_to_share, checked,
                 new DialogInterface.OnMultiChoiceClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which, boolean isChecked) {
                         if (isChecked) {
-                            mSelectedItems.add(which);
+                            Log.i("APP", "added " + which);
+                            mSelectedItems.set(which, 1);
                         } else if (mSelectedItems.contains(which)) {
-                            mSelectedItems.remove(Integer.valueOf(which));
+                            Log.i("APP", "removed " + which);
+                            mSelectedItems.set(which, 0);
                         }
                     }
                 })

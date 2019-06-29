@@ -7,6 +7,7 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Environment;
 import android.os.SystemClock;
+import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -49,19 +50,33 @@ public class Base extends AppCompatActivity {
         Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
         shareIntent.setType("message/rfc822");
         ArrayList<Uri> files = new ArrayList<>();
-
-        int i = -1;
-        for(Object suffix : file_suffixes.values()) {
-            i++;
-            if (!checked.contains(i)) {
+        Log.i("APP", "Sharing files. " + Environment.getExternalStorageDirectory().getAbsolutePath());
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        for(int i = 0; i < 3; i++) {
+            String suffix;
+            if (i == 0) {
+                suffix = (String) file_suffixes.get("text");
+            } else if (i == 1) {
+                suffix = (String) file_suffixes.get("audio");
+            } else {
+                suffix = (String) file_suffixes.get("timed");
+            }
+            int val = (int) checked.get(i);
+            Log.i("APP", "idx " + i + " val " + val);
+            if (val == 0) {
                 Log.i("APP", "skipping " + suffix + " " + i);
                 continue;
             }
-            File f = new File(Base.filesdir, fname + suffix);
-            files.add(Uri.fromFile(f));
+            File f = new File(filesdir, fname + suffix);
+            Log.i("APP", "fpath " + f.getAbsolutePath());
+            if (f.exists()) {
+                Log.i("APP", "file exists!");
+            } else {
+                Log.i("APP", "NO!");
+            }
+            files.add(FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", f));
         }
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
     }
 

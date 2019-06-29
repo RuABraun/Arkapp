@@ -38,6 +38,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bugsnag.android.Bugsnag;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -125,6 +127,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     protected void onCreate(Bundle savedInstanceState) {
         setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
+        Bugsnag.init(this);
 
         setContentView(R.layout.activity_main);
 

@@ -27,7 +27,7 @@
             android:screenOrientation="portrait"/>
 
         <provider
-            android:authorities="typefree.typefree"
+            android:authorities="typefree.typefree.provider"
             android:name="android.support.v4.content.FileProvider"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -38,6 +38,13 @@
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
+        <meta-data
+            android:name="com.bugsnag.android.API_KEY"
+            android:value="5cc2d148734f14017ecd459b1cfc8917"/>
+        <meta-data android:name="com.bugsnag.android.DETECT_NDK_CRASHES"
+            android:value="true"/>
+        <meta-data android:name="com.bugsnag.android.DETECT_ANRS"
+            android:value="true"/>
     </application>
 
 </manifest>

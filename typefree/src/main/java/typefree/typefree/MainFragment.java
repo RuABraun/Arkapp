@@ -30,6 +30,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bugsnag.android.Bugsnag;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -133,7 +135,6 @@ public class MainFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-
         act.h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
@@ -539,7 +540,7 @@ public class MainFragment extends Fragment {
             fab_del.setVisibility(View.VISIBLE);
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            lay_params.bottomMargin = 0;
+            lay_params.bottomMargin = 8;
             img_view.invalidate();
             img_view.requestLayout();
             // everything already done in dispatchTouchEvent
