@@ -267,6 +267,7 @@ public class FileInfo extends Fragment {
                     public boolean onMenuItemClick(MenuItem item) {
                         switch (item.getItemId()) {
                             case R.id.IntShare:
+                                pausePlaying();
                                 ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile.fname);
                                 dialog.show(act.fragmentManager, "ShareDialog");
                                 return true;
@@ -278,6 +279,7 @@ public class FileInfo extends Fragment {
                                 Toast.makeText(getActivity(), "Copied", Toast.LENGTH_SHORT).show();
                                 return true;
                             case R.id.IntDelete:
+                                pausePlaying();
                                 AlertDialog.Builder builder = new AlertDialog.Builder(act);
                                 builder.setTitle("Confirm")
                                         .setMessage("Are you sure?")
