@@ -353,50 +353,54 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         Date lastdate = null;
         ArrayList<ListItem> data_buffer = new ArrayList<>();
         for (int i = 0; i < data_.size(); i++) {
-            Date date = null;
             AFile afile = data_.get(i);
-            try {
-                date = sdf.parse(afile.date);
-            } catch (ParseException e) {
-                e.printStackTrace();
-            }
-
-            if (i > 0) {
-                Calendar c = Calendar.getInstance();
-                c.setTime(date);
-                int n = c.get(Calendar.WEEK_OF_YEAR);
-                Calendar clast = Calendar.getInstance();
-                clast.setTime(lastdate);
-                int lastn = clast.get(Calendar.WEEK_OF_YEAR);
-
-                if (n != lastn) {
-                    Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
-                    mondayDate.setTime(lastdate);
-                    while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                        mondayDate.add(Calendar.DATE, -1);
-                    }
-                    Date divdate = mondayDate.getTime();
-                    SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
-                    String str_divdate = sdf_.format(divdate);
-                    DivItem div = new DivItem(str_divdate);
-                    data_buffer.add(div);
-
-                    if (n - 2 >= lastn) {
-                        Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
-                        mondayDate2.setTime(date);
-                        while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                            mondayDate2.add(Calendar.DATE, 1);
-                        }
-                        Date divdate2 = mondayDate2.getTime();
-                        String str_divdate2 = sdf_.format(divdate2);
-                        DivItem div2 = new DivItem(str_divdate2);
-                        data_buffer.add(div2);
-                    }
-                }
-            }
             data_buffer.add(afile);
-            lastdate = date;
         }
+//        for (int i = 0; i < data_.size(); i++) {
+//            Date date = null;
+//            AFile afile = data_.get(i);
+//            try {
+//                date = sdf.parse(afile.date);
+//            } catch (ParseException e) {
+//                e.printStackTrace();
+//            }
+//
+//            if (i > 0) {
+//                Calendar c = Calendar.getInstance();
+//                c.setTime(date);
+//                int n = c.get(Calendar.WEEK_OF_YEAR);
+//                Calendar clast = Calendar.getInstance();
+//                clast.setTime(lastdate);
+//                int lastn = clast.get(Calendar.WEEK_OF_YEAR);
+//
+//                if (n != lastn) {
+//                    Calendar mondayDate = Calendar.getInstance();  // not yet on Monday..
+//                    mondayDate.setTime(lastdate);
+//                    while (mondayDate.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+//                        mondayDate.add(Calendar.DATE, -1);
+//                    }
+//                    Date divdate = mondayDate.getTime();
+//                    SimpleDateFormat sdf_ = new SimpleDateFormat("EEE dd/MM/yyyy");
+//                    String str_divdate = sdf_.format(divdate);
+//                    DivItem div = new DivItem(str_divdate);
+//                    data_buffer.add(div);
+//
+//                    if (n - 2 >= lastn) {
+//                        Calendar mondayDate2 = Calendar.getInstance();  // not yet on Monday..
+//                        mondayDate2.setTime(date);
+//                        while (mondayDate2.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+//                            mondayDate2.add(Calendar.DATE, 1);
+//                        }
+//                        Date divdate2 = mondayDate2.getTime();
+//                        String str_divdate2 = sdf_.format(divdate2);
+//                        DivItem div2 = new DivItem(str_divdate2);
+//                        data_buffer.add(div2);
+//                    }
+//                }
+//            }
+//            data_buffer.add(afile);
+//            lastdate = date;
+//        }
         data_grouped_ = data_buffer;
 
         notifyDataSetChanged();
