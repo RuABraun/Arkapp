@@ -156,6 +156,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 return true;
             }
         });
+        // setting icon size?
         BottomNavigationView bottomNavigationView = findViewById(R.id.botNavig);
         BottomNavigationMenuView menuView = (BottomNavigationMenuView) bottomNavigationView.getChildAt(0);
         for (int i = 0; i < menuView.getChildCount(); i++) {

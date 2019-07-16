@@ -143,7 +143,7 @@ private:
     bool rnn_ready;
 
     // case model
-    int32 CASE_INNUM = 8;
+    int32 CASE_INNUM = 7;
     int32 CASE_OFFSET = 1;
     std::unique_ptr<tflite::FlatBufferModel> flatbuffer_model;
     std::unique_ptr<tflite::Interpreter> interpreter;

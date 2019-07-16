@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.support.annotation.Nullable;
 import android.app.Fragment;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -48,6 +49,7 @@ public class ManageFragment extends Fragment {
     private MainActivity act;
     private Runnable runnable;
     private Observer<List<AFile>> observer;
+    private FloatingActionButton fab_import;
     Runnable r;
 
     public ManageFragment() {
@@ -68,6 +70,7 @@ public class ManageFragment extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_manage, container, false);
         RecyclerView recview = view.findViewById(R.id.rv_files);
+        fab_import = view.findViewById(R.id.button_add);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
         return view;
