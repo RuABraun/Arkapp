@@ -25,7 +25,6 @@
         android:layout_height="52dp"
         android:layout_marginBottom="16dp"
         android:layout_marginEnd="32dp"
-        android:background="@drawable/border_white"
         android:backgroundTint="@color/colorPrimary"
         android:clickable="true"
         android:elevation="4dp"
@@ -35,6 +34,6 @@
         app:borderWidth="2dp"
         app:layout_constraintBottom_toBottomOf="@+id/rv_files"
         app:layout_constraintEnd_toEndOf="parent"
-        app:srcCompat="@drawable/circle" />
+        android:src="@drawable/circle" />
 
 </android.support.constraint.ConstraintLayout>

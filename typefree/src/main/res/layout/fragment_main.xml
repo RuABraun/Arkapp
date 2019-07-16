@@ -81,7 +81,6 @@
         android:layout_marginBottom="48dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
-        android:background="@drawable/border_white"
         android:backgroundTint="@color/colorPrimary"
         android:clickable="true"
         android:elevation="4dp"
@@ -94,13 +93,11 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/button_edit"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginEnd="8dp"
-        android:background="@drawable/border"
         android:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:elevation="4dp"
@@ -113,13 +110,11 @@
         app:pressedTranslationZ="12dp"
         android:src="@drawable/edit" />
 
-
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/button_copy"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginBottom="16dp"
-        android:background="@drawable/border"
         android:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:elevation="4dp"
@@ -192,7 +187,6 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginStart="8dp"
-        app:backgroundTint="#D50000"
         android:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:elevation="4dp"

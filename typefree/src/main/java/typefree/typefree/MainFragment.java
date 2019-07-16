@@ -144,8 +144,8 @@ public class MainFragment extends Fragment {
                     spinner.setVisibility(View.INVISIBLE);
                     act.h_main.removeCallbacks(runnable);
                     pulse = ObjectAnimator.ofPropertyValuesHolder(fab_rec,
-                            PropertyValuesHolder.ofFloat("scaleX", 1.1f),
-                            PropertyValuesHolder.ofFloat("scaleY", 1.1f));
+                            PropertyValuesHolder.ofFloat("scaleX", 1.15f),
+                            PropertyValuesHolder.ofFloat("scaleY", 1.15f));
                     pulse.setDuration(300);
                     pulse.setStartDelay(1000);
                     pulse.setRepeatCount(1);
