@@ -307,9 +307,6 @@ public class MainFragment extends Fragment {
             Log.i("APP", "set margin " + fab_rec_botmargin);
             layoutParams.bottomMargin = layoutParams.bottomMargin + act.bottomNavigationView.getMeasuredHeight();
 
-            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            Log.i("APP", "top margin " + mainview_layout.topMargin);
-
             ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
             final String fpath = filesdir + "tmpfile";
             t_starttrans = new Thread(new Runnable() {
@@ -352,8 +349,6 @@ public class MainFragment extends Fragment {
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
         } else {
-            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            Log.i("APP", "top margin " + mainview_layout.topMargin);
             time_counter.cancel();
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
@@ -379,8 +374,6 @@ public class MainFragment extends Fragment {
                         layoutParams.bottomMargin = fab_rec_botmargin;
                         fab_rec.invalidate();
                         fab_rec.requestLayout();
-                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-                        Log.i("APP", "top margin final " + mainview_layout.topMargin);
                     } else {
                         act.h_main.postDelayed(trans_done_runnable, 100);
                     }
@@ -405,7 +398,6 @@ public class MainFragment extends Fragment {
         String conststr = act.recEngine.get_const_text();
         String all = conststr + str;
         ed_transtext.setText(all, TextView.BufferType.EDITABLE);
-        ed_transtext.setSelection(all.length());
     }
 
     public void handle_touch_event(View v, MotionEvent event) {
