@@ -97,6 +97,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 String duration = Base.sec_to_timestr(elem.len_s);
                 holder.tv_flen.setText(duration);
                 holder.curr_pos = pos;
+                holder.spinner.setVisibility(View.INVISIBLE);
 
                 File txt_file = new File(Base.filesdir + elem.fname + Base.file_suffixes.get("text"));
                 if (txt_file.exists()) {
@@ -149,7 +150,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     public class AFileViewHolder extends RecyclerView.ViewHolder {
         TextView tv_fname, tv_flen, tv_date;
-        ImageButton button_opts, button_trans, button_img;
+        ImageButton button_opts, button_trans;
         final ProgressBar spinner;
         public View itemView;
         public int curr_pos;
@@ -179,7 +180,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
                     builder.setTitle("Transcribe audio file")
                             .setMessage("This is estimated to take: " + est_time + "\n\nThis will run in the background so" +
-                                    " you can switch to other apps while it runs, but your phone will run slower than normal.")
+                                    " probably you can switch to other apps while it runs, but your phone will run slower than normal (and if it does not work try not switching to other apps).")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final RecEngine recEngine = RecEngine.getInstance(rmodeldir);  // RISKY!! what if it was GCed and needs to be recreated?
@@ -238,7 +239,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     if (!f.exists()) {
                                         Log.i("APP", "File does not exist, title: " +
                                                 afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
-                                        Toast.makeText(context, "File does not exist!", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(context, "File does not exist! Maybe it still needs to be transcribed (mic button). Contact support for help.", Toast.LENGTH_SHORT).show();
                                         break;
                                     }
                                     Bundle bundle = new Bundle();
@@ -293,7 +294,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     if (!f.exists()) {
                         Log.i("APP", "File does not exist, title: " +
                                 afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
-                        Toast.makeText(context, "File does not exist! Contact support for help.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "File does not exist! Maybe it still needs to be transcribed (mic button). Contact support for help.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
