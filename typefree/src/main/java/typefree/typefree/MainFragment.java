@@ -307,6 +307,9 @@ public class MainFragment extends Fragment {
             Log.i("APP", "set margin " + fab_rec_botmargin);
             layoutParams.bottomMargin = layoutParams.bottomMargin + act.bottomNavigationView.getMeasuredHeight();
 
+            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            Log.i("APP", "top margin " + mainview_layout.topMargin);
+
             ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
             final String fpath = filesdir + "tmpfile";
             t_starttrans = new Thread(new Runnable() {
@@ -349,6 +352,8 @@ public class MainFragment extends Fragment {
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
         } else {
+            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            Log.i("APP", "top margin " + mainview_layout.topMargin);
             time_counter.cancel();
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
@@ -374,6 +379,8 @@ public class MainFragment extends Fragment {
                         layoutParams.bottomMargin = fab_rec_botmargin;
                         fab_rec.invalidate();
                         fab_rec.requestLayout();
+                        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+                        Log.i("APP", "top margin final " + mainview_layout.topMargin);
                     } else {
                         act.h_main.postDelayed(trans_done_runnable, 100);
                     }
@@ -411,11 +418,12 @@ public class MainFragment extends Fragment {
             int r = fab_edit.getLeft();
             if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) && is_editing) {
                 InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-                View view = act.getCurrentFocus();
-                if (view == null) {
-                    view = new View(act);
-                }
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+//                View view = act.getCurrentFocus();
+//                if (view == null) {
+//                    view = new View(act);
+//                }
+                Log.i("APP", "Closing keyboard.");
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
                 fab_edit.animate().translationY(0.f);
                 ed_transtext.clearFocus();
                 ed_transtext.setFocusableInTouchMode(false);
@@ -429,12 +437,13 @@ public class MainFragment extends Fragment {
             float x = event.getRawX() + w.getLeft() - scrcoords[0];
             float y = event.getRawY() + w.getTop() - scrcoords[1];
             if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom())) {
+                Log.i("APP", "Closing keyboard.");
                 InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-                View view = act.getCurrentFocus();
-                if (view == null) {
-                    view = new View(act);
-                }
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+//                View view = act.getCurrentFocus();
+//                if (view == null) {
+//                    view = new View(act);
+//                }
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
             }
         }
     }
@@ -538,9 +547,12 @@ public class MainFragment extends Fragment {
             fab_share.setVisibility(View.VISIBLE);
             fab_copy.setVisibility(View.VISIBLE);
             fab_del.setVisibility(View.VISIBLE);
+            fab_rec.setVisibility(View.VISIBLE);
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
             lay_params.bottomMargin = 8;
+            InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
             img_view.invalidate();
             img_view.requestLayout();
             // everything already done in dispatchTouchEvent
@@ -558,11 +570,11 @@ public class MainFragment extends Fragment {
         fab_share.animate().translationX(256f);
         fab_del.animate().translationX(-256f);
         ed_transtext.setText("", TextView.BufferType.EDITABLE);
-        ed_transtext.setSelection(0);
         edited_title = false;
     }
 
     public void resize_views(int height) {
+        Log.i("APP", "resizing");
         DisplayMetrics dm = new DisplayMetrics();
         act.getWindowManager().getDefaultDisplay().getMetrics(dm);
         int dp = (int) (height / dm.density);

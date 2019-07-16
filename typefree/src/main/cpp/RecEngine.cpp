@@ -523,7 +523,11 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::string text = prettify_text(words, words_split, indcs_kept, true);
 
     outtext = "";
-    const_outtext = const_outtext + "\n" + text;
+    if (const_outtext != "") {
+        const_outtext = const_outtext + "\n" + text;
+    } else {
+        const_outtext = text;
+    }
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
