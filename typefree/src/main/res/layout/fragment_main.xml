@@ -104,7 +104,7 @@
         android:focusable="true"
         android:onClick="onEditClick"
         android:scaleType="center"
-        app:borderWidth="1dp"
+        app:borderWidth="2dp"
         app:layout_constraintBottom_toBottomOf="@+id/button_rec"
         app:layout_constraintEnd_toEndOf="parent"
         app:pressedTranslationZ="12dp"

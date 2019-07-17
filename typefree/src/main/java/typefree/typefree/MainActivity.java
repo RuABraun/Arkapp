@@ -35,6 +35,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -59,8 +60,12 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     Handler h_background;
     private KeyboardHeightProvider keyboardHeightProvider;
     protected int keyboard_height;
+    private ProgressBar pb_init;
+    private TextView tv_init;
+    private boolean start_main;
 
-    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin");
+    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin", "id_mapping.int",
+            "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
     private String[] permissions = {Manifest.permission.RECORD_AUDIO,
@@ -68,8 +73,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private static final int REQUEST_PERMISSIONS_CODE = 200;
     protected PowerManager pm;
-    protected PowerManager.WakeLock wl;
     final String PREFS_NAME = "MyPrefsFile";
+    SharedPreferences settings;
 
     static {
         System.loadLibrary("rec-engine");
@@ -77,12 +82,10 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
     public native void native_load(AssetManager mgr, String rmodeldir);
 
-
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+        settings = getSharedPreferences(PREFS_NAME, 0);
 //        if (settings.getBoolean("is_first_time", true)) {
 //            pb_init.setVisibility(View.VISIBLE);
 //            tv_init.setVisibility(View.VISIBLE);
@@ -156,8 +159,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 return true;
             }
         });
+
         // setting icon size?
-        BottomNavigationView bottomNavigationView = findViewById(R.id.botNavig);
         BottomNavigationMenuView menuView = (BottomNavigationMenuView) bottomNavigationView.getChildAt(0);
         for (int i = 0; i < menuView.getChildCount(); i++) {
             final View iconView = menuView.getChildAt(i).findViewById(android.support.design.R.id.icon);
@@ -167,6 +170,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             layoutParams.width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 32, displayMetrics);
             iconView.setLayoutParams(layoutParams);
         }
+
+        pb_init = findViewById(R.id.pb_init);
+        tv_init = findViewById(R.id.tv_init);
 
         // Handle permissions
         ArrayList<String> need_permissions = new ArrayList<>();
@@ -208,9 +214,13 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             if (!mf.exists()) all_exist = false;
         }
         if (!all_exist) {
+            start_main = false;
             Log.i("APP", "before getasset");
             mgr = getResources().getAssets();
             Log.i("APP", "extracting");
+            pb_init.setVisibility(View.VISIBLE);
+            tv_init.setVisibility(View.VISIBLE);
+            bottomNavigationView.setVisibility(View.INVISIBLE);
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -218,9 +228,25 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                     recEngine = RecEngine.getInstance(rmodeldir);
                 }
             });
-            t.setPriority(6);
+            t.setPriority(7);
             t.start();
+            h_main.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (RecEngine.isready) {
+                        start_main = true;
+                        Log.i("APP", "main is ready to go");
+                        bottomNavigationView.setSelectedItemId(R.id.Transcribe);
+                        tv_init.setVisibility(View.INVISIBLE);
+                        pb_init.setVisibility(View.INVISIBLE);
+                        bottomNavigationView.setVisibility(View.VISIBLE);
+                    } else {
+                        h_main.postDelayed(this, 50);
+                    }
+                }
+            }, 100);
         } else {
+            start_main = true;
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -244,8 +270,10 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         handlerThread.start();
 
         do_asr_setup();
-        MainFragment frag = new MainFragment();
-        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").commit();
+        if (start_main) {
+            Log.i("APP", "Starting main fragment.");
+            bottomNavigationView.setSelectedItemId(R.id.Transcribe);
+        }
 
         h_background = new Handler(handlerThread.getLooper());
 
