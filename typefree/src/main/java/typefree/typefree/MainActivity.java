@@ -85,32 +85,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        settings = getSharedPreferences(PREFS_NAME, 0);
-//        if (settings.getBoolean("is_first_time", true)) {
-//            pb_init.setVisibility(View.VISIBLE);
-//            tv_init.setVisibility(View.VISIBLE);
-//            spinner.setVisibility(View.INVISIBLE);
-//            Log.i("APP", "Running for the first time.");
-//            t_del = new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    String[] dirs = {rmodeldir, filesdir};
-//                    for(String dir: dirs) {
-//                        File d = new File(dir);
-//                        File[] dirfiles = d.listFiles();
-//                        if (dirfiles != null) {
-//                            for (File fobj : dirfiles) {
-//                                fobj.delete();
-//                            }
-//                            d.delete();
-//                        }
-//                    }
-//                }
-//            });
-//            settings.edit().putBoolean("is_first_time", false).apply();
-//            t_del.setPriority(6);
-//            t_del.start();
-//        }
         switch (requestCode){
             case REQUEST_PERMISSIONS_CODE:
                 for(int i=0; i < grantResults.length; i++) {
@@ -135,6 +109,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         setContentView(R.layout.activity_main);
 
         fragmentManager = getFragmentManager();
+        settings = getSharedPreferences(PREFS_NAME, 0);
 
         bottomNavigationView = findViewById(R.id.botNavig);
         bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {

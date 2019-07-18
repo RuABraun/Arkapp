@@ -390,6 +390,10 @@ public class MainFragment extends Fragment {
             t_stoptrans.setPriority(8);
             t_stoptrans.start();
 
+            if (act.settings.getBoolean("knows_conv_save", true)) {
+                Toast.makeText(act, "The audio and transcript are saved by default.", Toast.LENGTH_SHORT).show();
+                act.settings.edit().putBoolean("knows_conv_save", false).apply();
+            }
         }
     }
 

@@ -73,6 +73,23 @@ public class ManageFragment extends Fragment {
         fab_import = view.findViewById(R.id.button_add);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
+
+        if (act.settings.getBoolean("knows_can_import", true)) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(act);
+            builder.setTitle("Info")
+                    .setMessage("Use the plus button to import audio or video files from your phone.")
+                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+            TextView tv = (TextView) alert.findViewById(android.R.id.message);
+            tv.setTextSize(18);
+            act.settings.edit().putBoolean("knows_can_import", false).apply();
+        }
         return view;
     }
 

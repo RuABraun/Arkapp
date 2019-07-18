@@ -120,6 +120,23 @@ public class FileInfo extends Fragment {
                 return true;
             }
         });
+
+        if (act.settings.getBoolean("knows_can_press", true)) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(act);
+            builder.setTitle("Info")
+                    .setMessage("Press on a word to start playing back the audio from when it was said.")
+                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+            TextView tv = (TextView) alert.findViewById(android.R.id.message);
+            tv.setTextSize(18);
+            act.settings.edit().putBoolean("knows_can_press", false).apply();
+        }
         this.fview = view;
         return view;
     }
