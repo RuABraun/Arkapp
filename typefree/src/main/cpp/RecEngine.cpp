@@ -159,7 +159,7 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     model_dir = modeldir;
     std::string nnet3_rxfilename = modeldir + "final.mdl",
             fst_rxfilename = modeldir + "HCLG.fst";
-    
+
     t_rnnlm = std::thread(&RecEngine::setupRnnlm, this, modeldir);
 
     decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
@@ -294,6 +294,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         decoder = new SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
 
+        tot_num_frames_decoded = 0;
         // Text output
         std::string ctmpath = fpath + "_timed.txt";
         os_ctm = fopen(ctmpath.c_str(), "wt");
@@ -381,10 +382,8 @@ void RecEngine::recognition_loop() {
         if (do_recognition) {
             tt.Reset();
             decoder->AdvanceDecoding();
-            LOGI("adv dec time %f", tt.Elapsed());
             if (decoder->isStopTime(silence_phones, trans_model, 3)) {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
-                tot_num_frames_decoded += num_frames_decoded;
                 LOGI("Stopped %f", num_frames_decoded * 3 / 100.f);
 
                 decoder->GetLattice(false, &finish_seg_clat);
@@ -394,7 +393,7 @@ void RecEngine::recognition_loop() {
 
                 t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
 
-                decoder->InitDecoding(tot_num_frames_decoded);
+                decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
             }
 
             if (decoder->NumFramesDecoded() > 0) {
@@ -527,15 +526,18 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
+    int32 time_offset_seconds = static_cast<int32>(tot_num_frames_decoded * 3 / 100.f);
     for(size_t j = 0; j < num_words; j++) {
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
         fwrite(" ", 1, 1, os_ctm);
-        std::string wtime = std::to_string(frame_shift * times[indcs_kept[j]]);
+        std::string wtime = std::to_string(time_offset_seconds + frame_shift * times[indcs_kept[j]]);
         size_t sz = wtime.find('.') + 2;
         fwrite(wtime.c_str(), 1, sz, os_ctm);
         fwrite("\n", 1, 1, os_ctm);
     }
+
+    tot_num_frames_decoded += num_out_frames;
 
     if (rnn_ready) {
         lm_to_add_orig->Clear();
