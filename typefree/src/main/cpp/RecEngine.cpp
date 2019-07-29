@@ -76,16 +76,18 @@ int start_logger()
 }
 
 
-void RecEngine::setupLex(std::string wsyms, std::string align_lex) {
+void RecEngine::setupRnnlm(std::string modeldir) {
+    rnn_ready = false;
+
+    std::string align_lex = modeldir + "align_lexicon.bin",
+            wsyms = modeldir + "words.txt";
     word_syms = SymbolTable::ReadText(wsyms);
     idx_sb = (int32) word_syms->Find("<sb>");
     std::vector<std::vector<int32>> lexicon;
     ReadLexiconForWordAlignBin(align_lex, &lexicon);
     lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
-}
+    LOGI("Done lexicons.");
 
-void RecEngine::setupRnnlm(std::string modeldir) {
-    rnn_ready = false;
     std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa",
             word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
             word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
@@ -95,7 +97,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     ReadKaldiObject(word_large_emb_fname, &word_emb_mat_large);
     ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
     ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
-    BaseFloat rnn_scale = 0.9f;
+    BaseFloat rnn_scale = 0.8f;
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
     carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
@@ -118,68 +120,9 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
     combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(carpa_lm_fst_subtract, lm_to_add);
 
-    LOGI("done setuprnnlm");
-    rnn_ready = true;
-}
-
-
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
-                                            sil_config(0.001f, ""),
-                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
-                                            tot_num_frames_decoded(0) {
-    //start_logger();
-    // ! -- ASR setup begin
-    fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
-    LOGI("Constructing rec");
-    start_logger();
-    model_dir = modeldir;
-    std::string nnet3_rxfilename = modeldir + "final.mdl",
-            fst_rxfilename = modeldir + "HCLG.fst",
-            align_lex = modeldir + "align_lexicon.bin",
-            wsyms = modeldir + "words.txt";
-
-    std::thread t(&RecEngine::setupLex, this, wsyms, align_lex);
-    t_rnnlm = std::thread(&RecEngine::setupRnnlm, this, modeldir);
-
-    decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
-
-    {
-        bool binary;
-        Input ki(nnet3_rxfilename, &binary);
-        trans_model.Read(ki.Stream(), binary);
-        am_nnet.Read(ki.Stream(), binary);
-
-        SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
-        SetDropoutTestMode(true, &(am_nnet.GetNnet()));
-        SetQuantTestMode(true, &(am_nnet.GetNnet()));
-//        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
-    }
-
-    left_context = am_nnet.LeftContext();
-    right_context = am_nnet.RightContext();
-    mFramesPerBurst = int32_t(1.5 * 0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
-
-    decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
-    feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);
-
-    {
-        std::ifstream is(modeldir + "silence.csl", std::ifstream::in);
-        if (!is.is_open()) KALDI_ERR << "No silence phones file";
-        while (std::getline(is, silence_phones)) {
-            break;
-        }
-    }
-    // ! -- AM setup end, doing RNN setup
-
     compose_opts = new ComposeLatticePrunedOptions(4.0, 900, 1.25, 75);
 
-    oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
-
-    fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-    int_audio = static_cast<int16_t*>(calloc(mFramesPerBurst, sizeof(int16_t)));
-
-    recognition_on = false;
-    do_recognition = false;
+    LOGI("done setuprnnlm");
 
     // Case model
     LOGI("Doing case");
@@ -200,7 +143,63 @@ RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
     casepos_zero_index = CASE_INNUM;
 
-    t.join();
+    LOGI("All ASR setup complete.");
+    rnn_ready = true;
+}
+
+
+RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
+                                            sil_config(0.001f, ""),
+                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
+                                            tot_num_frames_decoded(0) {
+    //start_logger();
+    // ! -- ASR setup begin
+    fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
+    LOGI("Constructing rec");
+    model_dir = modeldir;
+    std::string nnet3_rxfilename = modeldir + "final.mdl",
+            fst_rxfilename = modeldir + "HCLG.fst";
+    
+    t_rnnlm = std::thread(&RecEngine::setupRnnlm, this, modeldir);
+
+    decode_fst = ReadFstKaldiGeneric(fst_rxfilename);
+    LOGI("Read HCLG");
+    {
+        bool binary;
+        Input ki(nnet3_rxfilename, &binary);
+        trans_model.Read(ki.Stream(), binary);
+        am_nnet.Read(ki.Stream(), binary);
+
+        SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
+        SetDropoutTestMode(true, &(am_nnet.GetNnet()));
+        SetQuantTestMode(true, &(am_nnet.GetNnet()));
+//        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
+    }
+    LOGI("Done AM model.");
+    left_context = am_nnet.LeftContext();
+    right_context = am_nnet.RightContext();
+    mFramesPerBurst = int32_t(1.5 * 0.01f * fin_sample_rate_fp * ((float) (left_context + right_context) / 2 + 3));
+
+    decodable_info = new nnet3::DecodableNnetSimpleLoopedInfo(decodable_opts, &am_nnet);
+    feature_info = new OnlineNnet2FeaturePipelineInfo(feature_opts);
+
+    {
+        std::ifstream is(modeldir + "silence.csl", std::ifstream::in);
+        if (!is.is_open()) KALDI_ERR << "No silence phones file";
+        while (std::getline(is, silence_phones)) {
+            break;
+        }
+    }
+    // ! -- AM setup end, doing RNN setup
+    oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
+
+    fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
+    int_audio = static_cast<int16_t*>(calloc(mFramesPerBurst, sizeof(int16_t)));
+
+    recognition_on = false;  // when off recognition loop won't run
+    do_recognition = false;  // this is to prevent recognition from starting while appending data
+
+//    t.join();
     LOGI("Finished constructing rec");
 }
 
@@ -501,16 +500,13 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     TopSortCompactLatticeIfNeeded(&determinized_clat);
 
     CompactLattice best_path;
-    if (num_out_frames > 100) {
-        if (t_rnnlm.joinable()) t_rnnlm.join();
-        CompactLattice clat_rescored;
-        ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
-                                     const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                     &clat_rescored, max_ngram_order, true);
-        CompactLatticeShortestPath(clat_rescored, &best_path);
-    } else {
-        CompactLatticeShortestPath(determinized_clat, &best_path);
-    }
+
+    if (t_rnnlm.joinable()) t_rnnlm.join();
+    CompactLattice clat_rescored;
+    ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
+                                 const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                 &clat_rescored, max_ngram_order, true);
+    CompactLatticeShortestPath(clat_rescored, &best_path);
 
     CompactLattice aligned_clat;
     WordAlignLatticeLexicon(best_path, trans_model, *lexicon_info, opts, &aligned_clat);
