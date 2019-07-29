@@ -14,7 +14,7 @@
         android:layout_marginEnd="25dp"
         android:layout_marginStart="25dp"
         android:layout_marginTop="32dp"
-        android:text="Haven't gotten around to thinking about what settings to offer.. feel free to offer suggestions!"
+        android:text="Haven't gotten around to thinking about what settings to offer.. feel free to offer suggestions!\nGeneral feedback also very welcome of course."
         android:textSize="18sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"

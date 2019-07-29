@@ -123,7 +123,7 @@ public class FileInfo extends Fragment {
 
         if (act.settings.getBoolean("knows_can_press", true)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(act);
-            builder.setTitle("Info")
+            builder.setTitle("Tip!")
                     .setMessage("Press on a word to start playing back the audio from when it was said.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override

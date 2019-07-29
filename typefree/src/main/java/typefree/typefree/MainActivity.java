@@ -128,7 +128,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 }
                 if (item_id == R.id.Settings) {
                     Settings frag = new Settings();
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag).addToBackStack(null).commit();
+                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commit();
                     return true;
                 }
                 return true;

@@ -76,7 +76,7 @@ public class ManageFragment extends Fragment {
 
         if (act.settings.getBoolean("knows_can_import", true)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(act);
-            builder.setTitle("Info")
+            builder.setTitle("Tip!")
                     .setMessage("Use the plus button to import audio or video files from your phone.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override

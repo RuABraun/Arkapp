@@ -6,10 +6,12 @@ import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.support.constraint.ConstraintLayout;
@@ -182,6 +184,23 @@ public class MainFragment extends Fragment {
         int screenHeight = dm.heightPixels;
 
         Log.i("APP", "height " + screenHeight + " " + dm.density);
+
+        if (act.settings.getBoolean("knows_mic_location", true)) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(act);
+            builder.setTitle("Tip!")
+                    .setMessage("Point the microphone, typically at the bottom of your phone, towards the speaker (the closer the better).")
+                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+            TextView tv = (TextView) alert.findViewById(android.R.id.message);
+            tv.setTextSize(18);
+            act.settings.edit().putBoolean("knows_mic_location", false).apply();
+        }
     }
 
 
