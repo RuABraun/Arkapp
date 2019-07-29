@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.Layout;
@@ -53,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.lang.Math.abs;
+import static typefree.typefree.Base.sec_to_timestr;
 
 public class FileInfo extends Fragment {
 
@@ -79,10 +81,10 @@ public class FileInfo extends Fragment {
     private MainActivity act;
     private View fview;
     private ImageView cursortick, opts_menu;
-    private boolean showingKeyboard = false;
-    private boolean hidingKeyboard = false;
     private Toolbar toolbar;
     private boolean title_in_focus = false;
+    private int start_idx_colored = -1;
+    private int end_idx_colored = -1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -259,8 +261,10 @@ public class FileInfo extends Fragment {
                                 String word = original_words.get(i);
                                 int startidx = word_start_c_idx.get(i);
                                 int endidx = startidx + word.length();
-                                s.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorPrimary)),
+                                s.setSpan(new ForegroundColorSpan(ContextCompat.getColor(act, R.color.colorPrimary)),
                                         startidx, endidx, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                start_idx_colored = startidx;
+                                end_idx_colored = endidx;
                             }
                         }
                         return false;
@@ -343,7 +347,7 @@ public class FileInfo extends Fragment {
         tv.setText(afile.date);
         tv_fduration = getView().findViewById(R.id.file_duration);
         int file_len_s = afile.len_s;
-        tv_fduration.setText(String.valueOf(file_len_s));
+        tv_fduration.setText(sec_to_timestr(file_len_s));
 
         String fpath = Base.filesdir + afile.fname + Base.file_suffixes.get("text");
         String normal_text;
@@ -444,6 +448,12 @@ public class FileInfo extends Fragment {
         if (seekbar_runnable != null) {
             act.h_main.removeCallbacks(seekbar_runnable);
         }
+        if (start_idx_colored != -1) {
+            Spannable s = (Spannable) tv_transtext.getText();
+            s.setSpan(new ForegroundColorSpan(ContextCompat.getColor(act, R.color.colorText)),
+                    start_idx_colored, end_idx_colored, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+
         seekbar_runnable = new Runnable() {
             @Override
             public void run() {
@@ -518,8 +528,6 @@ public class FileInfo extends Fragment {
             title_in_focus = true;
         } else if (title_in_focus) {
             title_in_focus = false;
-            showingKeyboard = false;
-            hidingKeyboard = true;
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
 
@@ -604,9 +612,6 @@ public class FileInfo extends Fragment {
 
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
-
-            showingKeyboard = false;
-            hidingKeyboard = true;
 
             ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
             Log.i("APP", "length " + fileholder_bottom_margin);
