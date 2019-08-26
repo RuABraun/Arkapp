@@ -183,10 +183,16 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     " probably you can switch to other apps while it runs, but your phone will run slower than normal (and if it does not work try not switching to other apps).")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
-                                    final RecEngine recEngine = RecEngine.getInstance(rmodeldir);  // RISKY!! what if it was GCed and needs to be recreated?
+                                    final RecEngine recEngine = RecEngine.getInstance(rmodeldir, context.exclusiveCores);  // RISKY!! what if it was GCed and needs to be recreated?
                                     spinner.setVisibility(View.VISIBLE);
                                     button_trans.setVisibility(View.INVISIBLE);
                                     recog_done = false;
+                                    context.h_background.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Base.temper_performance(context, 60, 30, 15);
+                                        }
+                                    }, 500);
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
@@ -194,7 +200,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                             recog_done = true;
                                         }
                                     });
-                                    t.setPriority(7);
+                                    t.setPriority(9);
                                     t.start();
                                     context.h_main.post(new Runnable() {
                                         @Override

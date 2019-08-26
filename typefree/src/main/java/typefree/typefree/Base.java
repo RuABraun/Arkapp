@@ -6,6 +6,7 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
@@ -115,8 +116,61 @@ public class Base extends AppCompatActivity {
     public static int convertPixelsToDp(float px, Context context){
         Resources resources = context.getResources();
         DisplayMetrics metrics = resources.getDisplayMetrics();
-        int dp = (int) (px / (metrics.densityDpi / 160f));
+        int dp = (int) (px / (metrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT));
         return dp;
+    }
+
+    public static void temper_performance(final MainActivity act, int init_fast_run_time,
+                                          int slow_run_time, int fast_run_time) {
+        int i = 0;
+        while (RecEngine.isrunning) {
+            if (i == 0) {
+                try {
+                    Thread.sleep(init_fast_run_time * 1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    Thread.sleep(fast_run_time * 1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (act.pm.isSustainedPerformanceModeSupported()) {
+                act.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.i("APP", "turning sustainedperf on");
+                        act.getWindow().setSustainedPerformanceMode(true);
+                    }
+                });
+            }
+            try {
+                Thread.sleep((slow_run_time + i) * 1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (act.pm.isSustainedPerformanceModeSupported()) {
+                act.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.i("APP", "turning sustainedperf off");
+                        act.getWindow().setSustainedPerformanceMode(false);
+                    }
+                });
+            }
+            i += 2;
+        }
+        if (act.pm.isSustainedPerformanceModeSupported()) {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Log.i("APP", "Turning sustainedperf off for good");
+                    act.getWindow().setSustainedPerformanceMode(false);
+                }
+            });
+        }
     }
 }
 

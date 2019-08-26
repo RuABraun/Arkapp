@@ -49,10 +49,20 @@ JNIEXPORT void JNICALL Java_typefree_typefree_MainActivity_native_1load(JNIEnv* 
 }
 
 JNIEXPORT jlong JNICALL
-Java_typefree_typefree_RecEngine_native_1createEngine(JNIEnv *env, jobject, jstring jmodeldir) {
+Java_typefree_typefree_RecEngine_native_1createEngine(JNIEnv *env, jobject, jstring jmodeldir,
+                                                      jintArray exclusiveCores) {
+//    exclusiveCores.
+    std::vector<int> v;
+    jsize length = env->GetArrayLength(exclusiveCores);
+    jboolean isCopy;
+    jint* elements = env->GetIntArrayElements(exclusiveCores, &isCopy);
+    for (int i = 0; i < length; i++) {
+        v.push_back(elements[i]);
+    }
+
     const char* cstrb = env->GetStringUTFChars(jmodeldir, NULL);
     std::string modeldir = std::string(cstrb);
-    RecEngine* engine = new (std::nothrow) RecEngine(modeldir);
+    RecEngine* engine = new (std::nothrow) RecEngine(modeldir, v);
     return (jlong) engine;
 }
 
@@ -115,12 +125,20 @@ JNIEXPORT jstring JNICALL Java_typefree_typefree_RecEngine_native_1getText(JNIEn
 }
 
 JNIEXPORT jstring JNICALL Java_typefree_typefree_RecEngine_native_1getConstText(JNIEnv* env, jobject, jlong engineHandle) {
-    RecEngine *engine = (RecEngine*) engineHandle;
+    RecEngine *engine = (RecEngine *) engineHandle;
     if (engine == nullptr) {
         LOGE("Engine handle is invalid, call createHandle() to create a new one");
         return env->NewStringUTF("!ERROR");
     }
-    jstring jstr = env->NewStringUTF(engine->get_const_text());
+    int size = 0;
+    const char *ctext = engine->get_const_text(&size);
+    jstring jstr;
+    if (size == -1) {
+        const char *str = "";
+        jstr = env->NewStringUTF(str);
+    } else {
+        jstr = env->NewStringUTF(ctext);
+    }
     return jstr;
 }
 

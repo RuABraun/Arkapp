@@ -2,11 +2,14 @@ package typefree.typefree;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -40,6 +43,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bugsnag.android.Bugsnag;
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.install.model.AppUpdateType;
+import com.google.android.play.core.install.model.UpdateAvailability;
+import com.google.android.play.core.tasks.Task;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -64,7 +73,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     private TextView tv_init;
     private boolean start_main;
 
-    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "align_lexicon.bin", "id_mapping.int",
+    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int", "id_mapping.int",
             "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
@@ -75,6 +84,10 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     protected PowerManager pm;
     final String PREFS_NAME = "MyPrefsFile";
     SharedPreferences settings;
+    private AppUpdateManager appUpdateManager;
+    int update_request_code = 123;
+    private MainActivity baseact = this;
+    int exclusiveCores[] = {};
 
     static {
         System.loadLibrary("rec-engine");
@@ -200,7 +213,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 @Override
                 public void run() {
                     native_load(mgr, rmodeldir);
-                    recEngine = RecEngine.getInstance(rmodeldir);
+                    recEngine = RecEngine.getInstance(rmodeldir, exclusiveCores);
                 }
             });
             t.setPriority(7);
@@ -225,7 +238,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    recEngine = RecEngine.getInstance(rmodeldir);
+                    recEngine = RecEngine.getInstance(rmodeldir, exclusiveCores);
                 }
             });
             t.setPriority(7);
@@ -241,8 +254,51 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             finish();
             return;
         }
+
+        appUpdateManager = AppUpdateManagerFactory.create(this);
+        if (!settings.getBoolean("knows_is_first_start", true)) {
+            Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
+
+            appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
+                if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                        && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setTitle("Update available!").setMessage("An improved version of the app is available!\n" +
+                        "However, this may take a while to download and you can not use the app while doing so.\n" +
+                            "Do you want to update now?")
+                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            }).setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                            try {
+                                appUpdateManager.startUpdateFlowForResult(appUpdateInfo, AppUpdateType.IMMEDIATE,
+                                        baseact, update_request_code);
+                            } catch (IntentSender.SendIntentException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                    AlertDialog alert = builder.create();
+                    alert.show();
+                }
+            });
+        } else {
+            settings.edit().putBoolean("knows_conv_save", false).apply();
+        }
+
         handlerThread = new HandlerThread("BackgroundHandlerThread");
         handlerThread.start();
+
+        exclusiveCores = android.os.Process.getExclusiveCores();
+        Log.i("APP", "numcore " + exclusiveCores.length);
+        for(int i = 0; i < exclusiveCores.length; i++) {
+            Log.i("APP", "core " + exclusiveCores[i]);
+        }
 
         do_asr_setup();
         if (start_main) {
@@ -253,15 +309,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         h_background = new Handler(handlerThread.getLooper());
 
         pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        if (pm.isSustainedPerformanceModeSupported()) {
-            getWindow().setSustainedPerformanceMode(true);
-        }
-//        int exclusiveCores[] = {};
-//        exclusiveCores = android.os.Process.getExclusiveCores();
-//        Log.i("APP", "numcore " + exclusiveCores.length);
-//        for(int i = 0; i < exclusiveCores.length; i++) {
-//            Log.i("APP", "core " + exclusiveCores[i]);
-//        }
     }
 
     @Override
@@ -389,6 +436,16 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     @Override
     public void onResume() {
         super.onResume();
+        appUpdateManager.getAppUpdateInfo()
+                .addOnSuccessListener(appUpdateInfo -> {
+                    if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
+                        try {
+                            appUpdateManager.startUpdateFlowForResult(appUpdateInfo, AppUpdateType.IMMEDIATE, this, update_request_code);
+                        } catch (IntentSender.SendIntentException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
         keyboardHeightProvider.setKeyboardHeightObserver(this);
     }
 

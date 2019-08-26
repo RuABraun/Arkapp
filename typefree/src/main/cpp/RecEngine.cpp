@@ -80,15 +80,15 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     rnn_ready = false;
 
     std::string align_lex = modeldir + "align_lexicon.bin",
-            wsyms = modeldir + "words.txt";
+            wsyms = modeldir + "words.txt",
+            word_boundary_f = modeldir + "word_boundary.int";
     word_syms = SymbolTable::ReadText(wsyms);
     idx_sb = (int32) word_syms->Find("<sb>");
-    std::vector<std::vector<int32>> lexicon;
-    ReadLexiconForWordAlignBin(align_lex, &lexicon);
-    lexicon_info = new WordAlignLatticeLexiconInfo(lexicon);
+    wordb_info = new WordBoundaryInfo(opts, word_boundary_f);
+
     LOGI("Done lexicons.");
 
-    std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa",
+    std::string lm_to_subtract_fname = modeldir + "o3_1M.carpa",
             word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
             word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
             word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
@@ -148,11 +148,13 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 }
 
 
-RecEngine::RecEngine(std::string modeldir): decodable_opts(1.0, 51, 3),
+RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
+                                            decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
                                             tot_num_frames_decoded(0) {
-    //start_logger();
+    start_logger();
+    excl_cores = exclusiveCores;
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
     LOGI("Constructing rec");
@@ -212,7 +214,7 @@ RecEngine::~RecEngine() {
     delete decoder;
     delete decodable_info;
     delete feature_info;
-    delete lexicon_info;
+    delete wordb_info;
     delete decoder_opts;
     delete os_ctm, os_txt;
 }
@@ -221,7 +223,13 @@ const char* RecEngine::get_text(){
     return outtext.c_str();
 }
 
-const char* RecEngine::get_const_text(){
+const char* RecEngine::get_const_text(int* size){
+    if (!text_updated) {
+        *size = -1;
+    } else {
+        *size = (int) const_outtext.size();
+        text_updated = false;
+    }
     return const_outtext.c_str();
 }
 
@@ -287,7 +295,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 30, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(8.0, 1500, 6.0, 30, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -373,7 +381,7 @@ void RecEngine::write_to_wav(int32 num_frames) {
 }
 
 void RecEngine::recognition_loop() {
-
+    set_thread_affinity();
     Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
@@ -409,7 +417,7 @@ void RecEngine::recognition_loop() {
                 outtext = tmpstr;
             }
             timetaken = tt.Elapsed();
-            LOGI("Total decode time %f", timetaken);
+//            LOGI("Total decode time %f", timetaken);
             do_recognition = false;
         }
         if (timetaken < 0.1) {
@@ -508,7 +516,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     CompactLatticeShortestPath(clat_rescored, &best_path);
 
     CompactLattice aligned_clat;
-    WordAlignLatticeLexicon(best_path, trans_model, *lexicon_info, opts, &aligned_clat);
+    WordAlignLattice(best_path, trans_model, *wordb_info, 0, &aligned_clat);
 
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
@@ -519,10 +527,12 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
     outtext = "";
     if (const_outtext != "") {
-        const_outtext = const_outtext + "\n" + text;
+        const_outtext = const_outtext + '\n' + text;
     } else {
         const_outtext = text;
     }
+    text_updated = true;
+
     fwrite(text.c_str(), 1, text.size(), os_txt);
 
     int32 num_words = words_split.size();
@@ -570,7 +580,9 @@ int32 RecEngine::run_casing(std::vector<int32> casewords, std::vector<int32> cas
             argmax = i;
         }
     }
-    if (output[0] > 0.1f) argmax = 0;
+    if (output[0] > 0.2f) {
+        argmax = 0;
+    }
     return argmax;
 }
 
@@ -680,7 +692,8 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 }
 
 void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
-
+    set_thread_affinity();
+    reset_text();
     try {
         LOGI("Transcribing file");
         using namespace kaldi;
@@ -894,4 +907,24 @@ int RecEngine::convert_audio(const char* audiopath, const char* wavpath) {
     write_wav(wavpath, data, size, fin_sample_rate);
     free(data);
     return 0;
+}
+
+void RecEngine::set_thread_affinity() {
+//    if (thread_affinity_set) return;
+    pid_t current_thread_id = gettid();
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+
+    for (int i = 0; i < excl_cores.size(); i++) {
+        int cpu_id = excl_cores[i];
+        CPU_SET(cpu_id, &cpu_set);
+    }
+
+    int result = sched_setaffinity(current_thread_id, sizeof(cpu_set_t), &cpu_set);
+    if (result == 0) {
+        LOGI("APP", "Thread affinity set");
+    } else {
+        LOGE("APP", "Error setting thread affinity!");
+    }
+    thread_affinity_set = true;
 }

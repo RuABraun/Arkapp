@@ -16,7 +16,7 @@
 #include "online2/online-nnet2-feature-pipeline.h"
 #include "online2/onlinebin-util.h"
 #include "online2/online-timing.h"
-#include "lat/word-align-lattice-lexicon.h"
+#include "lat/word-align-lattice.h"
 #include "lat/compose-lattice-pruned.h"
 #include "rnnlm/rnnlm-lattice-rescoring.h"
 #include "rnnlm/rnnlm-utils.h"
@@ -33,18 +33,16 @@
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
-    RecEngine(std::string modeldir);
+    RecEngine(std::string modeldir, std::vector<int> exclusiveCores);
 
     ~RecEngine();
-
-    void setupLex(std::string wsyms, std::string align_lex);
 
     void setupRnnlm(std::string modeldir);
 
     void setDeviceId(int32_t deviceId);
 
     const char* get_text();
-    const char* get_const_text();
+    const char* get_const_text(int* size);
     void reset_text();
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audioStream, void *audioData,
@@ -67,12 +65,18 @@ public:
 
     int convert_audio(const char* audiopath, const char* wavpath);
 
+    void set_thread_affinity();
+
 private:
 
     kaldi::Timer timer;
     std::string outtext;
     std::string const_outtext;
     int tot_num_frames = 0;
+    bool text_updated = false;
+
+    std::vector<int> excl_cores;
+    bool thread_affinity_set = false;
 
     int32_t mRecDeviceId = oboe::kUnspecified;
     int32_t mSampleRate;
@@ -97,8 +101,6 @@ private:
     std::thread t_rnnlm;
     std::thread t_finishsegment;
 
-    kaldi::BaseFloat amplitude_delta_avg = 0.5;
-
     int32 tot_num_frames_decoded;
 
     // ASR vars
@@ -116,8 +118,8 @@ private:
     kaldi::LatticeFasterDecoderConfig* decoder_opts;
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
-    kaldi::WordAlignLatticeLexiconInfo* lexicon_info;
-    kaldi::WordAlignLatticeLexiconOpts opts;
+    kaldi::WordBoundaryInfo* wordb_info;
+    kaldi::WordBoundaryInfoNewOpts opts;
     int32 left_context;
     int32 right_context;
     kaldi::BaseFloat frame_shift = 0.03;

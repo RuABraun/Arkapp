@@ -14,22 +14,23 @@ public class RecEngine {
 
     static long mEngineHandle = 0;
     static boolean isready = false;
+    static boolean isrunning = false;
 
-    private RecEngine(final String modeldir) {
+    private RecEngine(final String modeldir, int[] exclusiveCores) {
         doing_creation = true;
         Log.i("APP", "Creating engine " + Long.toString(mEngineHandle));
         if (mEngineHandle == 0) {
-            mEngineHandle = native_createEngine(modeldir);
+            mEngineHandle = native_createEngine(modeldir, exclusiveCores);
             Log.i("APP", "New engine handle " + Long.toString(mEngineHandle));
         }
         isready = true;
         doing_creation = false;
     }
 
-    public static RecEngine getInstance(String modeldir) {
+    public static RecEngine getInstance(String modeldir, int[] exclusiveCores) {
 
         if (instance == null && !doing_creation) {
-            instance = new RecEngine(modeldir);
+            instance = new RecEngine(modeldir, exclusiveCores);
         }
         return instance;
     }
@@ -44,12 +45,14 @@ public class RecEngine {
     public void transcribe_stream(String wavpath) {
         Log.i("APP", String.format("Using EngineHandle: %d", mEngineHandle));
         if (mEngineHandle != 0) {
+            isrunning = true;
             native_transcribe_stream(mEngineHandle, wavpath);
         }
     }
 
     public long stop_trans_stream() {
-        return native_stop_trans_stream(mEngineHandle);
+        long handle = native_stop_trans_stream(mEngineHandle);
+        return handle;
     }
 
 
@@ -76,7 +79,9 @@ public class RecEngine {
     public void transcribe_file(String wavpath, String fpath) {
         Log.i("APP", String.format("Using EngineHandle: %d", mEngineHandle));
         if (mEngineHandle != 0) {
+            isrunning = true;
             native_transcribe_file(mEngineHandle, wavpath, fpath);
+            isrunning = false;
         }
     }
 
@@ -88,7 +93,7 @@ public class RecEngine {
         return n;
     }
 
-    public static native long native_createEngine(String modeldir);
+    public static native long native_createEngine(String modeldir, int exclusiveCores[]);
     public static native void native_deleteEngine(long engineHandle);
     public static native void native_setAudioDeviceId(long engineHandle, int deviceId);
     public static native String native_getText(long engineHandle);

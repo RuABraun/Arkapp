@@ -131,7 +131,7 @@ public class KeyboardHeightProvider extends PopupWindow {
         // the keyboard height. But this worked fine on a Nexus.
         int orientation = getScreenOrientation();
         int keyboardHeight = screenSize.y - rect.bottom;
-
+        //Log.i("APP", "handleOnGlobalLayout: height " + keyboardHeight);
         if (keyboardHeight == 0) {
             notifyKeyboardHeightChanged(0, orientation);
         }

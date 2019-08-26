@@ -41,6 +41,8 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static android.content.Context.SENSOR_SERVICE;
+import static typefree.typefree.Base.convertPixelsToDp;
 import static typefree.typefree.Base.filesdir;
 
 
@@ -52,6 +54,7 @@ public class MainFragment extends Fragment {
     Runnable runnable, trans_update_runnable;
     Runnable trans_done_runnable;
     Runnable trans_edit_runnable;
+    Runnable temperature_runnable;
     private EditText ed_transtext;
     private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del;
     private EditText ed_title;
@@ -59,10 +62,11 @@ public class MainFragment extends Fragment {
     private String curr_cname = "";
     private boolean recognition_done = false;  // so we know if we have to modify a text file or rename files of conversation
     private AFile curr_afile;
-    private String const_transcript = "";
+    private int const_trans_size = 0;
     private ProgressBar spinner;
     Thread t_stoptrans, t_starttrans;
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
+    private boolean editing_title = false;
     private boolean is_editing = false, just_closed = false;
     private ProgressBar pb_init;
     private TextView tv_init, tv_counter;
@@ -70,6 +74,7 @@ public class MainFragment extends Fragment {
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
     private View fview;
+    private StringBuilder trans_text;
     ObjectAnimator pulse;
     Timer time_counter;
     int fab_rec_botmargin;
@@ -130,6 +135,13 @@ public class MainFragment extends Fragment {
         fab_copy.setTranslationX(256f);
         fab_share.setTranslationX(256f);
         fab_del.setTranslationX(-256f);
+
+//        int counter_bottom = tv_counter.getBottom();
+//        int view_bottom = img_view.getBottom();
+//
+//        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) ed_transtext.getLayoutParams();
+//        params.matchConstraintMaxHeight =
+
         this.fview = view;
         return view;
     }
@@ -201,6 +213,9 @@ public class MainFragment extends Fragment {
             tv.setTextSize(18);
             act.settings.edit().putBoolean("knows_mic_location", false).apply();
         }
+
+        trans_text = new StringBuilder();
+        trans_text.ensureCapacity(128);
     }
 
 
@@ -273,6 +288,13 @@ public class MainFragment extends Fragment {
         if (curr_cname.equals("")) {
             curr_cname = getString(R.string.default_convname);
         }
+        act.h_main.removeCallbacks(trans_update_runnable);
+        act.h_main.post(new Runnable() {
+            @Override
+            public void run() {
+                update_text();
+            }
+        });
 
         String date = act.getFileDate();
         String title = curr_cname;
@@ -286,7 +308,6 @@ public class MainFragment extends Fragment {
         long id = act.f_repo.insert(afile);
         curr_afile = act.f_repo.getById(id);  // has correct ID
         Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
-        act.h_main.removeCallbacks(trans_update_runnable);
         recognition_done = true;
     }
 
@@ -298,13 +319,13 @@ public class MainFragment extends Fragment {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            System.gc();
 
             if (recognition_done || curr_cname.equals("")) {
                 curr_cname = getString(R.string.default_convname);
                 edited_title = true;
-                ed_title.setText(curr_cname, TextView.BufferType.EDITABLE);
+                ed_title.setText(curr_cname);
                 edited_title = false;
-                const_transcript = "";
             }
 
             if (trans_edit_runnable != null) {
@@ -326,7 +347,8 @@ public class MainFragment extends Fragment {
             Log.i("APP", "set margin " + fab_rec_botmargin);
             layoutParams.bottomMargin = layoutParams.bottomMargin + act.bottomNavigationView.getMeasuredHeight();
 
-            ed_transtext.setText(const_transcript, TextView.BufferType.EDITABLE);
+            ed_transtext.setText("");
+
             final String fpath = filesdir + "tmpfile";
             t_starttrans = new Thread(new Runnable() {
                 @Override
@@ -336,6 +358,12 @@ public class MainFragment extends Fragment {
             });
             t_starttrans.setPriority(9);
             t_starttrans.start();
+            act.h_background.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    Base.temper_performance(act, 10, 60, 5);
+                }
+            }, 500);
 
             is_recording = true;
 
@@ -343,7 +371,9 @@ public class MainFragment extends Fragment {
                 public void run() {
                     trans_update_runnable=this;
                     update_text();
-                    act.h_main.postDelayed(trans_update_runnable, 25);
+                    if (is_recording) {
+                        act.h_main.postDelayed(trans_update_runnable, 200);
+                    }
                 }
             }, 100);
             time_counter = new Timer();
@@ -367,10 +397,25 @@ public class MainFragment extends Fragment {
             }, 0, 1000);
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
+            if (act.settings.getBoolean("knows_slowdown", true)) {
+                act.h_main.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(act, "To prevent overheating, the app will sometimes slow down temporarily. Don't worry" +
+                                " you won't lose anything.", Toast.LENGTH_LONG).show();
+                    }
+                }, 10 * 1000);
+                act.settings.edit().putBoolean("knows_slowdown", false).apply();
+            }
         } else {
             time_counter.cancel();
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
+            RecEngine.isrunning = false;
+            if (act.pm.isSustainedPerformanceModeSupported()) {
+                Log.i("APP", "Turning sustainedperf off for good");
+                act.getWindow().setSustainedPerformanceMode(false);
+            }
 
             act.h_main.postDelayed(new Runnable() {
                 public void run() {
@@ -419,25 +464,26 @@ public class MainFragment extends Fragment {
     public void update_text() {
         String str = act.recEngine.get_text();
         String conststr = act.recEngine.get_const_text();
-        String all = conststr + str;
-        ed_transtext.setText(all, TextView.BufferType.EDITABLE);
+        int strlen = str.length();
+        if (conststr.equals("")) {
+            trans_text.replace(const_trans_size, const_trans_size + strlen, str);
+        } else {
+            const_trans_size = conststr.length();
+            trans_text.replace(0, const_trans_size, conststr);
+            trans_text.replace(const_trans_size, const_trans_size + strlen, str);
+        }
+
+        ed_transtext.setText(trans_text);
+        ed_transtext.setSelection(trans_text.length());
     }
 
     public void handle_touch_event(View v, MotionEvent event) {
         if (v == ed_transtext) {
-            View w = act.getCurrentFocus();
-            int scrcoords[] = new int[2];
-            w.getLocationOnScreen(scrcoords);
-            float x = event.getRawX() + w.getLeft() - scrcoords[0];
-            float y = event.getRawY() + w.getTop() - scrcoords[1];
-            int r = fab_edit.getLeft();
-            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom()) && is_editing) {
+            int x = convertPixelsToDp(event.getRawX(), act);
+            int y = convertPixelsToDp(event.getRawY(), act);
+            if (event.getAction() == MotionEvent.ACTION_UP && (x < v.getLeft() || x >= v.getRight() || y < v.getTop() || y > v.getBottom()) && is_editing) {
                 InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-//                View view = act.getCurrentFocus();
-//                if (view == null) {
-//                    view = new View(act);
-//                }
-                Log.i("APP", "Closing keyboard.");
+                //Log.i("APP", "Closing keyboard text.");
                 imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
                 fab_edit.animate().translationY(0.f);
                 ed_transtext.clearFocus();
@@ -445,24 +491,28 @@ public class MainFragment extends Fragment {
                 is_editing = false;
                 just_closed = true;
             }
-        } else if (v == ed_title) {
-            View w = act.getCurrentFocus();
-            int scrcoords[] = new int[2];
-            w.getLocationOnScreen(scrcoords);
-            float x = event.getRawX() + w.getLeft() - scrcoords[0];
-            float y = event.getRawY() + w.getTop() - scrcoords[1];
-            if (event.getAction() == MotionEvent.ACTION_UP && (x < w.getLeft() || x >= w.getRight() || y < w.getTop() || y > w.getBottom())) {
-                Log.i("APP", "Closing keyboard.");
-                InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-//                View view = act.getCurrentFocus();
-//                if (view == null) {
-//                    view = new View(act);
-//                }
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        } else {
+            int x = convertPixelsToDp(event.getRawX(), act);
+            int y = convertPixelsToDp(event.getRawY(), act);
+            //Log.i("APP", x + " " + y + " " + ed_title.getLeft() + "-"+ed_title.getRight() + " " + ed_title.getTop()+"-"+ed_title.getBottom());
+            if (x < ed_title.getLeft() || x >= ed_title.getRight() || y < ed_title.getTop() || y > ed_title.getBottom()) {
+                if (v == ed_title && event.getAction() == MotionEvent.ACTION_UP) {
+                    //Log.i("APP", "Closing keyboard title.");
+                    InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                    fab_share.setVisibility(View.VISIBLE);
+                    fab_copy.setVisibility(View.VISIBLE);
+                    fab_del.setVisibility(View.VISIBLE);
+                    fab_rec.setVisibility(View.VISIBLE);
+                    fab_edit.setVisibility(View.VISIBLE);
+                    editing_title = false;
+                }
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                //Log.i("APP", "Editing title.");
+                editing_title = true;
             }
         }
     }
-
 
     public boolean checkRecDone() {
         if (!recognition_done) {
@@ -516,7 +566,7 @@ public class MainFragment extends Fragment {
             fab_share.setVisibility(View.INVISIBLE);
             fab_copy.setVisibility(View.INVISIBLE);
             fab_del.setVisibility(View.INVISIBLE);
-
+            fab_rec.setVisibility(View.INVISIBLE);
             text_textWatcher = new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -584,7 +634,7 @@ public class MainFragment extends Fragment {
         fab_copy.animate().translationX(256f);
         fab_share.animate().translationX(256f);
         fab_del.animate().translationX(-256f);
-        ed_transtext.setText("", TextView.BufferType.EDITABLE);
+        ed_transtext.setText("");
         edited_title = false;
     }
 
@@ -594,6 +644,14 @@ public class MainFragment extends Fragment {
         act.getWindowManager().getDefaultDisplay().getMetrics(dm);
         int dp = (int) (height / dm.density);
         fab_edit.animate().translationY(-dp);
+        if (editing_title) {
+            Log.i("APP", "setting edit invis");
+            fab_share.setVisibility(View.INVISIBLE);
+            fab_copy.setVisibility(View.INVISIBLE);
+            fab_del.setVisibility(View.INVISIBLE);
+            fab_rec.setVisibility(View.INVISIBLE);
+            fab_edit.setVisibility(View.INVISIBLE);
+        }
         ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
         mainview_layout.bottomMargin = height - 100;
         img_view.invalidate();

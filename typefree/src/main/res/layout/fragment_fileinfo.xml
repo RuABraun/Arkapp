@@ -142,7 +142,7 @@
             android:lineSpacingExtra="4dp"
             android:scrollbars="vertical"
             android:textColor="@color/colorText"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
 
         <typefree.typefree.EditTextCursorListener
             android:id="@+id/ed_trans"
@@ -162,7 +162,7 @@
             android:textColor="@color/colorText"
             android:textColorLink="@color/colorText"
             android:textCursorDrawable="@drawable/colorcursor"
-            android:textSize="18sp"
+            android:textSize="20sp"
             tools:layout_editor_absoluteX="352dp"
             tools:layout_editor_absoluteY="456dp" />
 

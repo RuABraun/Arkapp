@@ -2,13 +2,19 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.bugsnag.android.gradle'
 
 android {
+    signingConfigs {
+        release {
+            storeFile file('/home/seni/typefree/keys/android.keystore')
+            storePassword 'backer'
+            keyAlias = 'app'
+            keyPassword 'wanter'
+        }
+    }
     compileSdkVersion 27
     defaultConfig {
         applicationId "typefree.typefree"
         minSdkVersion 24
         targetSdkVersion 27
-        versionCode 1
-        versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
@@ -19,6 +25,7 @@ android {
                 arguments '-j8 -v'
             }
         }
+        signingConfig signingConfigs.release
     }
     splits {
         abi {
@@ -30,7 +37,8 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -43,19 +51,23 @@ android {
         noCompress 'fst', 'txt', 'int', 'mdl', 'raw', 'csl', 'mat', 'conf', 'bin', 'carpa', 'pb'
     }
 
-    project.ext.versionCodes = ['armeabi': 1, 'armeabi-v7a': 2, 'arm64-v8a': 3, 'mips': 5, 'mips64': 6, 'x86': 8, 'x86_64': 9]
+//    project.ext.versionCodes = ['armeabi': 1, 'armeabi-v7a': 2, 'arm64-v8a': 3, 'mips': 5, 'mips64': 6, 'x86': 8, 'x86_64': 9]
 
-    android.applicationVariants.all { variant ->
-        // assign different version code for each output
-        variant.outputs.each { output ->
-            output.versionCodeOverride =
-                    project.ext.versionCodes.get(output.getFilter(com.android.build.OutputFile.ABI), 0) * 1000000 + android.defaultConfig.versionCode
-        }
+//    android.applicationVariants.all { variant ->
+//        // assign different version code for each output
+//        variant.outputs.each { output ->
+//            output.versionCodeOverride =
+//                    project.ext.versionCodes.get(output.getFilter(com.android.build.OutputFile.ABI), 0) * 1000000 + android.defaultConfig.versionCode
+//        }
+//    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.so'])
+    implementation fileTree(include: ['*.jar', '*.so'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:27.1.1'
     implementation 'com.android.support.constraint:constraint-layout:1.1.2'
     implementation 'com.android.support:recyclerview-v7:27.1.1'
@@ -65,8 +77,9 @@ dependencies {
     implementation 'com.android.support:design:27.1.1'
     implementation 'com.android.support:support-v4:27.1.1'
     implementation 'com.bugsnag:bugsnag-android:4.+'
+    implementation 'com.google.android.play:core:1.5.0'
     annotationProcessor 'android.arch.persistence.room:compiler:1.1.1'
-    implementation "android.arch.lifecycle:extensions:1.1.1"
+    implementation 'android.arch.lifecycle:extensions:1.1.1'
     annotationProcessor "android.arch.lifecycle:compiler:1.1.1"
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'

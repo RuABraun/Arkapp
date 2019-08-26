@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/typefree.iml" filepath="$PROJECT_DIR$/typefree.iml" />
+      <module fileurl="file://$PROJECT_DIR$/AndroidStudioProjects-typefree.iml" filepath="$PROJECT_DIR$/AndroidStudioProjects-typefree.iml" />
       <module fileurl="file://$PROJECT_DIR$/typefree/typefree-typefree.iml" filepath="$PROJECT_DIR$/typefree/typefree-typefree.iml" />
     </modules>
   </component>
