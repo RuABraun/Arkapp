@@ -1,10 +1,8 @@
 package typefree.typefree;
 
-import android.Manifest;
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
@@ -32,16 +30,12 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.bugsnag.android.Bugsnag;
-
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import static android.content.Context.SENSOR_SERVICE;
 import static typefree.typefree.Base.convertPixelsToDp;
 import static typefree.typefree.Base.filesdir;
 
@@ -54,7 +48,6 @@ public class MainFragment extends Fragment {
     Runnable runnable, trans_update_runnable;
     Runnable trans_done_runnable;
     Runnable trans_edit_runnable;
-    Runnable temperature_runnable;
     private EditText ed_transtext;
     private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del;
     private EditText ed_title;
@@ -68,8 +61,7 @@ public class MainFragment extends Fragment {
     private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
     private boolean editing_title = false;
     private boolean is_editing = false, just_closed = false;
-    private ProgressBar pb_init;
-    private TextView tv_init, tv_counter;
+    private TextView tv_counter;
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
@@ -93,8 +85,6 @@ public class MainFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
-        pb_init = view.findViewById(R.id.progressBar_init_setup);
-        tv_init = view.findViewById(R.id.textview_init_setup);
         tv_counter = view.findViewById(R.id.tv_counter);
         tv_counter.setVisibility(View.INVISIBLE);
 
@@ -123,7 +113,7 @@ public class MainFragment extends Fragment {
 
         ed_transtext = view.findViewById(R.id.trans_edit_view);
 
-        fab_rec.setVisibility(View.INVISIBLE);
+        fab_rec.hide();
         spinner.setVisibility(View.VISIBLE);
 
         fab_edit = view.findViewById(R.id.button_edit);
@@ -154,7 +144,7 @@ public class MainFragment extends Fragment {
                 runnable=this;
                 act.h_main.postDelayed(runnable, 100);
                 if (RecEngine.isready) {
-                    fab_rec.setVisibility(View.VISIBLE);
+                    fab_rec.show();
                     spinner.setVisibility(View.INVISIBLE);
                     act.h_main.removeCallbacks(runnable);
                     pulse = ObjectAnimator.ofPropertyValuesHolder(fab_rec,
@@ -319,18 +309,17 @@ public class MainFragment extends Fragment {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            System.gc();
+
+            if (trans_edit_runnable != null) {
+                act.h_background.removeCallbacks(trans_edit_runnable);
+                act.h_background.post(trans_edit_runnable);
+            }
 
             if (recognition_done || curr_cname.equals("")) {
                 curr_cname = getString(R.string.default_convname);
                 edited_title = true;
                 ed_title.setText(curr_cname);
                 edited_title = false;
-            }
-
-            if (trans_edit_runnable != null) {
-                act.h_background.removeCallbacks(trans_edit_runnable);
-                act.h_background.post(trans_edit_runnable);
             }
 
             recognition_done = false;
@@ -348,6 +337,8 @@ public class MainFragment extends Fragment {
             layoutParams.bottomMargin = layoutParams.bottomMargin + act.bottomNavigationView.getMeasuredHeight();
 
             ed_transtext.setText("");
+            const_trans_size = 0;
+            trans_text.setLength(0);
 
             final String fpath = filesdir + "tmpfile";
             t_starttrans = new Thread(new Runnable() {
@@ -397,6 +388,7 @@ public class MainFragment extends Fragment {
             }, 0, 1000);
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
+
             if (act.settings.getBoolean("knows_slowdown", true)) {
                 act.h_main.postDelayed(new Runnable() {
                     @Override
@@ -500,11 +492,11 @@ public class MainFragment extends Fragment {
                     //Log.i("APP", "Closing keyboard title.");
                     InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                    fab_share.setVisibility(View.VISIBLE);
-                    fab_copy.setVisibility(View.VISIBLE);
-                    fab_del.setVisibility(View.VISIBLE);
-                    fab_rec.setVisibility(View.VISIBLE);
-                    fab_edit.setVisibility(View.VISIBLE);
+                    fab_share.show();
+                    fab_copy.show();
+                    fab_del.show();
+                    fab_rec.show();
+                    fab_edit.show();
                     editing_title = false;
                 }
             } else if (event.getAction() == MotionEvent.ACTION_UP) {
@@ -533,6 +525,22 @@ public class MainFragment extends Fragment {
         ClipData clip = ClipData.newPlainText("Transcript", text);
         clipboard.setPrimaryClip(clip);
         Toast.makeText(act.getApplicationContext(), "Copied", Toast.LENGTH_SHORT).show();
+        if (act.settings.getBoolean("knows_copy_paste", true)) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(act);
+            builder.setTitle("Tip!")
+                    .setMessage("Switch to another app of your choice, press and hold in a text-field for 1-2 seconds, release, and a \"paste\" option will appear.")
+                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+            TextView tv = (TextView) alert.findViewById(android.R.id.message);
+            tv.setTextSize(18);
+            act.settings.edit().putBoolean("knows_copy_paste", false).apply();
+        }
     }
 
     public void on_share_click(View view) {
@@ -560,13 +568,13 @@ public class MainFragment extends Fragment {
             ed_transtext.requestLayout();
 
             fab_edit.setImageResource(R.drawable.done);
-            fab_rec.setVisibility(View.INVISIBLE);
+            fab_rec.hide();
             Log.i("APP", "IN TRANSEDIT EDIT PRESS " + act.keyboard_height);
             fab_edit.animate().translationY(-act.keyboard_height);
-            fab_share.setVisibility(View.INVISIBLE);
-            fab_copy.setVisibility(View.INVISIBLE);
-            fab_del.setVisibility(View.INVISIBLE);
-            fab_rec.setVisibility(View.INVISIBLE);
+            fab_share.hide();
+            fab_copy.hide();
+            fab_del.hide();
+            fab_rec.hide();
             text_textWatcher = new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -609,10 +617,10 @@ public class MainFragment extends Fragment {
             }
             ed_transtext.removeTextChangedListener(text_textWatcher);
             fab_edit.setImageResource(R.drawable.edit);
-            fab_share.setVisibility(View.VISIBLE);
-            fab_copy.setVisibility(View.VISIBLE);
-            fab_del.setVisibility(View.VISIBLE);
-            fab_rec.setVisibility(View.VISIBLE);
+            fab_share.show();
+            fab_copy.show();
+            fab_del.show();
+            fab_rec.show();
             is_editing = false;
             ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
             lay_params.bottomMargin = 8;
@@ -639,18 +647,17 @@ public class MainFragment extends Fragment {
     }
 
     public void resize_views(int height) {
-        Log.i("APP", "resizing");
+        //Log.i("APP", "resizing");
         DisplayMetrics dm = new DisplayMetrics();
         act.getWindowManager().getDefaultDisplay().getMetrics(dm);
         int dp = (int) (height / dm.density);
         fab_edit.animate().translationY(-dp);
         if (editing_title) {
-            Log.i("APP", "setting edit invis");
-            fab_share.setVisibility(View.INVISIBLE);
-            fab_copy.setVisibility(View.INVISIBLE);
-            fab_del.setVisibility(View.INVISIBLE);
-            fab_rec.setVisibility(View.INVISIBLE);
-            fab_edit.setVisibility(View.INVISIBLE);
+            fab_share.hide();
+            fab_copy.hide();
+            fab_del.hide();
+            fab_rec.hide();
+            fab_edit.hide();
         }
         ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
         mainview_layout.bottomMargin = height - 100;

@@ -298,6 +298,22 @@ public class FileInfo extends Fragment {
                                 ClipData clip = ClipData.newPlainText("Transcript", simpletext);
                                 clipboard.setPrimaryClip(clip);
                                 Toast.makeText(getActivity(), "Copied", Toast.LENGTH_SHORT).show();
+                                if (act.settings.getBoolean("knows_copy_paste", true)) {
+                                    AlertDialog.Builder builder = new AlertDialog.Builder(act);
+                                    builder.setTitle("Tip!")
+                                            .setMessage("Switch to another app of your choice, press and hold in a text-field for 1-2 seconds, release, and a \"paste\" option will appear.")
+                                            .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    dialog.dismiss();
+                                                }
+                                            });
+                                    AlertDialog alert = builder.create();
+                                    alert.show();
+                                    TextView tv = (TextView) alert.findViewById(android.R.id.message);
+                                    tv.setTextSize(18);
+                                    act.settings.edit().putBoolean("knows_copy_paste", false).apply();
+                                }
                                 return true;
                             case R.id.IntDelete:
                                 pausePlaying();

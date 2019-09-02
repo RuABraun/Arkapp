@@ -198,6 +198,15 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                         public void run() {
                                             recEngine.transcribe_file(wavpath, fpath);
                                             recog_done = true;
+                                            if (context.pm.isSustainedPerformanceModeSupported()) {
+                                                context.runOnUiThread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        Log.i("APP", "turning sustainedperf off");
+                                                        context.getWindow().setSustainedPerformanceMode(false);
+                                                    }
+                                                });
+                                            }
                                         }
                                     });
                                     t.setPriority(9);

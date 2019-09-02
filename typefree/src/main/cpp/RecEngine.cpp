@@ -236,6 +236,7 @@ const char* RecEngine::get_const_text(int* size){
 void RecEngine::reset_text() {
     outtext = "";
     const_outtext = "";
+    text_updated = true;
 }
 
 void RecEngine::transcribe_stream(std::string fpath){
@@ -295,7 +296,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(8.0, 1500, 6.0, 30, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 30, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -402,19 +403,14 @@ void RecEngine::recognition_loop() {
                 t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
 
                 decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
-            }
-
-            if (decoder->NumFramesDecoded() > 0) {
+            } else if (decoder->NumFramesDecoded() > 0) {
                 Lattice olat;
                 decoder->GetBestPath(false, &olat);
 
                 std::vector<int32> words;
 
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
-
-                std::string tmpstr = prettify_text(words, dummy, dummyb, false);
-
-                outtext = tmpstr;
+                outtext = prettify_text(words, dummy, dummyb, false);
             }
             timetaken = tt.Elapsed();
 //            LOGI("Total decode time %f", timetaken);
@@ -704,7 +700,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
 
         BaseFloat chunk_length_secs = 0.72;
 
-        decoder_opts = new LatticeFasterDecoderConfig(10.0, 3000, 6.0, 40, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 40, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
