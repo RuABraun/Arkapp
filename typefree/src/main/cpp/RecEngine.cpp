@@ -88,7 +88,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     LOGI("Done lexicons.");
 
-    std::string lm_to_subtract_fname = modeldir + "o3_1M.carpa",
+    std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa",
             word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
             word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
             word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
@@ -151,7 +151,7 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
                                             decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
-                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, ""),
+                                            feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "", modeldir + "cmvn.conf"),
                                             tot_num_frames_decoded(0) {
     start_logger();
     excl_cores = exclusiveCores;

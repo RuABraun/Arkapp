@@ -389,16 +389,6 @@ public class MainFragment extends Fragment {
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
 
-            if (act.settings.getBoolean("knows_slowdown", true)) {
-                act.h_main.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(act, "To prevent overheating, the app will sometimes slow down temporarily. Don't worry" +
-                                " you won't lose anything.", Toast.LENGTH_LONG).show();
-                    }
-                }, 10 * 1000);
-                act.settings.edit().putBoolean("knows_slowdown", false).apply();
-            }
         } else {
             time_counter.cancel();
             spinner.setVisibility(View.VISIBLE);
