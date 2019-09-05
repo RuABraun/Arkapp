@@ -141,8 +141,10 @@ public class ManageFragment extends Fragment {
                 });
                 return;
             }
-            MediaPlayer mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(outpath));
+            File f = new File(outpath);
+            MediaPlayer mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.fromFile(f));
             int dur = (int) ((float) mPlayer.getDuration() / 1000.0f);
+            mPlayer.stop();
             mPlayer.release();
             AFile afile = new AFile(fname, fname, dur, act.getFileDate());
             act.f_repo.insert(afile);
@@ -162,7 +164,12 @@ public class ManageFragment extends Fragment {
                     boolean copied = false;
                     if (furi.getScheme().equals(ContentResolver.SCHEME_FILE)) {
                         path = furi.getPath();
+                        File f = new File(path);
+                        String basename = f.getName();
                         name = furi.getLastPathSegment();
+                        basename = MainActivity.getFileName(basename, act.f_repo);
+                        String dir = f.getParent();
+                        path = dir + "/" + basename;
                         Log.i("APP", "bla bla path " + path + " filename " + name);
                     } else if (furi.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
                         copied = true;
@@ -172,7 +179,9 @@ public class ManageFragment extends Fragment {
                         int idx_name = retCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                         name = retCursor.getString(idx_name);
                         String[] split = name.split("\\.");
-                        path = Base.filesdir + "tmp." + split[split.length-1];
+                        String fname = split[split.length-1];
+                        fname = MainActivity.getFileName(fname, act.f_repo);
+                        path = Base.filesdir + "tmp." + fname;
                         Log.i("APP", "bla bla path " + path + " filename " + name);
                         InputStream inputStream = null;
                         try {

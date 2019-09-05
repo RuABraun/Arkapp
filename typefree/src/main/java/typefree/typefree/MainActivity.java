@@ -68,6 +68,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     private ProgressBar pb_init;
     private TextView tv_init;
     private boolean start_main;
+    public int fragment_id = 1;
 
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int", "id_mapping.int",
             "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
@@ -127,15 +128,18 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 int item_id = item.getItemId();
                 if (item_id == R.id.Manage) {
                     ManageFragment frag = new ManageFragment();
+                    fragment_id = 2;
                     fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Transcribe) {
+                    fragment_id = 1;
                     MainFragment frag = new MainFragment();
                     fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Settings) {
+                    fragment_id = 3;
                     Settings frag = new Settings();
                     fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commit();
                     return true;
@@ -248,7 +252,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
         String uniqueID = InstanceID.getInstance(this).getId();
         Bugsnag.setUser(uniqueID, "email", "user");
-
+        Log.i("APP", "Starting up activity.");
         if (!perm_granted) {
             finish();
             return;
@@ -302,7 +306,13 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         do_asr_setup();
         if (start_main) {
             Log.i("APP", "Starting main fragment.");
-            bottomNavigationView.setSelectedItemId(R.id.Transcribe);
+            if (fragment_id == 1) {
+                bottomNavigationView.setSelectedItemId(R.id.Transcribe);
+            } else if (fragment_id == 2) {
+                bottomNavigationView.setSelectedItemId(R.id.Manage);
+            } else if (fragment_id == 3) {
+                bottomNavigationView.setSelectedItemId(R.id.Settings);
+            }
         }
 
         h_background = new Handler(handlerThread.getLooper());
@@ -434,6 +444,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
     @Override
     public void onResume() {
+        Log.i("APP", "Resuming activity");
         super.onResume();
         appUpdateManager.getAppUpdateInfo()
                 .addOnSuccessListener(appUpdateInfo -> {

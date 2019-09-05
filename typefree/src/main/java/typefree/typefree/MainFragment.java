@@ -287,7 +287,7 @@ public class MainFragment extends Fragment {
 
         String date = act.getFileDate();
         String title = curr_cname;
-        String fname = act.getFileName(curr_cname, act.f_repo);
+        String fname = MainActivity.getFileName(curr_cname, act.f_repo);
         fname_prefix = fname;
 
         MainActivity.renameConv("tmpfile", fname);

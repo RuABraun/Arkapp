@@ -154,8 +154,8 @@ public class FileInfo extends Fragment {
                 act.getFragmentManager().popBackStack();
             }
         });
-
-        mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.parse(Base.filesdir + afile.fname + ".wav"));
+        File f = new File(Base.filesdir + afile.fname + ".wav");
+        mPlayer = MediaPlayer.create(act.getApplicationContext(), Uri.fromFile(f));
         mSeekBar.setMax(mPlayer.getDuration());
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -378,7 +378,7 @@ public class FileInfo extends Fragment {
             normal_text = new String(buffer);
         } catch(IOException ex) {
             text_found = false;
-            normal_text = "Text file not found!";
+            normal_text = "Text file not found! You might want to return to the \"Files\" screen to press the microphone image to transcribe it!";
         }
         text = normal_text;
         ed_transtext.setText(text);
