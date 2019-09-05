@@ -3,6 +3,7 @@ package typefree.typefree;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
 import android.content.ClipData;
@@ -72,7 +73,6 @@ public class FileInfo extends Fragment {
     private List<Integer> word_times_ms = new ArrayList<>();
     private List<String> original_words = new ArrayList<>();
     private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
-    private boolean in_edit_mode = false;
     private TextWatcher title_textWatcher, text_textWatcher;
     private ImageView playView, fileViewHolder;
     private int playView_offset;
@@ -83,6 +83,7 @@ public class FileInfo extends Fragment {
     private ImageView cursortick, opts_menu;
     private Toolbar toolbar;
     private boolean title_in_focus = false;
+    private boolean editing_transtext = false;
     private int start_idx_colored = -1;
     private int end_idx_colored = -1;
 
@@ -527,42 +528,51 @@ public class FileInfo extends Fragment {
     }
 
     public void handle_touch_event(View view, MotionEvent event) {
-        Log.i("APP", "IN HANDLE TOUCH EVENT!");
-        if (in_edit_mode && view instanceof EditText && !title_in_focus) {
-            ed_transtext.requestFocus();
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            int x = (int) event.getRawX();
+            int y = (int) event.getRawY();
+
+            int[] location_edit_button = new int[2];
+            editButton.getLocationOnScreen(location_edit_button);
+            Rect edit_rect = new Rect(location_edit_button[0], location_edit_button[1],
+                                      location_edit_button[0] + editButton.getWidth(),
+                                      location_edit_button[1] + editButton.getHeight());
+            if (edit_rect.contains(x, y) && view != fileinfo_ed_title) {
+                on_edit_click(view);
+            } else if (view == ed_transtext) {
+                int[] location = new int[2];
+                ed_transtext.getLocationOnScreen(location);
+                Rect rect = new Rect(location[0], location[1],
+                                     location[0] + ed_transtext.getWidth(),
+                                     location[1] + ed_transtext.getHeight());
+                if (!rect.contains(x, y) && editing_transtext) {
+                    on_edit_click(view);
+                }
+            } else if (view == fileinfo_ed_title){
+                int[] location = new int[2];
+                fileinfo_ed_title.getLocationOnScreen(location);
+                Rect rect = new Rect(location[0], location[1],
+                        location[0] + fileinfo_ed_title.getWidth(),
+                        location[1] + fileinfo_ed_title.getHeight());
+                if (!rect.contains(x, y)) {
+                    InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                    fileinfo_ed_title.clearFocus();
+                }
+            }
         }
 
-        int x = (int) event.getRawX();
-        int y = (int) event.getRawY();
-
-        int view_left = fileinfo_ed_title.getLeft(), view_right = fileinfo_ed_title.getRight(),
-            view_top = fileinfo_ed_title.getTop() + 24, view_bottom = fileinfo_ed_title.getBottom() + 24;
-
-//        Log.i("APP", view_left + " " + " " + view_right + " " + view_top + " " + view_bottom);
-//        Log.i("APP", x + " " + y);
-        if (x > view_left && x < view_right && y > view_top && y < view_bottom) {
-            title_in_focus = true;
-        } else if (title_in_focus) {
-            title_in_focus = false;
-            InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
-
-            ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-            fv_lay_params.bottomMargin = fileholder_bottom_margin;
-            fileViewHolder.invalidate();
-            fileViewHolder.requestLayout();
-        }
     }
 
     public void on_edit_click(View view) {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
-        Log.i("APP", "editing");
-        if (!ed_transtext.hasFocus() && !in_edit_mode) {
-            Log.i("APP", "in A");
-            in_edit_mode = true;
+        Log.i("APP", "in edit click");
+        if (!editing_transtext) {
+            editing_transtext = true;
             viewSwitcher.showNext();
             cursortick.setVisibility(View.VISIBLE);
+            fileinfo_ed_title.setEnabled(false);
 
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -614,8 +624,9 @@ public class FileInfo extends Fragment {
 
         } else {
             // TODO: crashes when called on text that was edited!!
-            in_edit_mode = false;
+            editing_transtext = false;
             cursortick.setVisibility(View.INVISIBLE);
+            fileinfo_ed_title.setEnabled(true);
             playView_offset = 0;
             playView.animate().translationY(0);
             mediaButton.animate().translationY(0);
@@ -760,7 +771,7 @@ public class FileInfo extends Fragment {
 
     public void resize_views(int height) {
         // is called twice per action for some reason
-        if (height > 100) {
+        if (editing_transtext) {
             ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
             if (mainview_layout.bottomMargin < 100) {
                 fileholder_bottom_margin = mainview_layout.bottomMargin;

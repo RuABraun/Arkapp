@@ -1,6 +1,5 @@
 # For more information about using CMake with Android Studio, read the
 # documentation: https://d.android.com/studio/projects/add-native-code.html
-message("HELLLO")
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
@@ -30,8 +29,8 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/cpp/jni-bridge.cpp
-             src/main/cpp/RecEngine.cpp
+             /home/seni/AndroidStudioProjects/typefree/typefree/src/main/cpp/jni-bridge.cpp
+             /home/seni/AndroidStudioProjects/typefree/typefree/src/main/cpp/RecEngine.cpp
              ${DEBUG_UTILS_PATH}/trace.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a

@@ -41,6 +41,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bugsnag.android.Bugsnag;
+import com.google.android.gms.iid.InstanceID;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
@@ -69,7 +70,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     private boolean start_main;
 
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int", "id_mapping.int",
-            "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int");
+            "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
     private String[] permissions = {Manifest.permission.RECORD_AUDIO,
@@ -154,9 +155,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             iconView.setLayoutParams(layoutParams);
         }
 
-        pb_init = findViewById(R.id.pb_init);
-        tv_init = findViewById(R.id.tv_init);
-
         // Handle permissions
         ArrayList<String> need_permissions = new ArrayList<>();
         for(String perm: permissions) {
@@ -171,6 +169,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         } else {
             perm_granted = true;
         }
+
+        pb_init = findViewById(R.id.pb_init);
+        tv_init = findViewById(R.id.tv_init);
 
         keyboardHeightProvider = new KeyboardHeightProvider(this);
         View popupview = findViewById(R.id.main_root_view);
@@ -244,6 +245,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     @Override
     protected void onStart() {
         super.onStart();
+
+        String uniqueID = InstanceID.getInstance(this).getId();
+        Bugsnag.setUser(uniqueID, "email", "user");
 
         if (!perm_granted) {
             finish();
@@ -325,7 +329,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     }
 
     public void recordSwitch(View v) {
-        if (is_spamclick()) return;
+        if (Base.is_spamclick()) return;
         MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.record_switch(v);
     }

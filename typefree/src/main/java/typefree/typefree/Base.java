@@ -37,15 +37,7 @@ public class Base extends AppCompatActivity {
             put("timed", "_timed.txt");
         }
     };
-    private long time_lastclick = 0;
-
-    public boolean is_spamclick() {
-        if (SystemClock.elapsedRealtime() - time_lastclick < 500) {
-            return true;
-        }
-        time_lastclick = SystemClock.elapsedRealtime();
-        return false;
-    }
+    private static long time_lastclick = 0L;
 
     public void share(String fname, ArrayList checked) {
         Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
@@ -79,6 +71,14 @@ public class Base extends AppCompatActivity {
         }
         shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files);
         startActivity(Intent.createChooser(shareIntent, "Share file(s)"));
+    }
+
+    public static boolean is_spamclick() {
+        if (SystemClock.elapsedRealtime() - time_lastclick < 250) {
+            return true;
+        }
+        time_lastclick = SystemClock.elapsedRealtime();
+        return false;
     }
 
     public static void renameConv(String fname_old, String fname) {

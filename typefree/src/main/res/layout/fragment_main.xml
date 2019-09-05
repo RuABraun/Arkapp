@@ -108,7 +108,6 @@
         android:clickable="true"
         android:elevation="4dp"
         android:focusable="true"
-        android:onClick="onEditClick"
         android:scaleType="center"
         app:borderWidth="2dp"
         app:layout_constraintBottom_toBottomOf="@+id/button_rec"

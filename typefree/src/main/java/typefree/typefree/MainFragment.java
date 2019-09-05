@@ -58,9 +58,8 @@ public class MainFragment extends Fragment {
     private int const_trans_size = 0;
     private ProgressBar spinner;
     Thread t_stoptrans, t_starttrans;
-    private boolean edited_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
-    private boolean editing_title = false;
-    private boolean is_editing = false, just_closed = false;
+    private boolean manually_editing_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
+    private boolean editing_transtext = false;
     private TextView tv_counter;
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
@@ -233,7 +232,7 @@ public class MainFragment extends Fragment {
 
                     fname_prefix = MainActivity.getFileName(curr_cname, act.f_repo);
                     act.h_background.removeCallbacks(title_runnable);
-                    if (recognition_done && !edited_title) {
+                    if (recognition_done && !manually_editing_title) {
                         title_runnable = new Runnable() {
                             @Override
                             public void run() {
@@ -317,9 +316,9 @@ public class MainFragment extends Fragment {
 
             if (recognition_done || curr_cname.equals("")) {
                 curr_cname = getString(R.string.default_convname);
-                edited_title = true;
+                manually_editing_title = true;
                 ed_title.setText(curr_cname);
-                edited_title = false;
+                manually_editing_title = false;
             }
 
             recognition_done = false;
@@ -329,8 +328,8 @@ public class MainFragment extends Fragment {
             fab_del.animate().translationX(-256f);
             float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
             pulse.cancel();
+            fab_rec.setImageDrawable(act.getDrawable(R.drawable.stop));
             fab_rec.animate().translationX(offset);
-            fab_rec.setImageResource(R.drawable.stop);
             ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
             fab_rec_botmargin = layoutParams.bottomMargin;
             Log.i("APP", "set margin " + fab_rec_botmargin);
@@ -404,7 +403,7 @@ public class MainFragment extends Fragment {
                     trans_done_runnable=this;
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
-                        fab_rec.setImageResource(R.drawable.mic_full_inv);
+                        fab_rec.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
                         pulse.start();
                         spinner.setVisibility(View.INVISIBLE);
                         act.h_main.removeCallbacks(trans_done_runnable);
@@ -460,38 +459,42 @@ public class MainFragment extends Fragment {
     }
 
     public void handle_touch_event(View v, MotionEvent event) {
-        if (v == ed_transtext) {
-            int x = convertPixelsToDp(event.getRawX(), act);
-            int y = convertPixelsToDp(event.getRawY(), act);
-            if (event.getAction() == MotionEvent.ACTION_UP && (x < v.getLeft() || x >= v.getRight() || y < v.getTop() || y > v.getBottom()) && is_editing) {
-                InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-                //Log.i("APP", "Closing keyboard text.");
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                fab_edit.animate().translationY(0.f);
-                ed_transtext.clearFocus();
-                ed_transtext.setFocusableInTouchMode(false);
-                is_editing = false;
-                just_closed = true;
-            }
-        } else {
-            int x = convertPixelsToDp(event.getRawX(), act);
-            int y = convertPixelsToDp(event.getRawY(), act);
-            //Log.i("APP", x + " " + y + " " + ed_title.getLeft() + "-"+ed_title.getRight() + " " + ed_title.getTop()+"-"+ed_title.getBottom());
-            if (x < ed_title.getLeft() || x >= ed_title.getRight() || y < ed_title.getTop() || y > ed_title.getBottom()) {
-                if (v == ed_title && event.getAction() == MotionEvent.ACTION_UP) {
-                    //Log.i("APP", "Closing keyboard title.");
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            int x = (int) event.getRawX();
+            int y = (int) event.getRawY();
+
+            int[] location_button = new int[2];
+            fab_edit.getLocationOnScreen(location_button);
+            Rect edit_rect = new Rect(location_button[0], location_button[1],
+                    location_button[0] + ed_transtext.getWidth(),
+                    location_button[1] + ed_transtext.getHeight());
+            if (edit_rect.contains(x, y)) {  // inside edit button
+                on_edit_click(v);
+            } else if (v == ed_transtext) {
+                int[] location = new int[2];
+                ed_transtext.getLocationOnScreen(location);
+                Rect transtext_rect = new Rect(location[0], location[1],
+                        location[0] + ed_transtext.getWidth(),
+                        location[1] + ed_transtext.getHeight());
+                if (!transtext_rect.contains(x, y) && editing_transtext) {
+                    on_edit_click(v);
+                    Log.i("APP", "Closing keyboard text.");
+                }
+            } else if (v == ed_title) {
+                int[] location = new int[2];
+                ed_title.getLocationOnScreen(location);
+                Rect titletext_rect = new Rect(location[0], location[1],
+                        location[0] + ed_title.getWidth(),
+                        location[1] + ed_title.getHeight());
+
+                //Log.i("APP", "point " + event.getRawX() + " " + event.getRawY());
+                //Log.i("APP", "l " + titletext_rect.left + " r " + titletext_rect.right + " t " + titletext_rect.top + " b " + titletext_rect.bottom);
+                if (!titletext_rect.contains(x, y)) {
+                    Log.i("APP", "Closing keyboard title.");
                     InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                    fab_share.show();
-                    fab_copy.show();
-                    fab_del.show();
-                    fab_rec.show();
-                    fab_edit.show();
-                    editing_title = false;
+                    ed_title.clearFocus();
                 }
-            } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                //Log.i("APP", "Editing title.");
-                editing_title = true;
             }
         }
     }
@@ -547,24 +550,22 @@ public class MainFragment extends Fragment {
     public void on_edit_click(View view) {
         ed_transtext.setFocusable(true);
         ed_transtext.setFocusableInTouchMode(true);
-
-        if (!is_editing && !just_closed) {
-            is_editing = true;
-            ed_transtext.requestFocus();
-            InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
-            imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
-
-            ed_transtext.invalidate();
-            ed_transtext.requestLayout();
-
-            fab_edit.setImageResource(R.drawable.done);
+        Log.i("APP", "val " + editing_transtext);
+        if (!editing_transtext) {
+            Log.i("APP", "editing trans text");
+            ed_title.setEnabled(false);
             fab_rec.hide();
-            Log.i("APP", "IN TRANSEDIT EDIT PRESS " + act.keyboard_height);
-            fab_edit.animate().translationY(-act.keyboard_height);
             fab_share.hide();
             fab_copy.hide();
             fab_del.hide();
             fab_rec.hide();
+            editing_transtext = true;
+            fab_edit.setImageResource(R.drawable.done);
+
+            ed_transtext.requestFocus();
+            InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(ed_transtext, 0);
+
             text_textWatcher = new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -599,33 +600,36 @@ public class MainFragment extends Fragment {
             ed_transtext.addTextChangedListener(text_textWatcher);
 
         } else {
-            just_closed = false;
+            editing_transtext = false;
             Log.i("APP", "DONE EDIT");
             act.h_background.removeCallbacks(trans_edit_runnable);
             if (trans_edit_runnable != null) {
                 act.h_background.post(trans_edit_runnable);
             }
             ed_transtext.removeTextChangedListener(text_textWatcher);
+            fab_edit.animate().translationY(0.f);
             fab_edit.setImageResource(R.drawable.edit);
             fab_share.show();
             fab_copy.show();
             fab_del.show();
             fab_rec.show();
-            is_editing = false;
-            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-            lay_params.bottomMargin = 8;
+            ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
+            ConstraintLayout.LayoutParams lay_params = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            lay_params.bottomMargin = 8;
             img_view.invalidate();
             img_view.requestLayout();
-            // everything already done in dispatchTouchEvent
+            ed_transtext.clearFocus();
+            ed_title.setEnabled(true);
         }
         ed_transtext.setFocusableInTouchMode(false);
     }
 
     public void on_delete_click(View view) {
-        edited_title = true;
+        manually_editing_title = true;
         ed_title.setText("", TextView.BufferType.EDITABLE);
+        manually_editing_title = false;
         act.f_repo.delete(curr_afile);
         curr_afile = null;
         fab_edit.animate().translationX(256f);
@@ -633,26 +637,19 @@ public class MainFragment extends Fragment {
         fab_share.animate().translationX(256f);
         fab_del.animate().translationX(-256f);
         ed_transtext.setText("");
-        edited_title = false;
     }
 
     public void resize_views(int height) {
-        //Log.i("APP", "resizing");
         DisplayMetrics dm = new DisplayMetrics();
         act.getWindowManager().getDefaultDisplay().getMetrics(dm);
         int dp = (int) (height / dm.density);
-        fab_edit.animate().translationY(-dp);
-        if (editing_title) {
-            fab_share.hide();
-            fab_copy.hide();
-            fab_del.hide();
-            fab_rec.hide();
-            fab_edit.hide();
+        if (editing_transtext) {
+            Log.i("APP", "resizing " + fab_edit.getTranslationY() + " " + dp);
+            fab_edit.animate().translationY(-dp);
+            ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
+            mainview_layout.bottomMargin = height - 100;
+            img_view.invalidate();
+            img_view.requestLayout();
         }
-        ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
-        mainview_layout.bottomMargin = height - 100;
-        img_view.invalidate();
-        img_view.requestLayout();
     }
-
 }
