@@ -179,8 +179,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
 
                     builder.setTitle("Transcribe audio file")
-                            .setMessage("This is estimated to take: " + est_time + "\n\nThis will run in the background so" +
-                                    " probably you can switch to other apps while it runs, but your phone will run slower than normal (and if it does not work try not switching to other apps).")
+                            .setMessage("This is estimated to take: " + est_time + "\n\nTo be sure that recognizing the entire file works it is recommended to not switch to other apps while it is running.")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final RecEngine recEngine = RecEngine.getInstance(rmodeldir, context.exclusiveCores);  // RISKY!! what if it was GCed and needs to be recreated?

@@ -700,7 +700,7 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
 
         BaseFloat chunk_length_secs = 0.72;
 
-        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 40, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 600, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -906,7 +906,7 @@ int RecEngine::convert_audio(const char* audiopath, const char* wavpath) {
 }
 
 void RecEngine::set_thread_affinity() {
-//    if (thread_affinity_set) return;
+    if (excl_cores.size() == 0) return;
     pid_t current_thread_id = gettid();
     cpu_set_t cpu_set;
     CPU_ZERO(&cpu_set);

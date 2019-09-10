@@ -74,6 +74,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
+    private Runnable startup_runnable;
     private String[] permissions = {Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
@@ -97,17 +98,36 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode){
             case REQUEST_PERMISSIONS_CODE:
+                boolean failed = false;
                 for(int i=0; i < grantResults.length; i++) {
                     if(grantResults[i] != PackageManager.PERMISSION_GRANTED) {
-                        Toast.makeText(this, "Required permissions not granted, app closing.", Toast.LENGTH_LONG).show();
-                        finish();
+                        failed = true;
+                        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                        builder.setTitle("Warning")
+                                .setMessage("You must grant these permissions for the app to work.")
+                                .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                    }
+                                });
+                        AlertDialog alert = builder.create();
+                        alert.show();
+                        h_main.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                alert.dismiss();
+                                finish();
+                            }
+                        }, 3000);
                         break;
                     }
                 }
+                if (!failed) {
+                    perm_granted = true;
+                }
                 break;
         }
-        perm_granted = true;
-        onStart();
     }
 
     @Override
@@ -253,10 +273,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         String uniqueID = InstanceID.getInstance(this).getId();
         Bugsnag.setUser(uniqueID, "email", "user");
         Log.i("APP", "Starting up activity.");
-        if (!perm_granted) {
-            finish();
-            return;
-        }
 
         appUpdateManager = AppUpdateManagerFactory.create(this);
         if (!settings.getBoolean("knows_is_first_start", true)) {
@@ -297,44 +313,56 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         handlerThread = new HandlerThread("BackgroundHandlerThread");
         handlerThread.start();
 
-        exclusiveCores = android.os.Process.getExclusiveCores();
-        Log.i("APP", "numcore " + exclusiveCores.length);
-        for(int i = 0; i < exclusiveCores.length; i++) {
-            Log.i("APP", "core " + exclusiveCores[i]);
-        }
-
-        do_asr_setup();
-        if (start_main) {
-            Log.i("APP", "Starting main fragment.");
-            if (fragment_id == 1) {
-                bottomNavigationView.setSelectedItemId(R.id.Transcribe);
-            } else if (fragment_id == 2) {
-                bottomNavigationView.setSelectedItemId(R.id.Manage);
-            } else if (fragment_id == 3) {
-                bottomNavigationView.setSelectedItemId(R.id.Settings);
-            }
+        try {
+            exclusiveCores = android.os.Process.getExclusiveCores();
+            Log.i("APP", "numcore " + exclusiveCores.length);
+        } catch (RuntimeException e) {
+            ;
         }
 
         h_background = new Handler(handlerThread.getLooper());
 
         pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+
+        startup_runnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!perm_granted) {
+                    h_main.postDelayed(this, 500);
+                } else {
+                    do_asr_setup();
+                    if (start_main) {
+                        Log.i("APP", "Starting main fragment.");
+                        if (fragment_id == 1) {
+                            bottomNavigationView.setSelectedItemId(R.id.Transcribe);
+                        } else if (fragment_id == 2) {
+                            bottomNavigationView.setSelectedItemId(R.id.Manage);
+                        } else if (fragment_id == 3) {
+                            bottomNavigationView.setSelectedItemId(R.id.Settings);
+                        }
+                    }
+
+                }
+            }
+        };
+        h_main.post(startup_runnable);
     }
 
     @Override
     protected void onStop() {
-        super.onStop();
-        handlerThread.quit();
-        keyboardHeightProvider.close();
-        if (pm.isSustainedPerformanceModeSupported()) {
-            getWindow().setSustainedPerformanceMode(false);
+        if (handlerThread != null) {
+            handlerThread.quit();
         }
+        keyboardHeightProvider.close();
+        super.onStop();
     }
-
 
     @Override
     protected void onDestroy() {
         Log.i("APP", "Destroying");
-        recEngine.delete();
+        if (recEngine != null) {
+            recEngine.delete();
+        }
         super.onDestroy();
     }
 

@@ -24,6 +24,8 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.bugsnag.android.Bugsnag;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -113,11 +115,9 @@ public class ManageFragment extends Fragment {
     }
 
     class ConvertAudioRunnable implements Runnable {
-        String fname;
         String inpath;
         String outpath;
-        ConvertAudioRunnable(String f, String inp, String outp) {
-            fname = f;
+        ConvertAudioRunnable(String inp, String outp) {
             inpath = inp;
             outpath = outp;
         }
@@ -128,7 +128,7 @@ public class ManageFragment extends Fragment {
                     @Override
                     public void run() {
                         AlertDialog.Builder builder = new AlertDialog.Builder(act);
-                        builder.setMessage("Could not include this file :( Are you sure this is an audio file?");
+                        builder.setMessage("Could not include this file :( Are you sure this is an audio file?\n\nGet in touch if you think this should work: contact@typefree.io");
                         builder.setNeutralButton("OK", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
@@ -146,7 +146,10 @@ public class ManageFragment extends Fragment {
             int dur = (int) ((float) mPlayer.getDuration() / 1000.0f);
             mPlayer.stop();
             mPlayer.release();
-            AFile afile = new AFile(fname, fname, dur, act.getFileDate());
+            String fname = f.getName();
+            String[] split = fname.split("\\.");
+            String basename = split[0];
+            AFile afile = new AFile(basename, basename, dur, act.getFileDate());
             act.f_repo.insert(afile);
         }
     }
@@ -157,32 +160,24 @@ public class ManageFragment extends Fragment {
             case 7:
                 if (resultCode == RESULT_OK) {
                     Uri furi = data.getData();
-                    String name = "";
                     String path = "";
                     String newpath = "";
-                    String fname_tmp = "";
-                    boolean copied = false;
                     if (furi.getScheme().equals(ContentResolver.SCHEME_FILE)) {
                         path = furi.getPath();
                         File f = new File(path);
                         String basename = f.getName();
-                        name = furi.getLastPathSegment();
                         basename = MainActivity.getFileName(basename, act.f_repo);
-                        String dir = f.getParent();
-                        path = dir + "/" + basename;
-                        Log.i("APP", "bla bla path " + path + " filename " + name);
+                        newpath = Base.filesdir + basename + ".wav";
+                        Log.i("APP", "SCHEME_FILE: path " + path + " newpath " + newpath);
                     } else if (furi.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
-                        copied = true;
 
                         Cursor retCursor = act.getContentResolver().query(furi, null, null, null, null);
                         retCursor.moveToFirst();
                         int idx_name = retCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                        name = retCursor.getString(idx_name);
+                        String name = retCursor.getString(idx_name);
                         String[] split = name.split("\\.");
-                        String fname = split[split.length-1];
-                        fname = MainActivity.getFileName(fname, act.f_repo);
-                        path = Base.filesdir + "tmp." + fname;
-                        Log.i("APP", "bla bla path " + path + " filename " + name);
+                        String suffix = split[split.length-1];
+                        path = Base.filesdir + "tmp." + suffix;
                         InputStream inputStream = null;
                         try {
                             inputStream = act.getContentResolver().openInputStream(furi);
@@ -191,36 +186,41 @@ public class ManageFragment extends Fragment {
                         }
                         copyFileFromInputStream(inputStream, new File(path));
 
-                        fname_tmp = split[0];
+                        String basename = split[0];
                         for (int i = 1; i < split.length - 1; i++) {
-                            fname_tmp += split[i];
+                            basename += split[i];
                         }
-                        newpath = Base.filesdir + fname_tmp + ".wav";
-
+                        basename = MainActivity.getFileName(basename, act.f_repo);
+                        newpath = Base.filesdir + basename + ".wav";
+                        Log.i("APP", "SCHEME_CONTENT: path " + path + " newpath " + newpath);
                     } else {
-                        Log.i("APP", "bla bla bla other scheme");
+                        Log.e("APP", "Other scheme!");
                     }
 
                     if (newpath.equals("")) {
                         Log.e("APP", "Newpath is empty!");
+                        Bugsnag.leaveBreadcrumb("Newpath is empty!");
+                        Bugsnag.notify(new RuntimeException());
                         return;
                     }
                     final String inpath = path;
                     final String outpath = newpath;
-                    final String fname = fname_tmp;
 
-                    r = new ConvertAudioRunnable(fname, inpath, outpath);
+                    r = new ConvertAudioRunnable(inpath, outpath);
                     new Thread(r).start();
-                    //act.h_background.post(new );
 
-                    Log.i("APP-MANAGEFRAG", "Done");
+                    Log.i("APP", "Done importing.");
                     break;
                 }
-
+            default:
+                Log.e("APP", "Different request code?.");
+                Bugsnag.leaveBreadcrumb("Different request code?.");
+                Bugsnag.notify(new RuntimeException());
         }
     }
 
     public void on_add_press(View view) {
+        Bugsnag.leaveBreadcrumb("Importing file.");
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("audio/*");
         startActivityForResult(intent, 7);
