@@ -150,7 +150,7 @@ public class MainFragment extends Fragment {
                             PropertyValuesHolder.ofFloat("scaleX", 1.15f),
                             PropertyValuesHolder.ofFloat("scaleY", 1.15f));
                     pulse.setDuration(300);
-                    pulse.setStartDelay(1000);
+                    pulse.setStartDelay(2000);
                     pulse.setRepeatCount(1);
                     pulse.setRepeatMode(ObjectAnimator.REVERSE);
                     pulse.addListener(new Animator.AnimatorListener() {
@@ -189,7 +189,7 @@ public class MainFragment extends Fragment {
         if (act.settings.getBoolean("knows_mic_location", true)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(act);
             builder.setTitle("Tip!")
-                    .setMessage("Point the microphone, typically at the bottom of your phone, towards the speaker (the closer the better).")
+                    .setMessage("Point the microphone towards the speaker.\n\nTypically the mic is at the bottom of the phone.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {

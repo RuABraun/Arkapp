@@ -29,6 +29,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bugsnag.android.Bugsnag;
+
 import org.w3c.dom.Text;
 
 import java.io.File;
@@ -167,11 +169,11 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             button_trans.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-
                     final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);
                     String fname = afile_to_use.fname;
                     final String fpath = Base.filesdir + fname;
                     final String wavpath = Base.filesdir + fname + ".wav";
+                    Bugsnag.leaveBreadcrumb("About to transcribe imported file " + wavpath);
                     Log.i("APP", "Pressed on file " + fpath + " with name " + afile_to_use.title);
                     MediaPlayer mPlayer = MediaPlayer.create(context, Uri.parse(wavpath));
                     int dur = (int) ((float)mPlayer.getDuration() / 2000.0f);

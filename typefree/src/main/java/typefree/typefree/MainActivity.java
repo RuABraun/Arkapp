@@ -179,21 +179,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             iconView.setLayoutParams(layoutParams);
         }
 
-        // Handle permissions
-        ArrayList<String> need_permissions = new ArrayList<>();
-        for(String perm: permissions) {
-            if (ActivityCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
-                need_permissions.add(perm);
-            }
-        }
-        if (need_permissions.size() > 0) {
-            ActivityCompat.requestPermissions(this,
-                    need_permissions.toArray(new String[need_permissions.size()]),
-                    REQUEST_PERMISSIONS_CODE);
-        } else {
-            perm_granted = true;
-        }
-
         pb_init = findViewById(R.id.pb_init);
         tv_init = findViewById(R.id.tv_init);
 
@@ -206,8 +191,42 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         });
 
         f_repo = new FileRepository(getApplication());
+
+        ArrayList<String> need_permissions = new ArrayList<>();
+        for(String perm: permissions) {
+            if (ActivityCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                need_permissions.add(perm);
+            }
+        }
+        if (need_permissions.size() == 0) {
+            perm_granted = true;
+        } else {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Info about permissions")
+                    .setMessage("So that this app can use the phone's microphone and so you can import " +
+                            " audio files on your phone into the app it will ask for permission to get access to the microphone and the phone's files.\n" +
+                            "The app will never access your files on its own.")
+                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                            ask_for_permissions(need_permissions);
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+        }
     }
 
+    private void ask_for_permissions(ArrayList<String> need_permissions) {
+        if (need_permissions.size() > 0) {
+            ActivityCompat.requestPermissions(this,
+                    need_permissions.toArray(new String[need_permissions.size()]),
+                    REQUEST_PERMISSIONS_CODE);
+        } else {
+            perm_granted = true;
+        }
+    }
 
     private void do_asr_setup() {
 

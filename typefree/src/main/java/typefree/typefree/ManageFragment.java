@@ -165,7 +165,12 @@ public class ManageFragment extends Fragment {
                     if (furi.getScheme().equals(ContentResolver.SCHEME_FILE)) {
                         path = furi.getPath();
                         File f = new File(path);
-                        String basename = f.getName();
+                        String wholename = f.getName();
+                        String[] split = wholename.split("\\.");
+                        String basename = split[0];
+                        for (int i = 1; i < split.length - 1; i++) {
+                            basename += split[i];
+                        }
                         basename = MainActivity.getFileName(basename, act.f_repo);
                         newpath = Base.filesdir + basename + ".wav";
                         Log.i("APP", "SCHEME_FILE: path " + path + " newpath " + newpath);
@@ -214,8 +219,7 @@ public class ManageFragment extends Fragment {
                 }
             default:
                 Log.e("APP", "Different request code?.");
-                Bugsnag.leaveBreadcrumb("Different request code?.");
-                Bugsnag.notify(new RuntimeException());
+                Bugsnag.leaveBreadcrumb("Different request code? " + requestCode);
         }
     }
 

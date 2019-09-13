@@ -14,7 +14,7 @@ public class AFile extends ListItem implements Parcelable  {
     @ColumnInfo(name = "title")
     public String title;
     @ColumnInfo(name = "fname")
-    public String fname;
+    public String fname;  // text file path
     @ColumnInfo(name = "len_s")
     public int len_s;
     @ColumnInfo(name = "date")
