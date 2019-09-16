@@ -52,7 +52,7 @@ public:
 
     int stop_trans_stream();
 
-    void transcribe_file(std::string wavpath, std::string fpath);
+    int transcribe_file(std::string wavpath, std::string fpath);
 
     void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
 

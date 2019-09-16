@@ -29,8 +29,8 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             /home/seni/AndroidStudioProjects/typefree/typefree/src/main/cpp/jni-bridge.cpp
-             /home/seni/AndroidStudioProjects/typefree/typefree/src/main/cpp/RecEngine.cpp
+             src/main/cpp/jni-bridge.cpp
+             src/main/cpp/RecEngine.cpp
              ${DEBUG_UTILS_PATH}/trace.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a

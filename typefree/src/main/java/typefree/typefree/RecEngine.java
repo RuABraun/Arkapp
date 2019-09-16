@@ -76,13 +76,15 @@ public class RecEngine {
         if (mEngineHandle != 0) native_setAudioDeviceId(mEngineHandle, deviceId);
     }
 
-    public void transcribe_file(String wavpath, String fpath) {
+    public int transcribe_file(String wavpath, String fpath) {
         Log.i("APP", String.format("Using EngineHandle: %d", mEngineHandle));
         if (mEngineHandle != 0) {
             isrunning = true;
-            native_transcribe_file(mEngineHandle, wavpath, fpath);
+            int return_code = native_transcribe_file(mEngineHandle, wavpath, fpath);
             isrunning = false;
+            return return_code;
         }
+        return 1;
     }
 
     public int convert_audio(String audiopath, String wavpath) {
@@ -100,6 +102,6 @@ public class RecEngine {
     public static native String native_getConstText(long engineHandle);
     public static native void native_transcribe_stream(long engineHandle, String wavpath);
     public static native long native_stop_trans_stream(long engineHandle);
-    public static native void native_transcribe_file(long engineHandle, String wavpath, String ctm);
+    public static native int native_transcribe_file(long engineHandle, String wavpath, String ctm);
     public static native int native_convertAudio(long engineHandle, String audiopath, String wavpath);
 }

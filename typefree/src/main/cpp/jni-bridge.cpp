@@ -100,7 +100,7 @@ Java_typefree_typefree_RecEngine_native_1stop_1trans_1stream(JNIEnv *env, jobjec
     return num_out_frames;
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 Java_typefree_typefree_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, jlong engineHandle, jstring jwavpath, jstring jfpath) {
     const char* cstr = env->GetStringUTFChars(jwavpath, NULL);
     std::string wavpath = std::string(cstr);
@@ -109,9 +109,10 @@ Java_typefree_typefree_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, 
     RecEngine* engine = (RecEngine*) engineHandle;
     if (engine == nullptr) {
         LOGE("Engine handle is invalid");
-        return;
+        return 1;
     }
-    engine->transcribe_file(wavpath, fpath);
+    int return_code = engine->transcribe_file(wavpath, fpath);
+    return return_code;
 }
 
 JNIEXPORT jstring JNICALL Java_typefree_typefree_RecEngine_native_1getText(JNIEnv* env, jobject, jlong engineHandle) {

@@ -192,7 +192,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
             break;
         }
     }
-    // ! -- AM setup end, doing RNN setup
+    // ! -- AM setup end
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
     fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
@@ -687,7 +687,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
     return text;
 }
 
-void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
+int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
     set_thread_affinity();
     reset_text();
     try {
@@ -763,9 +763,9 @@ void RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
     } catch(const std::exception& e) {
         LOGE("FAILED FAILED FAILED");
         LOGE("ERROR %s",  e.what());
-        throw;
+        return 1;
     }
-
+    return 0;
 }
 extern "C" {
 int decode_audio_file(const char *path, const int fs, signed short **data, int *size) {

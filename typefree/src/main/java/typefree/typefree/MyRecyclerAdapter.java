@@ -197,7 +197,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            recEngine.transcribe_file(wavpath, fpath);
+                                            final int retcode = recEngine.transcribe_file(wavpath, fpath);
                                             recog_done = true;
                                             if (context.pm.isSustainedPerformanceModeSupported()) {
                                                 context.runOnUiThread(new Runnable() {
@@ -208,6 +208,22 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                                     }
                                                 });
                                             }
+                                            context.runOnUiThread(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                                                    builder.setTitle("Warning")
+                                                            .setMessage("Something went wrong transcribing the file, contact support for help: contact@typefree.io")
+                                                            .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                                                                @Override
+                                                                public void onClick(DialogInterface dialog, int which) {
+                                                                    dialog.dismiss();
+                                                                }
+                                                            });
+                                                    AlertDialog alert = builder.create();
+                                                    alert.show();
+                                                }
+                                            });
                                         }
                                     });
                                     t.setPriority(9);
@@ -252,10 +268,11 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
+                                    Bugsnag.leaveBreadcrumb("Opening file " + Base.filesdir + afile_to_use.fname + ".wav");
                                     if (!f.exists()) {
                                         Log.i("APP", "File does not exist, title: " +
                                                 afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
-                                        Toast.makeText(context, "File does not exist! Maybe it still needs to be transcribed (mic button). Contact support for help.", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(context, "File does not exist! Contact support for help: contact@typefree.io", Toast.LENGTH_SHORT).show();
                                         break;
                                     }
                                     Bundle bundle = new Bundle();
@@ -307,6 +324,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
                     final AFile afile_to_use = (AFile) data_grouped_.get(curr_pos);
                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
+                    Bugsnag.leaveBreadcrumb("Opening file " + Base.filesdir + afile_to_use.fname + ".wav");
                     if (!f.exists()) {
                         Log.i("APP", "File does not exist, title: " +
                                 afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
