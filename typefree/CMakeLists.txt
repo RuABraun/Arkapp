@@ -33,6 +33,14 @@ add_library( # Sets the name of the library.
              src/main/cpp/RecEngine.cpp
              ${DEBUG_UTILS_PATH}/trace.cpp)
 
+add_library(lib_bugsnag SHARED IMPORTED)
+set(BUGSNAG_LIB_DIR
+        ${CMAKE_SOURCE_DIR}/build/intermediates/bugsnag-libs)
+set(BUGSNAG_INCLUDE_DIR ${BUGSNAG_LIB_DIR}/assets/include)
+set_target_properties(lib_bugsnag PROPERTIES IMPORTED_LOCATION
+        ${BUGSNAG_LIB_DIR}/jni/${ANDROID_ABI}/libbugsnag-ndk.so)
+include_directories(${BUGSNAG_INCLUDE_DIR})
+
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
 # default, you only need to specify the name of the public NDK library
@@ -118,5 +126,5 @@ target_link_libraries( # Specifies the target library.
 
                        # Links the target library to the log library
                        # included in the NDK.
-                       ${log-lib} )
+                       ${log-lib} lib_bugsnag)
 

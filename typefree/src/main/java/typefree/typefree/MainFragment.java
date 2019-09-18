@@ -30,6 +30,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bugsnag.android.Bugsnag;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -302,6 +304,7 @@ public class MainFragment extends Fragment {
 
     public void record_switch(View view) {
         if (!is_recording ) {
+            Bugsnag.leaveBreadcrumb("Started transcribing stream.");
             if (!RecEngine.isready) return;
             try {
                 if (t_stoptrans != null) t_stoptrans.join();
@@ -389,6 +392,7 @@ public class MainFragment extends Fragment {
             act.bottomNavigationView.setVisibility(View.GONE);
 
         } else {
+            Bugsnag.leaveBreadcrumb("Stopped transcribing stream.");
             time_counter.cancel();
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;

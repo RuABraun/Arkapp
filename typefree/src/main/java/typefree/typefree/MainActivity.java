@@ -205,7 +205,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             builder.setTitle("Info about permissions")
                     .setMessage("So that this app can use the phone's microphone and so you can import " +
                             " audio files on your phone into the app it will ask for permission to get access to the microphone and the phone's files.\n" +
-                            "The app will never access your files on its own.")
+                            "The app will never access/share your files on its own.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
@@ -252,7 +252,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 @Override
                 public void run() {
                     native_load(mgr, rmodeldir);
+                    Bugsnag.leaveBreadcrumb("Begin loading model.");
                     recEngine = RecEngine.getInstance(rmodeldir, exclusiveCores);
+                    Bugsnag.leaveBreadcrumb("Done loading model");
                 }
             });
             t.setPriority(7);
@@ -277,7 +279,9 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
+                    Bugsnag.leaveBreadcrumb("Begin loading model.");
                     recEngine = RecEngine.getInstance(rmodeldir, exclusiveCores);
+                    Bugsnag.leaveBreadcrumb("Done loading model");
                 }
             });
             t.setPriority(7);
@@ -379,6 +383,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     @Override
     protected void onDestroy() {
         Log.i("APP", "Destroying");
+        Bugsnag.leaveBreadcrumb("Destroying");
         if (recEngine != null) {
             recEngine.delete();
         }

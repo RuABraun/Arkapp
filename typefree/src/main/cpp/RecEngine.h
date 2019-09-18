@@ -89,11 +89,11 @@ private:
     size_t fact_chunk_pos;
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
-    float_t* fp_audio;
-    int16_t* int_audio; // is in int16 range
+    float_t* fp_audio = NULL;
+    int16_t* int_audio = NULL; // is in int16 range
 
-    FILE* os_ctm;
-    FILE* os_txt;
+    FILE* os_ctm = NULL;
+    FILE* os_txt = NULL;
 
     std::atomic<bool> recognition_on;
     std::atomic<bool> do_recognition;
@@ -109,16 +109,16 @@ private:
     kaldi::nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
     kaldi::OnlineSilenceWeightingConfig sil_config;
     kaldi::OnlineNnet2FeaturePipelineConfig feature_opts;
-    fst::Fst<fst::StdArc>* decode_fst;
+    fst::Fst<fst::StdArc>* decode_fst = NULL;
     kaldi::OnlineNnet2FeaturePipelineInfo* feature_info = NULL;
     kaldi::nnet3::DecodableNnetSimpleLoopedInfo* decodable_info = NULL;
     kaldi::SingleUtteranceNnet3Decoder* decoder = NULL;
     kaldi::OnlineNnet2FeaturePipeline* feature_pipeline = NULL;
-    fst::SymbolTable* word_syms;
-    kaldi::LatticeFasterDecoderConfig* decoder_opts;
+    fst::SymbolTable* word_syms = NULL;
+    kaldi::LatticeFasterDecoderConfig* decoder_opts = NULL;
     kaldi::BaseFloat fin_sample_rate_fp;
     kaldi::TransitionModel trans_model;
-    kaldi::WordBoundaryInfo* wordb_info;
+    kaldi::WordBoundaryInfo* wordb_info = NULL;
     kaldi::WordBoundaryInfoNewOpts opts;
     int32 left_context;
     int32 right_context;
@@ -136,12 +136,12 @@ private:
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_fst = NULL;
     fst::ScaleDeterministicOnDemandFst* carpa_lm_fst_subtract = NULL;
     kaldi::nnet3::Nnet rnnlm;
-    kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts;
-    kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info;
-    kaldi::rnnlm::KaldiRnnlmDeterministicFstAdapt* lm_to_add_orig;
-    fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add;
-    const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms;
-    const kaldi::ComposeLatticePrunedOptions* compose_opts;
+    kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts = NULL;
+    kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info = NULL;
+    kaldi::rnnlm::KaldiRnnlmDeterministicFstAdapt* lm_to_add_orig = NULL;
+    fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add = NULL;
+    const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms = NULL;
+    const kaldi::ComposeLatticePrunedOptions* compose_opts = NULL;
     bool rnn_ready;
 
     // case model

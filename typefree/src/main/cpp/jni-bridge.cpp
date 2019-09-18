@@ -4,6 +4,7 @@
 #include "RecEngine.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
+#include <bugsnag.h>
 
 
 extern "C" {
@@ -112,6 +113,9 @@ Java_typefree_typefree_RecEngine_native_1transcribe_1file(JNIEnv *env, jobject, 
         return 1;
     }
     int return_code = engine->transcribe_file(wavpath, fpath);
+    if (return_code != 0) {
+        bugsnag_notify_env(env, "Transcription error", "Failed to transcribe file output path", BSG_SEVERITY_WARN);
+    }
     return return_code;
 }
 

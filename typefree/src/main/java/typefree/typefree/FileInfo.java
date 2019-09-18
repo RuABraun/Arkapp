@@ -45,6 +45,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewSwitcher;
 
+import com.bugsnag.android.Bugsnag;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -255,6 +257,7 @@ public class FileInfo extends Fragment {
                                 Log.i("APP", "PLAY");
                                 int offset = layout.getOffsetForHorizontal(lineidx, x);
                                 int i = getIdxForCharOffset(offset);
+                                if (i == -1) return false;
                                 int time_ms = word_times_ms.get(i);
                                 mPlayer.seekTo(time_ms);
                                 playMediaPlayer();
@@ -351,6 +354,7 @@ public class FileInfo extends Fragment {
     private int getIdxForCharOffset(int offset) {
         int sz = word_start_c_idx.size();
         int i = 0;
+        if (sz == 0) return -1;
         while(word_start_c_idx.get(i) < offset) {
             i++;
             if (i == sz) break;
@@ -360,6 +364,7 @@ public class FileInfo extends Fragment {
     }
 
     public void setFileFields() {
+        Bugsnag.leaveBreadcrumb("Setting file fields.");
         TextView tv = getView().findViewById(R.id.file_date);
         tv.setText(afile.date);
         tv_fduration = getView().findViewById(R.id.file_duration);
@@ -376,6 +381,10 @@ public class FileInfo extends Fragment {
             fis.read(buffer);
             fis.close();
             normal_text = new String(buffer);
+            String text_no_whitespace = normal_text.replaceAll("\\\\s", "");
+            if (text_no_whitespace.length() == 0) {
+                text_found = false;
+            }
         } catch(IOException ex) {
             text_found = false;
             normal_text = "Transcript not found! You might want to return to the \"Files\" screen to press the microphone image to transcribe it!";
@@ -388,6 +397,7 @@ public class FileInfo extends Fragment {
             @Override
             public void onSelectionChanged(int startoffset) {
                 int wordidx = getIdxForCharOffset(startoffset);
+                if (wordidx == -1 || word_times_ms.size() == 0) return;
                 int time_ms = word_times_ms.get(wordidx);
                 float ratio = (float) time_ms / mPlayer.getDuration();
                 Log.i("APP", "ratio " + ratio);
@@ -458,6 +468,7 @@ public class FileInfo extends Fragment {
         fileinfo_ed_title.setText(afile.title);
 
         act.f_repo = new FileRepository(act.getApplication());
+        Bugsnag.leaveBreadcrumb("Finished setting file fields");
     }
 
     public void playMediaPlayer() {
@@ -483,9 +494,11 @@ public class FileInfo extends Fragment {
                 if (lineidx < 0) lineidx = 0;
                 int offset = layout.getOffsetForHorizontal(lineidx, tv_transtext.getMeasuredWidth());
                 int idx = getIdxForCharOffset(offset);
-                if (word_times_ms.get(idx) + 1000 < cur_time_ms && idx < word_times_ms.size() - 8) {  // otherwise scrolls at end of text
-                    int line_height = tv_transtext.getLineHeight();
-                    tv_transtext.scrollBy(0, line_height);
+                if (word_times_ms.size() > 0) {
+                    if (word_times_ms.get(idx) + 1000 < cur_time_ms && idx < word_times_ms.size() - 8) {  // otherwise scrolls at end of text
+                        int line_height = tv_transtext.getLineHeight();
+                        tv_transtext.scrollBy(0, line_height);
+                    }
                 }
 
                 act.h_main.postDelayed(this, 100);

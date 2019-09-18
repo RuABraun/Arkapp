@@ -175,7 +175,6 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
         SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
         SetQuantTestMode(true, &(am_nnet.GetNnet()));
-//        nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
     LOGI("Done AM model.");
     left_context = am_nnet.LeftContext();
@@ -217,6 +216,8 @@ RecEngine::~RecEngine() {
     delete wordb_info;
     delete decoder_opts;
     delete os_ctm, os_txt;
+    delete const_arpa;
+    delete rnn_info;
 }
 
 const char* RecEngine::get_text(){

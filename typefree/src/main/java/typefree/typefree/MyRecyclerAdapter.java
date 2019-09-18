@@ -197,7 +197,9 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
+                                            Bugsnag.leaveBreadcrumb("Starting transcription of file " + wavpath);
                                             final int retcode = recEngine.transcribe_file(wavpath, fpath);
+                                            Bugsnag.leaveBreadcrumb("Finished transcription of file.");
                                             recog_done = true;
                                             if (context.pm.isSustainedPerformanceModeSupported()) {
                                                 context.runOnUiThread(new Runnable() {
@@ -208,22 +210,24 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                                     }
                                                 });
                                             }
-                                            context.runOnUiThread(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                                                    builder.setTitle("Warning")
-                                                            .setMessage("Something went wrong transcribing the file, contact support for help: contact@typefree.io")
-                                                            .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
-                                                                @Override
-                                                                public void onClick(DialogInterface dialog, int which) {
-                                                                    dialog.dismiss();
-                                                                }
-                                                            });
-                                                    AlertDialog alert = builder.create();
-                                                    alert.show();
-                                                }
-                                            });
+                                            if (retcode != 0) {
+                                                context.runOnUiThread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                                                        builder.setTitle("Warning")
+                                                                .setMessage("Something went wrong transcribing the file, contact support for help: contact@typefree.io")
+                                                                .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                                                                    @Override
+                                                                    public void onClick(DialogInterface dialog, int which) {
+                                                                        dialog.dismiss();
+                                                                    }
+                                                                });
+                                                        AlertDialog alert = builder.create();
+                                                        alert.show();
+                                                    }
+                                                });
+                                            }
                                         }
                                     });
                                     t.setPriority(9);
