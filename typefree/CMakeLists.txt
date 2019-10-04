@@ -94,6 +94,10 @@ endif()
 # qnnpack
 set (QNNPATH "/home/seni/git/QNNPACK/build/android/${ANDROID_ABI}/")
 
+# pytorch
+#set (TORCHPATH "/home/seni/git/pytorch-android/build_android/install")
+#include_directories(${TORCHPATH}/include)
+#include_directories(/home/seni/git/pytorch-android /home/seni/git/pytorch-android/aten/src )
 
 include_directories("/home/seni/git/prebuilt-libz/android-${ANDROID_ABI}/include")
 
@@ -128,3 +132,4 @@ target_link_libraries( # Specifies the target library.
                        # included in the NDK.
                        ${log-lib} lib_bugsnag)
 
+#${TORCHPATH}/lib/libtorch.a ${TORCHPATH}/lib/libc10.a ${TORCHPATH}/lib/libnnpack.a ${TORCHPATH}/lib/libcpuinfo.a

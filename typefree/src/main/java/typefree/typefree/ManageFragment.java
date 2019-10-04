@@ -13,8 +13,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.support.annotation.Nullable;
-import android.app.Fragment;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -33,13 +33,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import static android.app.Activity.RESULT_OK;
 
@@ -66,7 +60,6 @@ public class ManageFragment extends Fragment {
         adapter = new MyRecyclerAdapter(act, act.f_repo, act.fragmentManager);
     }
 
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -79,7 +72,7 @@ public class ManageFragment extends Fragment {
         if (act.settings.getBoolean("knows_can_import", true)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(act);
             builder.setTitle("Tip!")
-                    .setMessage("Use the plus button to import audio or video files from your phone.")
+                    .setMessage("Use the + button to import audio or video files from your phone.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
@@ -110,8 +103,8 @@ public class ManageFragment extends Fragment {
 
     @Override
     public void onStop() {
-        super.onStop();
         fviewmodel.getAllFiles().removeObserver(observer);
+        super.onStop();
     }
 
     class ConvertAudioRunnable implements Runnable {

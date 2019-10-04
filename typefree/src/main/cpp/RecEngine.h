@@ -29,7 +29,34 @@
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/kernels/register.h"
 #include "tensorflow/lite/string_util.h"
+#include <atomic>
 
+class RingBuffer {
+public:
+    RingBuffer();
+    RingBuffer(int32_t size);
+
+    ~RingBuffer();
+
+    void Append(float_t* data, int32_t size);
+
+    void AppendI(int16_t* data, int32_t size);
+
+    void Add(float_t val);
+
+    int32_t Set(int32_t* offset);
+
+    float_t Get(int32_t index);
+
+    void Reset();
+
+    std::atomic<int32_t> next_index_;  // points 1 past last index used
+    std::atomic<int32_t> newest_gotten_index_;
+    int32_t size_;
+    float_t* data_;
+    int32_t num_added_;
+
+};
 
 class RecEngine : oboe::AudioStreamCallback {
 public:
@@ -89,8 +116,7 @@ private:
     size_t fact_chunk_pos;
     std::ofstream f;
     const static int32_t fin_sample_rate = 16000;
-    float_t* fp_audio = NULL;
-    int16_t* int_audio = NULL; // is in int16 range
+    RingBuffer audio_buffer;
 
     FILE* os_ctm = NULL;
     FILE* os_txt = NULL;
@@ -154,8 +180,6 @@ private:
     int32 casepos_zero_index;
 
     int32 run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos);
-
-    void write_to_wav(int32 num_frames);
 
 };
 

@@ -2,7 +2,6 @@ package typefree.typefree;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.FragmentManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -12,6 +11,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -181,7 +181,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
 
                     builder.setTitle("Transcribe audio file")
-                            .setMessage("This is estimated to take: " + est_time + "\n\nTo be sure that recognizing the entire file works it is recommended to not switch to other apps while it is running.")
+                            .setMessage("This is estimated to take: " + est_time + "\n\nPlease wait for the process to finish, do not switch to another app (or it will likely fail).")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final RecEngine recEngine = RecEngine.getInstance(rmodeldir, context.exclusiveCores);  // RISKY!! what if it was GCed and needs to be recreated?
@@ -288,7 +288,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     break;
                                 case R.id.Share:
                                     ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
-                                    dialog.show(((MainActivity) context).getFragmentManager(), "ShareDialog");
+                                    dialog.show(fragmentManager, "ShareDialog");
                                     break;
 
                                 case R.id.Delete:

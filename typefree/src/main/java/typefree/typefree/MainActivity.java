@@ -1,34 +1,23 @@
 package typefree.typefree;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.FragmentManager;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
-import android.graphics.Rect;
 import android.os.Bundle;
-import android.os.CpuUsageInfo;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
-import android.app.Fragment;
 import android.os.PowerManager;
 import android.support.annotation.NonNull;
-import android.support.constraint.ConstraintLayout;
-import android.support.constraint.Constraints;
 import android.support.design.internal.BottomNavigationMenuView;
 import android.support.design.widget.BottomNavigationView;
 import android.support.v4.app.ActivityCompat;
-import android.text.Editable;
-import android.text.TextWatcher;
+import android.support.v4.app.FragmentManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -38,7 +27,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.bugsnag.android.Bugsnag;
 import com.google.android.gms.iid.InstanceID;
@@ -138,7 +126,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
         setContentView(R.layout.activity_main);
 
-        fragmentManager = getFragmentManager();
+        fragmentManager = getSupportFragmentManager();
         settings = getSharedPreferences(PREFS_NAME, 0);
 
         bottomNavigationView = findViewById(R.id.botNavig);
@@ -377,6 +365,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             handlerThread.quit();
         }
         keyboardHeightProvider.close();
+        Bugsnag.leaveBreadcrumb("Stopping activity.");
         super.onStop();
     }
 

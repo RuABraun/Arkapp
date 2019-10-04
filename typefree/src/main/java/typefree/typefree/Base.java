@@ -122,54 +122,49 @@ public class Base extends AppCompatActivity {
 
     public static void temper_performance(final MainActivity act, int init_fast_run_time,
                                           int slow_run_time, int fast_run_time) {
-        int i = 0;
-        while (RecEngine.isrunning) {
-            if (i == 0) {
-                try {
+        try {
+            int i = 0;
+            while (RecEngine.isrunning && !(Thread.currentThread().isInterrupted())) {
+                if (i == 0) {
                     Thread.sleep(init_fast_run_time * 1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                try {
+                } else {
                     Thread.sleep(fast_run_time * 1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
                 }
-            }
-            if (act.pm.isSustainedPerformanceModeSupported()) {
-                act.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.i("APP", "turning sustainedperf on");
-                        act.getWindow().setSustainedPerformanceMode(true);
-                    }
-                });
-            }
-            try {
+                if (act.pm.isSustainedPerformanceModeSupported()) {
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Log.i("APP", "turning sustainedperf on");
+                            act.getWindow().setSustainedPerformanceMode(true);
+                        }
+                    });
+                }
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 Thread.sleep((slow_run_time + i) * 1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                if (act.pm.isSustainedPerformanceModeSupported()) {
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Log.i("APP", "turning sustainedperf off");
+                            act.getWindow().setSustainedPerformanceMode(false);
+                        }
+                    });
+                }
+                i += 2;
             }
             if (act.pm.isSustainedPerformanceModeSupported()) {
                 act.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Log.i("APP", "turning sustainedperf off");
+                        Log.i("APP", "Turning sustainedperf off for good");
                         act.getWindow().setSustainedPerformanceMode(false);
                     }
                 });
             }
-            i += 2;
-        }
-        if (act.pm.isSustainedPerformanceModeSupported()) {
-            act.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Log.i("APP", "Turning sustainedperf off for good");
-                    act.getWindow().setSustainedPerformanceMode(false);
-                }
-            });
+        } catch (InterruptedException e) {
+            return;
         }
     }
 }

@@ -1,11 +1,7 @@
 package typefree.typefree;
 
-import android.animation.Animator;
-import android.animation.ObjectAnimator;
-import android.animation.PropertyValuesHolder;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -14,6 +10,7 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.app.Fragment;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.DisplayMetrics;
@@ -38,7 +35,6 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import static typefree.typefree.Base.convertPixelsToDp;
 import static typefree.typefree.Base.filesdir;
 
 
@@ -46,10 +42,8 @@ public class MainFragment extends Fragment {
 
 
     public boolean is_recording = false;
-    Runnable title_runnable;
-    Runnable runnable, trans_update_runnable;
-    Runnable trans_done_runnable;
-    Runnable trans_edit_runnable;
+    Runnable title_runnable, runnable, trans_update_runnable, trans_done_runnable,
+        trans_edit_runnable, performance_runnable;
     private EditText ed_transtext;
     private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del;
     private EditText ed_title;
@@ -59,16 +53,15 @@ public class MainFragment extends Fragment {
     private AFile curr_afile;
     private int const_trans_size = 0;
     private ProgressBar spinner;
-    Thread t_stoptrans, t_starttrans;
+    Thread t_stoptrans, t_starttrans, t_perf_adjuster;
     private boolean manually_editing_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
     private boolean editing_transtext = false;
-    private TextView tv_counter;
+    private TextView tv_counter, tv_transcribe_hint;
     private ImageView img_view;
     private TextWatcher title_textWatcher, text_textWatcher;
     private MainActivity act;
     private View fview;
     private StringBuilder trans_text;
-    ObjectAnimator pulse;
     Timer time_counter;
     int fab_rec_botmargin;
 
@@ -88,6 +81,7 @@ public class MainFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         tv_counter = view.findViewById(R.id.tv_counter);
         tv_counter.setVisibility(View.INVISIBLE);
+        tv_transcribe_hint = view.findViewById(R.id.tv_transcribe_hint);
 
         spinner = view.findViewById(R.id.progressBar);
         ed_title = view.findViewById(R.id.ed_title);
@@ -140,6 +134,8 @@ public class MainFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        Log.i("APP", "Starting main fragment");
+        Bugsnag.leaveBreadcrumb("Starting main fragment");
         act.h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
@@ -148,50 +144,14 @@ public class MainFragment extends Fragment {
                     fab_rec.show();
                     spinner.setVisibility(View.INVISIBLE);
                     act.h_main.removeCallbacks(runnable);
-                    pulse = ObjectAnimator.ofPropertyValuesHolder(fab_rec,
-                            PropertyValuesHolder.ofFloat("scaleX", 1.15f),
-                            PropertyValuesHolder.ofFloat("scaleY", 1.15f));
-                    pulse.setDuration(300);
-                    pulse.setStartDelay(2000);
-                    pulse.setRepeatCount(1);
-                    pulse.setRepeatMode(ObjectAnimator.REVERSE);
-                    pulse.addListener(new Animator.AnimatorListener() {
-                        @Override
-                        public void onAnimationStart(Animator animation) {
-
-                        }
-
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            pulse.setStartDelay(2000);
-                            pulse.start();
-                        }
-
-                        @Override
-                        public void onAnimationCancel(Animator animation) {
-
-                        }
-
-                        @Override
-                        public void onAnimationRepeat(Animator animation) {
-
-                        }
-                    });
-                    pulse.start();
                 }
             }
         }, 100);
 
-        DisplayMetrics dm = new DisplayMetrics();
-        act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-        int screenHeight = dm.heightPixels;
-
-        Log.i("APP", "height " + screenHeight + " " + dm.density);
-
         if (act.settings.getBoolean("knows_mic_location", true)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(act);
             builder.setTitle("Tip!")
-                    .setMessage("Point the microphone towards the speaker.\n\nTypically the mic is at the bottom of the phone.")
+                    .setMessage("For best performance point the microphone towards the speaker.\n\nTypically the mic is at the bottom of the phone.")
                     .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
@@ -305,6 +265,7 @@ public class MainFragment extends Fragment {
     public void record_switch(View view) {
         if (!is_recording ) {
             Bugsnag.leaveBreadcrumb("Started transcribing stream.");
+            tv_transcribe_hint.setVisibility(View.INVISIBLE);
             if (!RecEngine.isready) return;
             try {
                 if (t_stoptrans != null) t_stoptrans.join();
@@ -330,7 +291,7 @@ public class MainFragment extends Fragment {
             fab_share.animate().translationX(256f);
             fab_del.animate().translationX(-256f);
             float offset = (float) fab_edit.getLeft() - fab_rec.getLeft() - 4;
-            pulse.cancel();
+
             fab_rec.setImageDrawable(act.getDrawable(R.drawable.stop));
             fab_rec.animate().translationX(offset);
             ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
@@ -351,12 +312,17 @@ public class MainFragment extends Fragment {
             });
             t_starttrans.setPriority(9);
             t_starttrans.start();
-            act.h_background.postDelayed(new Runnable() {
+
+            performance_runnable =
+
+            t_perf_adjuster = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     Base.temper_performance(act, 10, 60, 5);
                 }
-            }, 500);
+            });
+            t_perf_adjuster.start();
+            act.h_background.postDelayed(performance_runnable, 500);
 
             is_recording = true;
 
@@ -397,6 +363,7 @@ public class MainFragment extends Fragment {
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
             RecEngine.isrunning = false;
+            t_perf_adjuster.interrupt();
             if (act.pm.isSustainedPerformanceModeSupported()) {
                 Log.i("APP", "Turning sustainedperf off for good");
                 act.getWindow().setSustainedPerformanceMode(false);
@@ -408,13 +375,13 @@ public class MainFragment extends Fragment {
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
                         fab_rec.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
-                        pulse.start();
                         spinner.setVisibility(View.INVISIBLE);
                         act.h_main.removeCallbacks(trans_done_runnable);
                         fab_edit.animate().translationX(0f);
                         fab_copy.animate().translationX(0f);
                         fab_share.animate().translationX(0f);
                         fab_del.animate().translationX(0f);
+                        tv_transcribe_hint.setVisibility(View.VISIBLE);
                         update_text();
                         tv_counter.setVisibility(View.INVISIBLE);
                         act.bottomNavigationView.setVisibility(View.VISIBLE);

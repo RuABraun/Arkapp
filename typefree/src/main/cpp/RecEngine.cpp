@@ -152,7 +152,8 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
                                             decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "", modeldir + "cmvn.conf"),
-                                            tot_num_frames_decoded(0) {
+                                            tot_num_frames_decoded(0),
+                                            audio_buffer(16000 * 5) {
     start_logger();
     excl_cores = exclusiveCores;
     // ! -- ASR setup begin
@@ -194,19 +195,21 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
     // ! -- AM setup end
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
-    fp_audio = static_cast<float_t*>(calloc(mFramesPerBurst, sizeof(float_t)));
-    int_audio = static_cast<int16_t*>(calloc(mFramesPerBurst, sizeof(int16_t)));
-
     recognition_on = false;  // when off recognition loop won't run
     do_recognition = false;  // this is to prevent recognition from starting while appending data
 
-//    t.join();
     LOGI("Finished constructing rec");
+
+//    torch::jit::script::Module module;
+//    module = torch::jit::load(modeldir + "traced_model.pt");
+//
+//    std::vector<torch::jit::IValue> inputs;
+//    inputs.push_back(torch::ones({1, 3}));
+//    at::Tensor output = module.forward(inputs).toTensor();
+//    LOGI("OKAY!");
 }
 
 RecEngine::~RecEngine() {
-    free(fp_audio);
-    free(int_audio);
     delete word_syms;
     delete decode_fst;
     delete feature_pipeline;
@@ -311,6 +314,8 @@ void RecEngine::transcribe_stream(std::string fpath){
         std::string txtpath = fpath + ".txt";
         os_txt = fopen(txtpath.c_str(), "wt");
 
+        audio_buffer.Reset();
+
         // ---------------- Done
 
         result = mRecStream->requestStart();
@@ -366,10 +371,6 @@ int RecEngine::stop_trans_stream() {
         int32 num_bytes = file_length - data_chunk_pos - 8;
         write_word(f, num_bytes, 4);
 
-//        int32 num_frames = (file_length - data_chunk_pos - 8) / sizeof(float);
-//        f.seekp(fact_chunk_pos);
-//        write_word(f, num_frames, 4);
-
         f.seekp(4);
         write_word(f, file_length - 8, 4);
         f.close();
@@ -378,23 +379,30 @@ int RecEngine::stop_trans_stream() {
     return 0;
 }
 
-void RecEngine::write_to_wav(int32 num_frames) {
-    f.write((char*) &fp_audio[0], num_frames * 4);
-}
 
 void RecEngine::recognition_loop() {
     set_thread_affinity();
-    Timer tt;
+//    Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    int32_t total_sz = 0;
+    int32_t offset = 0, size = 0;
     while(recognition_on) {
         double timetaken;
-        if (do_recognition) {
-            tt.Reset();
+        size = audio_buffer.Set(&offset);
+//        LOGI("numadded %d size %d index %d", audio_buffer.num_added_, size, audio_buffer.next_index_);
+        if (size > 0) {
+            total_sz += size;
+            Vector<float> data(size);
+            for(int32_t i = 0; i < size; i++) {
+                data(i) = audio_buffer.Get(offset + i);
+            }
+            feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
             decoder->AdvanceDecoding();
+
             if (decoder->isStopTime(silence_phones, trans_model, 3)) {
                 int32 num_frames_decoded = decoder->NumFramesDecoded();
-                LOGI("Stopped %f", num_frames_decoded * 3 / 100.f);
 
                 decoder->GetLattice(false, &finish_seg_clat);
 
@@ -413,19 +421,61 @@ void RecEngine::recognition_loop() {
                 if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
                 outtext = prettify_text(words, dummy, dummyb, false);
             }
-            timetaken = tt.Elapsed();
-//            LOGI("Total decode time %f", timetaken);
-            do_recognition = false;
+
+            for(int32_t i = 0; i < size; i++) {
+                float val = data(i);
+                int16_t vali = static_cast<int16_t>(val + 0.5f);
+                f.write((char*) &vali, sizeof(int16_t));
+            }
         }
-        if (timetaken < 0.1) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+//        tt.Reset();
+//        timetaken = tt.Elapsed();
+
+    }
+    size = audio_buffer.Set(&offset);
+//    LOGI("numadded %d size %d nextindex %d", audio_buffer.num_added_, size, audio_buffer.next_index_);
+    if (size > 0) {
+        total_sz += size;
+        Vector<float> data(size);
+        for(int32_t i = 0; i < size; i++) {
+            data(i) = audio_buffer.Get(offset + i);
+        }
+        feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
+        decoder->AdvanceDecoding();
+
+        if (decoder->isStopTime(silence_phones, trans_model, 3)) {
+            int32 num_frames_decoded = decoder->NumFramesDecoded();
+
+            decoder->GetLattice(false, &finish_seg_clat);
+
+            if (t_rnnlm.joinable()) t_rnnlm.join();
+            if (t_finishsegment.joinable()) t_finishsegment.join();
+
+            t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
+
+            decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+        } else if (decoder->NumFramesDecoded() > 0) {
+            Lattice olat;
+            decoder->GetBestPath(false, &olat);
+
+            std::vector<int32> words;
+
+            if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
+            outtext = prettify_text(words, dummy, dummyb, false);
+        }
+
+        for(int32_t i = 0; i < size; i++) {
+            float val = data(i);
+            int16_t vali = static_cast<int16_t>(val + 0.5f);
+            f.write((char*) &vali, sizeof(int16_t));
         }
     }
+    LOGI("Num samples added %d", total_sz);
+    LOGI("Num samples added B %d", audio_buffer.num_added_);
 }
 
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-
     const float mul = 32768.0f;
     const float cnt_channel_fp = static_cast<float>(mChannelCount);
     float val;
@@ -434,49 +484,10 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     // Note we put data in floating point format but in PCM (int) range
     if(mIsfloat) {
         float* audio_data = static_cast<float*>(audioData);
-        int k = 0;
-        for (int i = 0; i < num_samples_in ; i += mChannelCount) {
-            val = 0.0f;
-            for (int j = 0; j < mChannelCount; j++) {
-                val += audio_data[i + j];
-            }
-            fp_audio[k] = val * mul;
-            k++;
-        }
+        audio_buffer.Append(audio_data, numFrames);
     } else {
-        const float mul_div = 1.0f / 32768.0f;
         int16_t* audio_data = static_cast<int16_t*>(audioData);
-        int k = 0;
-        for (int i = 0; i < num_samples_in; i += mChannelCount) {
-            val = 0.0f;
-            for (int j = 0; j < mChannelCount; j++) {
-                val += static_cast<float>(audio_data[i + j]);
-            }
-            fp_audio[k] = (val / cnt_channel_fp);
-            k++;
-        }
-    }
-
-    do_recognition = false;  // this is to prevent recognition from starting while appending data
-    SubVector<float> data(fp_audio, numFrames);
-    feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
-
-    for (int i = 0; i < numFrames; i++) {
-        val = fp_audio[i];
-        int_audio[i] = static_cast<int16_t>(val + 0.5f);
-    }
-    do_recognition = true;
-    f.write((char*) &int_audio[0], numFrames * 2);
-
-//    int32_t bufferSize = mRecStream->getBufferSizeInFrames();
-//    auto underrunCount = audioStream->getXRunCount();
-
-//    LOGI("numFrames %d, actual numF %d, Underruns %d, buffer size %d", mFramesPerBurst, numFrames, underrunCount, bufferSize);
-
-    if (numFrames < mFramesPerBurst) {
-        for(int i = 0; i < mFramesPerBurst; i++) {
-            int_audio[i] = 0;
-        }
+        audio_buffer.AppendI(audio_data, numFrames);
     }
 
     return oboe::DataCallbackResult::Continue;
@@ -491,26 +502,29 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
     TopSortCompactLatticeIfNeeded(clat);
 
-    CompactLattice clat_composed;
-    fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
-    ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
+    CompactLattice clat_composed, best_path;
 
-    Lattice lat_composed;
-    ConvertLattice(clat_composed, &lat_composed);
-    Invert(&lat_composed);
-    CompactLattice determinized_clat;
-    DeterminizeLattice(lat_composed, &determinized_clat);
+    if (num_out_frames > 150) {
+        fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
+        ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
 
-    TopSortCompactLatticeIfNeeded(&determinized_clat);
+        Lattice lat_composed;
+        ConvertLattice(clat_composed, &lat_composed);
+        Invert(&lat_composed);
+        CompactLattice determinized_clat;
+        DeterminizeLattice(lat_composed, &determinized_clat);
 
-    CompactLattice best_path;
+        TopSortCompactLatticeIfNeeded(&determinized_clat);
 
-    if (t_rnnlm.joinable()) t_rnnlm.join();
-    CompactLattice clat_rescored;
-    ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
-                                 const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                 &clat_rescored, max_ngram_order, true);
-    CompactLatticeShortestPath(clat_rescored, &best_path);
+        if (t_rnnlm.joinable()) t_rnnlm.join();
+        CompactLattice clat_rescored;
+        ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
+                                     const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                     &clat_rescored, max_ngram_order, true);
+        CompactLatticeShortestPath(clat_rescored, &best_path);
+    } else {
+        CompactLatticeShortestPath(*clat, &best_path);
+    }
 
     CompactLattice aligned_clat;
     WordAlignLattice(best_path, trans_model, *wordb_info, 0, &aligned_clat);
@@ -924,4 +938,76 @@ void RecEngine::set_thread_affinity() {
         LOGE("APP", "Error setting thread affinity!");
     }
     thread_affinity_set = true;
+}
+
+RingBuffer::RingBuffer() {
+}
+
+RingBuffer::RingBuffer(int32_t size) {
+    data_ = new float_t[size]();
+    next_index_ = 0;
+    size_ = size;
+    newest_gotten_index_ = 0;
+    num_added_ = 0;
+}
+
+RingBuffer::~RingBuffer() {
+    delete[] data_;
+}
+
+void RingBuffer::Append(float_t* data, int32_t size) {
+    int32_t next_index = next_index_.load();
+    for(int32_t i = 0; i < size; i++) {
+        data_[next_index + i] = data[i] * 32768.0f;
+    }
+    next_index += size;
+    next_index %= size_;
+    num_added_ += size;
+    next_index_ = next_index;
+}
+
+void RingBuffer::AppendI(int16_t* data, int32_t size) {
+    int32_t next_index = next_index_.load();
+    for(int32_t i = 0; i < size; i++) {
+        data_[next_index + i] = static_cast<float_t>(data[i]);
+    }
+    next_index += size;
+    next_index %= size_;
+    next_index_ = next_index;
+    num_added_ += size;
+}
+
+void RingBuffer::Add(float_t val) {
+    int32_t next_index = next_index_.load();
+    data_[next_index] = val;
+    next_index++;
+    if (next_index >= size_) next_index = 0;
+    next_index_ = next_index;
+    num_added_++;
+}
+
+int32_t RingBuffer::Set(int32_t* offset) {
+    int32_t next_index = next_index_.load();
+    int32_t size;
+    int32_t newest_gotten_index = newest_gotten_index_.load();
+    if (next_index >= newest_gotten_index_) {
+        size = next_index - newest_gotten_index_;
+    } else {
+        size = (size_ - newest_gotten_index_) + next_index;
+    }
+    *offset = newest_gotten_index_;
+    newest_gotten_index_ = next_index;
+    //KALDI_LOG << "offset " << *offset << " size " << size;
+    return size;
+}
+
+float_t RingBuffer::Get(int32_t index) {
+    index %= size_;
+    return data_[index];
+}
+
+void RingBuffer::Reset() {
+    next_index_ = 0;
+    newest_gotten_index_ = 0;
+    num_added_ = 0;
 }
