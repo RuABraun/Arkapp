@@ -179,8 +179,8 @@ public class FileInfo extends Fragment {
         });
 
         tv_transtext.setOnTouchListener(new View.OnTouchListener() {
-            int MAX_CLICK_DUR = 100;
-            int MAX_CLICK_DIST = 10;
+            int MAX_CLICK_DUR = 1500;
+            int MAX_CLICK_DIST = 25;
             long click_start_time, click_last_time;
             int start_y, x, y;
 
@@ -252,9 +252,8 @@ public class FileInfo extends Fragment {
                             int lineidx = layout.getLineForVertical(y + yscroll);
                             // if the line idx is the same it means the click position is far below
                             // the text and we don't want to play
-                            int lineidx_check = layout.getLineForVertical(y + yscroll - 50);
+                            int lineidx_check = layout.getLineForVertical(y + yscroll - tv_transtext.getLineHeight()*2);
                             if (lineidx != lineidx_check || lineidx == 0) {
-                                Log.i("APP", "PLAY");
                                 int offset = layout.getOffsetForHorizontal(lineidx, x);
                                 int i = getIdxForCharOffset(offset);
                                 if (i == -1) return false;
