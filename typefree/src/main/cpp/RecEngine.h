@@ -30,6 +30,8 @@
 #include "tensorflow/lite/kernels/register.h"
 #include "tensorflow/lite/string_util.h"
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 class RingBuffer {
 public:
@@ -55,7 +57,6 @@ public:
     int32_t size_;
     float_t* data_;
     int32_t num_added_;
-
 };
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -85,6 +86,10 @@ public:
 
     void recognition_loop();
 
+    void pause_stream();
+
+    void resume_stream();
+
     std::string prettify_text(std::vector<int32>& words, std::vector<std::string>& words_split,
                               std::vector<int32>& indcs_kept, bool split);
 
@@ -94,13 +99,12 @@ public:
 
     void set_thread_affinity();
 
-private:
-
     kaldi::Timer timer;
     std::string outtext;
     std::string const_outtext;
     int tot_num_frames = 0;
     bool text_updated = false;
+    int32_t paused_num_samples_;
 
     std::vector<int> excl_cores;
     bool thread_affinity_set = false;
@@ -121,14 +125,17 @@ private:
     FILE* os_ctm = NULL;
     FILE* os_txt = NULL;
 
+    std::mutex mutex_decoding_;
     std::atomic<bool> recognition_on;
-    std::atomic<bool> do_recognition;
+    std::atomic<bool> is_recognition_paused;
+    bool is_decoding;  // AdvanceDecoding is being called
+    std::condition_variable cv_decoding_;
     std::thread t_recognition;
     std::thread t_rnnlm;
     std::thread t_finishsegment;
 
     int32 tot_num_frames_decoded;
-
+private:
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;

@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static android.app.Activity.RESULT_OK;
 
@@ -46,6 +47,7 @@ public class ManageFragment extends Fragment {
     private Runnable runnable;
     private Observer<List<AFile>> observer;
     private FloatingActionButton fab_import;
+    private ProgressBar pb_import;
     Runnable r;
 
     public ManageFragment() {
@@ -66,30 +68,46 @@ public class ManageFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_manage, container, false);
         RecyclerView recview = view.findViewById(R.id.rv_files);
         fab_import = view.findViewById(R.id.button_add);
+        pb_import = view.findViewById(R.id.progbar_import);
+        Log.i("APP", "AAAAAAA " + act.just_imported_file);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
-
-        if (act.settings.getBoolean("knows_can_import", true)) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(act);
-            builder.setTitle("Tip!")
-                    .setMessage("Use the + button to import audio or video files from your phone.")
-                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    });
-            AlertDialog alert = builder.create();
-            alert.show();
-            TextView tv = (TextView) alert.findViewById(android.R.id.message);
-            tv.setTextSize(18);
-            act.settings.edit().putBoolean("knows_can_import", false).apply();
+        if (!act.just_imported_file) {
+            pb_import.setVisibility(View.INVISIBLE);
+            Log.i("APP", "X " + pb_import.getVisibility());
+        } else {
+            pb_import.setVisibility(View.VISIBLE);
+            Log.i("APP", "Y " + pb_import.getVisibility());
+            runnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (act.finished_conversion) {
+                        act.finished_conversion = false;
+                        Log.i("APP", "visib done " + pb_import.getVisibility());
+                        pb_import.setVisibility(View.INVISIBLE);
+                    } else {
+                        Log.i("APP", "visib " + pb_import.getVisibility());
+                        act.h_main.postDelayed(this, 500);
+                    }
+                }
+            };
+            act.h_main.post(runnable);
         }
+        if (!act.just_imported_file) {
+            String tag = "knows_can_import";
+            if (!act.settings.getBoolean(tag, false)) {
+                String msg = "Use the + button to import audio or video files from your phone.";
+                TipDialog dialog = TipDialog.newInstance("Tip!", msg, tag);
+                dialog.show(act.fragmentManager, "TipDialog");
+            }
+        }
+        act.just_imported_file = false;
         return view;
     }
 
     @Override
     public void onStart() {
+        Log.i("APP", "BBBBBBB " + act.just_imported_file);
         super.onStart();
         observer = new Observer<List<AFile>>() {
             @Override
@@ -98,13 +116,20 @@ public class ManageFragment extends Fragment {
             }
         };
         fviewmodel.getAllFiles().observe(act, observer);
-
+//        act.h_main.postDelayed(runnable, 1000);
     }
 
     @Override
     public void onStop() {
         fviewmodel.getAllFiles().removeObserver(observer);
         super.onStop();
+    }
+
+    @Override
+    public void onPause() {
+        act.h_main.removeCallbacks(runnable);
+        pb_import.setVisibility(View.INVISIBLE);
+        super.onPause();
     }
 
     class ConvertAudioRunnable implements Runnable {
@@ -115,6 +140,7 @@ public class ManageFragment extends Fragment {
             outpath = outp;
         }
         public void run() {
+            Log.i("APP", "visB " + pb_import.getVisibility());
             int ret = act.recEngine.convert_audio(inpath, outpath);
             if (ret != 0) {
                 act.runOnUiThread(new Runnable() {
@@ -139,11 +165,26 @@ public class ManageFragment extends Fragment {
             int dur = (int) ((float) mPlayer.getDuration() / 1000.0f);
             mPlayer.stop();
             mPlayer.release();
+            Log.i("APP", "visC " + pb_import.getVisibility());
             String fname = f.getName();
             String[] split = fname.split("\\.");
             String basename = split[0];
             AFile afile = new AFile(basename, basename, dur, act.getFileDate());
             act.f_repo.insert(afile);
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    String tag = "knows_transcribe_after_import";
+                    if (!act.settings.getBoolean(tag, false)) {
+                        String msg = "Now press the microphone on the file you added to transcibe it.";
+                        TipDialog dialog = TipDialog.newInstance("Tip!", msg, tag);
+                        dialog.show(act.fragmentManager, "TipDialog");
+                    }
+                }
+            });
+
+            Log.i("APP", "visD " + pb_import.getVisibility());
+            act.finished_conversion = true;
         }
     }
 
@@ -152,6 +193,8 @@ public class ManageFragment extends Fragment {
         switch(requestCode) {
             case 7:
                 if (resultCode == RESULT_OK) {
+                    act.just_imported_file = true;
+                    Log.i("APP", "CCCCCC");
                     Uri furi = data.getData();
                     String path = "";
                     String newpath = "";
@@ -203,10 +246,10 @@ public class ManageFragment extends Fragment {
                     }
                     final String inpath = path;
                     final String outpath = newpath;
-
                     r = new ConvertAudioRunnable(inpath, outpath);
+                    Log.i("APP", "visA " + pb_import.getVisibility());
+                    act.finished_conversion = false;
                     new Thread(r).start();
-
                     Log.i("APP", "Done importing.");
                     break;
                 }

@@ -87,6 +87,17 @@ public class RecEngine {
         return 1;
     }
 
+    public void pause_switch_stream() {
+        if (mEngineHandle == 0) return;
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int n = native_pauseSwitch(mEngineHandle);
+            }
+        });
+        t.start();
+    }
+
     public int convert_audio(String audiopath, String wavpath) {
         int n = -1;
         if (mEngineHandle != 0) {
@@ -104,4 +115,5 @@ public class RecEngine {
     public static native long native_stop_trans_stream(long engineHandle);
     public static native int native_transcribe_file(long engineHandle, String wavpath, String ctm);
     public static native int native_convertAudio(long engineHandle, String audiopath, String wavpath);
+    public static native int native_pauseSwitch(long engineHandle);
 }

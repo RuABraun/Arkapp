@@ -3,7 +3,7 @@
     <item android:drawable="@color/colorPrimary"/>
 
     <item android:layout_width="match_parent" >
-        <bitmap android:src="@mipmap/splashscreen"
+        <bitmap android:src="@mipmap/splashdrawing"
             android:gravity="fill_horizontal|fill_vertical" />
     </item>
 </layer-list>

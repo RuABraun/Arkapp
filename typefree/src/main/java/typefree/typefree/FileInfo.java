@@ -126,21 +126,11 @@ public class FileInfo extends Fragment {
             }
         });
 
-        if (act.settings.getBoolean("knows_can_press", true)) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(act);
-            builder.setTitle("Tip!")
-                    .setMessage("Press on a word to start playing back the audio from when it was said.")
-                    .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    });
-            AlertDialog alert = builder.create();
-            alert.show();
-            TextView tv = (TextView) alert.findViewById(android.R.id.message);
-            tv.setTextSize(18);
-            act.settings.edit().putBoolean("knows_can_press", false).apply();
+        String tag = "knows_can_press";
+        if (!act.settings.getBoolean(tag, false)) {
+            String msg = "Press on a word to start playing back the audio from when it was said.";
+            TipDialog dialog = TipDialog.newInstance("Tip!", msg, tag);
+            dialog.show(act.fragmentManager, "TipDialog");
         }
         this.fview = view;
         return view;

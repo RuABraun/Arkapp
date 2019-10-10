@@ -80,22 +80,21 @@
         android:id="@+id/button_rec"
         android:layout_width="52dp"
         android:layout_height="52dp"
-        app:fabCustomSize="52dp"
-        app:maxImageSize="36dp"
-        android:layout_marginBottom="48dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        app:backgroundTint="@color/colorPrimary"
         android:clickable="true"
         android:elevation="4dp"
         android:focusable="true"
         android:onClick="recordSwitch"
         android:scaleType="center"
         android:src="@drawable/mic_full_inv"
+        app:backgroundTint="@color/colorPrimary"
         app:borderWidth="2dp"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:fabCustomSize="52dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.85"
+        app:maxImageSize="36dp" />
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/button_edit"
@@ -119,19 +118,19 @@
         android:id="@+id/button_copy"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        app:fabCustomSize="48dp"
-        app:maxImageSize="32dp"
         android:layout_marginBottom="16dp"
-        app:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:elevation="4dp"
         android:focusable="true"
         android:onClick="onCopyClick"
         android:scaleType="center"
+        android:src="@drawable/copy_c"
+        app:backgroundTint="@color/colBackground"
         app:borderWidth="1dp"
-        app:layout_constraintBottom_toTopOf="@+id/progressBar"
+        app:fabCustomSize="48dp"
+        app:layout_constraintBottom_toTopOf="@+id/button_edit"
         app:layout_constraintEnd_toEndOf="@+id/button_edit"
-        android:src="@drawable/copy_c" />
+        app:maxImageSize="32dp" />
 
 
     <ProgressBar
@@ -139,10 +138,7 @@
         style="?android:attr/progressBarStyle"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_marginBottom="48dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintBottom_toBottomOf="@+id/button_rec"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -196,19 +192,19 @@
         android:id="@+id/button_delete"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        app:fabCustomSize="48dp"
-        app:maxImageSize="32dp"
         android:layout_marginStart="8dp"
-        app:backgroundTint="@color/colBackground"
         android:clickable="true"
         android:elevation="4dp"
         android:focusable="true"
         android:onClick="onDeleteClick"
         android:scaleType="center"
+        android:src="@drawable/delete_c"
+        app:backgroundTint="@color/colBackground"
         app:borderWidth="1dp"
+        app:fabCustomSize="48dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/button_edit"
-        android:src="@drawable/delete_c" />
+        app:maxImageSize="32dp" />
 
     <TextView
         android:id="@+id/tv_counter"
@@ -231,5 +227,24 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/progressBar" />
+
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/button_pause"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:onClick="pauseSwitch"
+        android:src="@drawable/pause_c"
+        android:visibility="gone"
+        app:backgroundTint="@color/colorPrimary"
+        app:borderWidth="2dp"
+        app:fabCustomSize="48dp"
+        app:layout_constraintBottom_toBottomOf="@+id/progressBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:maxImageSize="28dp" />
 
 </android.support.constraint.ConstraintLayout>

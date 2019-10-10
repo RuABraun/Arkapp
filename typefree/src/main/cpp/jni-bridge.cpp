@@ -181,4 +181,18 @@ Java_typefree_typefree_RecEngine_native_1convertAudio(
 
 }
 
+JNIEXPORT jint JNICALL
+Java_typefree_typefree_RecEngine_native_1pauseSwitch(JNIEnv *env, jobject, jlong engineHandle) {
+    RecEngine *engine = (RecEngine *) engineHandle;
+    if (engine == nullptr) {
+        LOGE("Engine handle is invalid, call createHandle() to create a new one");
+        return -1;
+    }
+    if (!engine->is_recognition_paused.load()) {
+        engine->pause_stream();
+    } else {
+        engine->resume_stream();
+    }
+    return 0;
+}
 }

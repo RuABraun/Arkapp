@@ -196,7 +196,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
     oboe::DefaultStreamValues::FramesPerBurst = mFramesPerBurst;
 
     recognition_on = false;  // when off recognition loop won't run
-    do_recognition = false;  // this is to prevent recognition from starting while appending data
+    is_recognition_paused = false;  // when off only features extracted
 
     LOGI("Finished constructing rec");
 
@@ -328,15 +328,11 @@ void RecEngine::transcribe_stream(std::string fpath){
     } else {
         LOGE("Failed to create stream. Error: %s", oboe::convertToText(result));
     }
-    timer.Reset();
 }
 
 int RecEngine::stop_trans_stream() {
-    float tt = (float) timer.Elapsed();
-    LOGI("Time taken %f", tt);
-    LOGI("Tot num samples %d, time in s %d", tot_num_frames, tot_num_frames / 16000);
+    is_recognition_paused = false;
     if (mRecStream != nullptr) {
-        KALDI_LOG << "IN STOP TRANS";
 
         oboe::Result result = mRecStream->requestStop();
 
@@ -385,47 +381,56 @@ void RecEngine::recognition_loop() {
 //    Timer tt;
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     int32_t total_sz = 0;
     int32_t offset = 0, size = 0;
-    while(recognition_on) {
+    while(recognition_on.load()) {
         double timetaken;
         size = audio_buffer.Set(&offset);
-//        LOGI("numadded %d size %d index %d", audio_buffer.num_added_, size, audio_buffer.next_index_);
         if (size > 0) {
             total_sz += size;
             Vector<float> data(size);
             for(int32_t i = 0; i < size; i++) {
                 data(i) = audio_buffer.Get(offset + i);
             }
-            feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
-            decoder->AdvanceDecoding();
+            if (!is_recognition_paused.load()) {
+                {
+                    std::unique_lock<std::mutex> lock(mutex_decoding_);
+                    is_decoding = true;
+                    feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
+                    decoder->AdvanceDecoding();
 
-            if (decoder->isStopTime(silence_phones, trans_model, 3)) {
-                int32 num_frames_decoded = decoder->NumFramesDecoded();
+                    if (decoder->isStopTime(silence_phones, trans_model, 3)) {
+                        int32 num_frames_decoded = decoder->NumFramesDecoded();
 
-                decoder->GetLattice(false, &finish_seg_clat);
+                        decoder->GetLattice(false, &finish_seg_clat);
 
-                if (t_rnnlm.joinable()) t_rnnlm.join();
-                if (t_finishsegment.joinable()) t_finishsegment.join();
+                        if (t_rnnlm.joinable()) t_rnnlm.join();
+                        if (t_finishsegment.joinable()) t_finishsegment.join();
 
-                t_finishsegment = std::thread(&RecEngine::finish_segment, this, &finish_seg_clat, num_frames_decoded);
+                        t_finishsegment = std::thread(&RecEngine::finish_segment, this,
+                                                      &finish_seg_clat, num_frames_decoded);
 
-                decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
-            } else if (decoder->NumFramesDecoded() > 0) {
-                Lattice olat;
-                decoder->GetBestPath(false, &olat);
+                        decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+                    } else if (decoder->NumFramesDecoded() > 0) {
+                        Lattice olat;
+                        decoder->GetBestPath(false, &olat);
 
-                std::vector<int32> words;
+                        std::vector<int32> words;
 
-                if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
-                outtext = prettify_text(words, dummy, dummyb, false);
-            }
-
-            for(int32_t i = 0; i < size; i++) {
-                float val = data(i);
-                int16_t vali = static_cast<int16_t>(val + 0.5f);
-                f.write((char*) &vali, sizeof(int16_t));
+                        if (!GetLinearWordSequence(olat, &words)) LOGE("Failed get linear seq");
+                        outtext = prettify_text(words, dummy, dummyb, false);
+                    }
+                    is_decoding = false;
+                    cv_decoding_.notify_one();
+                }
+                for (int32_t i = 0; i < size; i++) {
+                    float val = data(i);
+                    int16_t vali = static_cast<int16_t>(val + 0.5f);
+                    f.write((char *) &vali, sizeof(int16_t));
+                }
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
 //        tt.Reset();
@@ -433,7 +438,6 @@ void RecEngine::recognition_loop() {
 
     }
     size = audio_buffer.Set(&offset);
-//    LOGI("numadded %d size %d nextindex %d", audio_buffer.num_added_, size, audio_buffer.next_index_);
     if (size > 0) {
         total_sz += size;
         Vector<float> data(size);
@@ -470,10 +474,7 @@ void RecEngine::recognition_loop() {
             f.write((char*) &vali, sizeof(int16_t));
         }
     }
-    LOGI("Num samples added %d", total_sz);
-    LOGI("Num samples added B %d", audio_buffer.num_added_);
 }
-
 
 oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     const float mul = 32768.0f;
@@ -493,10 +494,55 @@ oboe::DataCallbackResult RecEngine::onAudioReady(oboe::AudioStream *audioStream,
     return oboe::DataCallbackResult::Continue;
 }
 
+void RecEngine::pause_stream() {
+    if (!recognition_on.load()) return;
+    is_recognition_paused = true;
+    paused_num_samples_ = audio_buffer.num_added_;
+    std::unique_lock<std::mutex> lock(mutex_decoding_);
+    this->cv_decoding_.wait_for(lock, std::chrono::seconds(5), [this]{return !is_decoding;});
+    int32 num_frames_decoded = decoder->NumFramesDecoded();
+
+    decoder->GetLattice(false, &finish_seg_clat);
+
+    if (t_rnnlm.joinable()) t_rnnlm.join();
+    if (t_finishsegment.joinable()) t_finishsegment.join();
+    t_finishsegment = std::thread(&RecEngine::finish_segment, this,
+                                  &finish_seg_clat, num_frames_decoded);
+
+    decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+}
+
+void RecEngine::resume_stream() {
+    std::unique_lock<std::mutex> lock(mutex_decoding_);
+    int32_t pause_duration = audio_buffer.num_added_ - paused_num_samples_;
+    Vector<float> data;
+    const int32_t num_prepend = 8000;
+    if (pause_duration > num_prepend) {
+        data.Resize(num_prepend);
+        int32_t next_index = audio_buffer.next_index_.load();
+        int32_t start = next_index - num_prepend;
+        for (int32_t i = 0; i < num_prepend; i++) {
+            int32_t j = start + i;
+            if (j < 0) j = audio_buffer.size_ + j;
+            data(i) = ((float) (1.f / (num_prepend - i))) * audio_buffer.Get(j);
+        }
+    } else {
+        data.Resize(pause_duration);
+        int32_t next_index = audio_buffer.next_index_.load();
+        int32_t start = next_index - pause_duration;
+        for (int32_t i = 0; i < pause_duration; i++) {
+            int32_t j = start + i;
+            if (j < 0) j = audio_buffer.size_ + j;
+            data(i) = ((float) (1.f / (pause_duration - i))) * audio_buffer.Get(j);
+        }
+    }
+    feature_pipeline->AcceptWaveform(fin_sample_rate_fp, data);
+    is_recognition_paused = false;
+}
+
 void RecEngine::setDeviceId(int32_t deviceId) {
     mRecDeviceId = deviceId;
 }
-
 
 void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
@@ -545,6 +591,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     text_updated = true;
 
     fwrite(text.c_str(), 1, text.size(), os_txt);
+    fwrite("\n", 1, 1, os_txt);
 
     int32 num_words = words_split.size();
     int32 time_offset_seconds = static_cast<int32>(tot_num_frames_decoded * 3 / 100.f);
@@ -961,8 +1008,8 @@ void RingBuffer::Append(float_t* data, int32_t size) {
         data_[next_index + i] = data[i] * 32768.0f;
     }
     next_index += size;
-    next_index %= size_;
     num_added_ += size;
+    next_index %= size_;
     next_index_ = next_index;
 }
 
@@ -972,9 +1019,9 @@ void RingBuffer::AppendI(int16_t* data, int32_t size) {
         data_[next_index + i] = static_cast<float_t>(data[i]);
     }
     next_index += size;
+    num_added_ += size;
     next_index %= size_;
     next_index_ = next_index;
-    num_added_ += size;
 }
 
 void RingBuffer::Add(float_t val) {

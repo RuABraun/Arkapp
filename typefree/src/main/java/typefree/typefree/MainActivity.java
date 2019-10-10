@@ -74,6 +74,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     int update_request_code = 123;
     private MainActivity baseact = this;
     int exclusiveCores[] = {};
+    public boolean just_imported_file = false;
+    public boolean finished_conversion = false;
 
     static {
         System.loadLibrary("rec-engine");
@@ -254,8 +256,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                         start_main = true;
                         Log.i("APP", "main is ready to go");
                         bottomNavigationView.setSelectedItemId(R.id.Transcribe);
-                        tv_init.setVisibility(View.INVISIBLE);
-                        pb_init.setVisibility(View.INVISIBLE);
+                        tv_init.setVisibility(View.GONE);
+                        pb_init.setVisibility(View.GONE);
                         bottomNavigationView.setVisibility(View.VISIBLE);
                     } else {
                         h_main.postDelayed(this, 50);
@@ -343,7 +345,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                 } else {
                     do_asr_setup();
                     if (start_main) {
-                        Log.i("APP", "Starting main fragment.");
+                        Log.i("APP", "Starting appropriate fragment.");
                         if (fragment_id == 1) {
                             bottomNavigationView.setSelectedItemId(R.id.Transcribe);
                         } else if (fragment_id == 2) {
@@ -383,6 +385,12 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         if (Base.is_spamclick()) return;
         MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         main_frag.record_switch(v);
+    }
+
+    public void pauseSwitch(View v) {
+        if (Base.is_spamclick()) return;
+        MainFragment main_frag = (MainFragment) fragmentManager.findFragmentByTag("main");
+        main_frag.pause_switch(v);
     }
 
     public void onCopyClick(View v) {

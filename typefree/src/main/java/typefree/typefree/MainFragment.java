@@ -45,7 +45,7 @@ public class MainFragment extends Fragment {
     Runnable title_runnable, runnable, trans_update_runnable, trans_done_runnable,
         trans_edit_runnable, performance_runnable;
     private EditText ed_transtext;
-    private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del;
+    private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del, fab_pause;
     private EditText ed_title;
     private String fname_prefix = "";
     private String curr_cname = "";
@@ -62,6 +62,7 @@ public class MainFragment extends Fragment {
     private MainActivity act;
     private View fview;
     private StringBuilder trans_text;
+    private boolean paused_stream = false;
     Timer time_counter;
     int fab_rec_botmargin;
 
@@ -117,6 +118,7 @@ public class MainFragment extends Fragment {
         fab_copy = view.findViewById(R.id.button_copy);
         fab_share = view.findViewById(R.id.button_share);
         fab_del = view.findViewById(R.id.button_delete);
+        fab_pause = view.findViewById(R.id.button_pause);
         fab_copy.setTranslationX(256f);
         fab_share.setTranslationX(256f);
         fab_del.setTranslationX(-256f);
@@ -142,7 +144,7 @@ public class MainFragment extends Fragment {
                 act.h_main.postDelayed(runnable, 100);
                 if (RecEngine.isready) {
                     fab_rec.show();
-                    spinner.setVisibility(View.INVISIBLE);
+                    spinner.setVisibility(View.GONE);
                     act.h_main.removeCallbacks(runnable);
                 }
             }
@@ -356,10 +358,14 @@ public class MainFragment extends Fragment {
             }, 0, 1000);
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
+            fab_pause.show();
 
         } else {
             Bugsnag.leaveBreadcrumb("Stopped transcribing stream.");
             time_counter.cancel();
+            if (paused_stream) pause_switch(view);
+            fab_pause.setVisibility(View.GONE);
+            paused_stream = false;
             spinner.setVisibility(View.VISIBLE);
             is_recording = false;
             RecEngine.isrunning = false;
@@ -375,7 +381,7 @@ public class MainFragment extends Fragment {
                     if (recognition_done) {
                         fab_rec.animate().translationX(0f);
                         fab_rec.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
-                        spinner.setVisibility(View.INVISIBLE);
+                        spinner.setVisibility(View.GONE);
                         act.h_main.removeCallbacks(trans_done_runnable);
                         fab_edit.animate().translationX(0f);
                         fab_copy.animate().translationX(0f);
@@ -427,6 +433,18 @@ public class MainFragment extends Fragment {
 
         ed_transtext.setText(trans_text);
         ed_transtext.setSelection(trans_text.length());
+    }
+
+    public void pause_switch(View v) {
+        if (!paused_stream) {
+            paused_stream = true;
+            fab_pause.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
+            act.recEngine.pause_switch_stream();
+        } else {
+            paused_stream = false;
+            act.recEngine.pause_switch_stream();
+            fab_pause.setImageDrawable(act.getDrawable(R.drawable.pause_c));
+        }
     }
 
     public void handle_touch_event(View v, MotionEvent event) {
@@ -530,8 +548,10 @@ public class MainFragment extends Fragment {
             fab_copy.hide();
             fab_del.hide();
             fab_rec.hide();
+            tv_transcribe_hint.setVisibility(View.INVISIBLE);
             editing_transtext = true;
             fab_edit.setImageResource(R.drawable.done);
+            fab_edit.animate().translationY(-700);
 
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
@@ -584,6 +604,7 @@ public class MainFragment extends Fragment {
             fab_copy.show();
             fab_del.show();
             fab_rec.show();
+            tv_transcribe_hint.setVisibility(View.VISIBLE);
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
@@ -615,8 +636,6 @@ public class MainFragment extends Fragment {
         act.getWindowManager().getDefaultDisplay().getMetrics(dm);
         int dp = (int) (height / dm.density);
         if (editing_transtext) {
-            Log.i("APP", "resizing " + fab_edit.getTranslationY() + " " + dp);
-            fab_edit.animate().translationY(-dp);
             ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) img_view.getLayoutParams();
             mainview_layout.bottomMargin = height - 100;
             img_view.invalidate();
