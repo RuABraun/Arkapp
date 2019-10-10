@@ -286,6 +286,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     bundle.putParcelable("file_obj", afile_to_use);
                                     FileInfo finfo_frag = new FileInfo();
                                     finfo_frag.setArguments(bundle);
+                                    if (fragmentManager == null) return true;
                                     fragmentManager.beginTransaction().replace(R.id.main_root_view,
                                             finfo_frag, "fileinfo").addToBackStack(null).commit();
                                     break;
@@ -343,6 +344,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     bundle.putParcelable("file_obj", afile_to_use);
                     FileInfo finfo_frag = new FileInfo();
                     finfo_frag.setArguments(bundle);
+                    if (fragmentManager == null) return;
                     fragmentManager.beginTransaction().replace(R.id.main_root_view,
                         finfo_frag, "fileinfo").addToBackStack(null).commit();
                 }
