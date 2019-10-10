@@ -758,7 +758,6 @@ public class FileInfo extends Fragment {
 
     @Override
     public void onPause() {
-        super.onPause();
         pausePlaying();
         if (title_runnable != null) {
             act.h_background.removeCallbacks(title_runnable);
@@ -769,6 +768,7 @@ public class FileInfo extends Fragment {
             ed_trans_runnable.run();
         }
         fileinfo_ed_title.removeTextChangedListener(title_textWatcher);
+        super.onPause();
     }
 
     public void resize_views(int height) {

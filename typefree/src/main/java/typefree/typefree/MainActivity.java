@@ -125,7 +125,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
         Bugsnag.init(this);
-
+        Log.i("APP-MAINACTIVITY", "In onCreate");
         setContentView(R.layout.activity_main);
 
         fragmentManager = getSupportFragmentManager();
@@ -137,21 +137,30 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
                 int item_id = item.getItemId();
                 if (item_id == R.id.Manage) {
-                    ManageFragment frag = new ManageFragment();
+                    ManageFragment frag = (ManageFragment) fragmentManager.findFragmentByTag("manage");
+                    if (frag == null || frag.isRemoving()) {
+                        frag = new ManageFragment();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commit();
+                    }
                     fragment_id = 2;
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Transcribe) {
+                    MainFragment frag = (MainFragment) fragmentManager.findFragmentByTag("main");
+                    if (frag == null || frag.isRemoving()) {
+                        frag = new MainFragment();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commit();
+                    }
                     fragment_id = 1;
-                    MainFragment frag = new MainFragment();
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commit();
                     return true;
                 }
                 if (item_id == R.id.Settings) {
+                    Settings frag = (Settings) fragmentManager.findFragmentByTag("extra");
+                    if (frag == null || frag.isRemoving()) {
+                        frag = new Settings();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commit();
+                    }
                     fragment_id = 3;
-                    Settings frag = new Settings();
-                    fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commit();
                     return true;
                 }
                 return true;

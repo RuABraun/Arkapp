@@ -9,7 +9,6 @@
     android:focusable="false"
     android:focusableInTouchMode="true"
     tools:context="typefree.typefree.MainActivity"
-    android:keepScreenOn="true"
     android:background="@color/colorPrimary" >
 
     <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"

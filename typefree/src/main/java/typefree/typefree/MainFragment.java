@@ -20,6 +20,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -80,6 +81,7 @@ public class MainFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
+        Log.i("APP", "Starting MainFragment onCreateView");
         tv_counter = view.findViewById(R.id.tv_counter);
         tv_counter.setVisibility(View.INVISIBLE);
         tv_transcribe_hint = view.findViewById(R.id.tv_transcribe_hint);
@@ -123,12 +125,6 @@ public class MainFragment extends Fragment {
         fab_share.setTranslationX(256f);
         fab_del.setTranslationX(-256f);
 
-//        int counter_bottom = tv_counter.getBottom();
-//        int view_bottom = img_view.getBottom();
-//
-//        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) ed_transtext.getLayoutParams();
-//        params.matchConstraintMaxHeight =
-
         this.fview = view;
         return view;
     }
@@ -137,7 +133,7 @@ public class MainFragment extends Fragment {
     public void onStart() {
         super.onStart();
         Log.i("APP", "Starting main fragment");
-        Bugsnag.leaveBreadcrumb("Starting main fragment");
+        Bugsnag.leaveBreadcrumb("In MainFragment onStart");
         act.h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
@@ -218,9 +214,10 @@ public class MainFragment extends Fragment {
 
     @Override
     public void onPause() {
+        Bugsnag.leaveBreadcrumb("Mainfragment onPause");
         InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(ed_transtext.getWindowToken(), 0);
-        super.onPause();
+        stop_transcribe(getView());
         if (title_runnable != null) {
             act.h_background.removeCallbacks(title_runnable);
             title_runnable.run();
@@ -233,35 +230,87 @@ public class MainFragment extends Fragment {
             act.h_main.removeCallbacks(trans_update_runnable);
         }
         ed_title.removeTextChangedListener(title_textWatcher);
+        super.onPause();
     }
 
 
-    public void stop_transcribe() {
-        long num_out_frames = act.recEngine.stop_trans_stream();
-        if (curr_cname.equals("")) {
-            curr_cname = getString(R.string.default_convname);
+    public void stop_transcribe(View view) {
+        if (!is_recording) return;
+        Bugsnag.leaveBreadcrumb("Stopped transcribing stream.");
+        time_counter.cancel();
+        act.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (paused_stream) pause_switch(view);
+        fab_pause.setVisibility(View.GONE);
+        paused_stream = false;
+        spinner.setVisibility(View.VISIBLE);
+        is_recording = false;
+        RecEngine.isrunning = false;
+        t_perf_adjuster.interrupt();
+        if (act.pm.isSustainedPerformanceModeSupported()) {
+            Log.i("APP", "Turning sustainedperf off for good");
+            act.getWindow().setSustainedPerformanceMode(false);
         }
-        act.h_main.removeCallbacks(trans_update_runnable);
-        act.h_main.post(new Runnable() {
+
+        act.h_main.postDelayed(new Runnable() {
+            public void run() {
+                trans_done_runnable=this;
+                if (recognition_done) {
+                    fab_rec.animate().translationX(0f);
+                    fab_rec.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
+                    spinner.setVisibility(View.GONE);
+                    act.h_main.removeCallbacks(trans_done_runnable);
+                    fab_edit.animate().translationX(0f);
+                    fab_copy.animate().translationX(0f);
+                    fab_share.animate().translationX(0f);
+                    fab_del.animate().translationX(0f);
+                    tv_transcribe_hint.setVisibility(View.VISIBLE);
+                    update_text();
+                    tv_counter.setVisibility(View.INVISIBLE);
+                    act.bottomNavigationView.setVisibility(View.VISIBLE);
+                    ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
+                    Log.i("APP", "use margin " + fab_rec_botmargin + " old " + layoutParams.bottomMargin);
+                    layoutParams.bottomMargin = fab_rec_botmargin;
+                    fab_rec.invalidate();
+                    fab_rec.requestLayout();
+                } else {
+                    act.h_main.postDelayed(trans_done_runnable, 100);
+                }
+            }
+        }, 100);
+
+        t_stoptrans = new Thread(new Runnable() {
             @Override
             public void run() {
-                update_text();
+                long num_out_frames = act.recEngine.stop_trans_stream();
+                if (curr_cname.equals("")) {
+                    curr_cname = getString(R.string.default_convname);
+                }
+                act.h_main.removeCallbacks(trans_update_runnable);
+                act.h_main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        update_text();
+                    }
+                });
+
+                String date = act.getFileDate();
+                String title = curr_cname;
+                String fname = MainActivity.getFileName(curr_cname, act.f_repo);
+                fname_prefix = fname;
+
+                MainActivity.renameConv("tmpfile", fname);
+
+                int duration_s = (int) (3 * num_out_frames) / 100;
+                AFile afile = new AFile(title, fname, duration_s, date);
+                long id = act.f_repo.insert(afile);
+                curr_afile = act.f_repo.getById(id);  // has correct ID
+                Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
+                recognition_done = true;
+                Log.i("APP", "Finished recording.");
             }
         });
-
-        String date = act.getFileDate();
-        String title = curr_cname;
-        String fname = MainActivity.getFileName(curr_cname, act.f_repo);
-        fname_prefix = fname;
-
-        MainActivity.renameConv("tmpfile", fname);
-
-        int duration_s = (int) (3 * num_out_frames) / 100;
-        AFile afile = new AFile(title, fname, duration_s, date);
-        long id = act.f_repo.insert(afile);
-        curr_afile = act.f_repo.getById(id);  // has correct ID
-        Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
-        recognition_done = true;
+        t_stoptrans.setPriority(8);
+        t_stoptrans.start();
     }
 
     public void record_switch(View view) {
@@ -315,8 +364,6 @@ public class MainFragment extends Fragment {
             t_starttrans.setPriority(9);
             t_starttrans.start();
 
-            performance_runnable =
-
             t_perf_adjuster = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -324,7 +371,6 @@ public class MainFragment extends Fragment {
                 }
             });
             t_perf_adjuster.start();
-            act.h_background.postDelayed(performance_runnable, 500);
 
             is_recording = true;
 
@@ -359,59 +405,9 @@ public class MainFragment extends Fragment {
             tv_counter.setVisibility(View.VISIBLE);
             act.bottomNavigationView.setVisibility(View.GONE);
             fab_pause.show();
-
+            act.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } else {
-            Bugsnag.leaveBreadcrumb("Stopped transcribing stream.");
-            time_counter.cancel();
-            if (paused_stream) pause_switch(view);
-            fab_pause.setVisibility(View.GONE);
-            paused_stream = false;
-            spinner.setVisibility(View.VISIBLE);
-            is_recording = false;
-            RecEngine.isrunning = false;
-            t_perf_adjuster.interrupt();
-            if (act.pm.isSustainedPerformanceModeSupported()) {
-                Log.i("APP", "Turning sustainedperf off for good");
-                act.getWindow().setSustainedPerformanceMode(false);
-            }
-
-            act.h_main.postDelayed(new Runnable() {
-                public void run() {
-                    trans_done_runnable=this;
-                    if (recognition_done) {
-                        fab_rec.animate().translationX(0f);
-                        fab_rec.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
-                        spinner.setVisibility(View.GONE);
-                        act.h_main.removeCallbacks(trans_done_runnable);
-                        fab_edit.animate().translationX(0f);
-                        fab_copy.animate().translationX(0f);
-                        fab_share.animate().translationX(0f);
-                        fab_del.animate().translationX(0f);
-                        tv_transcribe_hint.setVisibility(View.VISIBLE);
-                        update_text();
-                        tv_counter.setVisibility(View.INVISIBLE);
-                        act.bottomNavigationView.setVisibility(View.VISIBLE);
-                        ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) fab_rec.getLayoutParams();
-                        Log.i("APP", "use margin " + fab_rec_botmargin + " old " + layoutParams.bottomMargin);
-                        layoutParams.bottomMargin = fab_rec_botmargin;
-                        fab_rec.invalidate();
-                        fab_rec.requestLayout();
-                    } else {
-                        act.h_main.postDelayed(trans_done_runnable, 100);
-                    }
-                }
-            }, 100);
-
-            t_stoptrans = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    stop_transcribe();
-                    Log.i("APP", "Finished recording.");
-                }
-            });
-            t_stoptrans.setPriority(8);
-            t_stoptrans.start();
-
+            stop_transcribe(view);
             if (act.settings.getBoolean("knows_conv_save", true)) {
                 Toast.makeText(act, "The audio and transcript are saved by default.", Toast.LENGTH_SHORT).show();
                 act.settings.edit().putBoolean("knows_conv_save", false).apply();

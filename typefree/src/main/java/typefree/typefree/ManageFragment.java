@@ -69,24 +69,19 @@ public class ManageFragment extends Fragment {
         RecyclerView recview = view.findViewById(R.id.rv_files);
         fab_import = view.findViewById(R.id.button_add);
         pb_import = view.findViewById(R.id.progbar_import);
-        Log.i("APP", "AAAAAAA " + act.just_imported_file);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
         if (!act.just_imported_file) {
             pb_import.setVisibility(View.INVISIBLE);
-            Log.i("APP", "X " + pb_import.getVisibility());
         } else {
             pb_import.setVisibility(View.VISIBLE);
-            Log.i("APP", "Y " + pb_import.getVisibility());
             runnable = new Runnable() {
                 @Override
                 public void run() {
                     if (act.finished_conversion) {
                         act.finished_conversion = false;
-                        Log.i("APP", "visib done " + pb_import.getVisibility());
                         pb_import.setVisibility(View.INVISIBLE);
                     } else {
-                        Log.i("APP", "visib " + pb_import.getVisibility());
                         act.h_main.postDelayed(this, 500);
                     }
                 }
@@ -107,7 +102,6 @@ public class ManageFragment extends Fragment {
 
     @Override
     public void onStart() {
-        Log.i("APP", "BBBBBBB " + act.just_imported_file);
         super.onStart();
         observer = new Observer<List<AFile>>() {
             @Override
@@ -140,7 +134,6 @@ public class ManageFragment extends Fragment {
             outpath = outp;
         }
         public void run() {
-            Log.i("APP", "visB " + pb_import.getVisibility());
             int ret = act.recEngine.convert_audio(inpath, outpath);
             if (ret != 0) {
                 act.runOnUiThread(new Runnable() {
@@ -165,7 +158,6 @@ public class ManageFragment extends Fragment {
             int dur = (int) ((float) mPlayer.getDuration() / 1000.0f);
             mPlayer.stop();
             mPlayer.release();
-            Log.i("APP", "visC " + pb_import.getVisibility());
             String fname = f.getName();
             String[] split = fname.split("\\.");
             String basename = split[0];
@@ -174,6 +166,7 @@ public class ManageFragment extends Fragment {
             act.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    Bugsnag.leaveBreadcrumb("Finished importing file.");
                     String tag = "knows_transcribe_after_import";
                     if (!act.settings.getBoolean(tag, false)) {
                         String msg = "Now press the microphone on the file you added to transcibe it.";
@@ -183,7 +176,6 @@ public class ManageFragment extends Fragment {
                 }
             });
 
-            Log.i("APP", "visD " + pb_import.getVisibility());
             act.finished_conversion = true;
         }
     }
@@ -194,7 +186,6 @@ public class ManageFragment extends Fragment {
             case 7:
                 if (resultCode == RESULT_OK) {
                     act.just_imported_file = true;
-                    Log.i("APP", "CCCCCC");
                     Uri furi = data.getData();
                     String path = "";
                     String newpath = "";
@@ -247,7 +238,6 @@ public class ManageFragment extends Fragment {
                     final String inpath = path;
                     final String outpath = newpath;
                     r = new ConvertAudioRunnable(inpath, outpath);
-                    Log.i("APP", "visA " + pb_import.getVisibility());
                     act.finished_conversion = false;
                     new Thread(r).start();
                     Log.i("APP", "Done importing.");

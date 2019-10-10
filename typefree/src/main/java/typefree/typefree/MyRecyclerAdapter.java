@@ -21,6 +21,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageButton;
@@ -188,6 +189,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     spinner.setVisibility(View.VISIBLE);
                                     button_trans.setVisibility(View.INVISIBLE);
                                     recog_done = false;
+                                    context.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                                     context.h_background.postDelayed(new Runnable() {
                                         @Override
                                         public void run() {
@@ -237,6 +239,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                         public void run() {
                                             runnable = this;
                                             if (recog_done) {
+                                                context.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                                                 spinner.setVisibility(View.INVISIBLE);
                                                 button_trans.setImageResource(R.drawable.textfile);
                                                 button_trans.setVisibility(View.VISIBLE);
