@@ -288,7 +288,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     finfo_frag.setArguments(bundle);
                                     if (fragmentManager == null) return true;
                                     fragmentManager.beginTransaction().replace(R.id.main_root_view,
-                                            finfo_frag, "fileinfo").addToBackStack(null).commit();
+                                            finfo_frag, "fileinfo").addToBackStack(null).commitAllowingStateLoss();
                                     break;
                                 case R.id.Share:
                                     ShareConvDialogFragment dialog = ShareConvDialogFragment.newInstance(afile_to_use.fname);
@@ -346,7 +346,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     finfo_frag.setArguments(bundle);
                     if (fragmentManager == null) return;
                     fragmentManager.beginTransaction().replace(R.id.main_root_view,
-                        finfo_frag, "fileinfo").addToBackStack(null).commit();
+                        finfo_frag, "fileinfo").addToBackStack(null).commitAllowingStateLoss();
                 }
             });
         }

@@ -3,8 +3,9 @@
     <color name="colorPrimary">#6A1B9A</color>
     <color name="colorPrimaryDark">#4A148C</color>
     <color name="colorAlt">#c9a690</color>
-    <color name="colorAccent">#2E7D32</color>
+    <color name="colorAccent">#FF8051</color>
     <color name="colorText">#212121</color>
     <color name="colorTextMinor">#c8424242</color>
     <color name="colBackground">#f3e5f5</color>
+    <color name="colorDefaultWhite">#FFFFFF</color>
 </resources>

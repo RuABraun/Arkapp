@@ -56,7 +56,7 @@ public:
     std::atomic<int32_t> newest_gotten_index_;
     int32_t size_;
     float_t* data_;
-    int32_t num_added_;
+    std::atomic<int32_t> num_added_;
 };
 
 class RecEngine : oboe::AudioStreamCallback {
@@ -85,6 +85,8 @@ public:
     void finish_segment(kaldi::CompactLattice* clat, int32 num_out_frames);
 
     void recognition_loop();
+
+    void run_recognition();
 
     void pause_stream();
 

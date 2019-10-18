@@ -140,7 +140,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                     ManageFragment frag = (ManageFragment) fragmentManager.findFragmentByTag("manage");
                     if (frag == null || frag.isRemoving()) {
                         frag = new ManageFragment();
-                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commit();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "manage").addToBackStack(null).commitAllowingStateLoss();
                     }
                     fragment_id = 2;
                     return true;
@@ -149,7 +149,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                     MainFragment frag = (MainFragment) fragmentManager.findFragmentByTag("main");
                     if (frag == null || frag.isRemoving()) {
                         frag = new MainFragment();
-                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commit();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "main").addToBackStack(null).commitAllowingStateLoss();
                     }
                     fragment_id = 1;
                     return true;
@@ -158,7 +158,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
                     Settings frag = (Settings) fragmentManager.findFragmentByTag("extra");
                     if (frag == null || frag.isRemoving()) {
                         frag = new Settings();
-                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commit();
+                        fragmentManager.beginTransaction().replace(R.id.fragment_container, frag, "extra").addToBackStack(null).commitAllowingStateLoss();
                     }
                     fragment_id = 3;
                     return true;
@@ -519,7 +519,7 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
     @Override
     public void onKeyboardHeightChanged(int height, int orientation) {
-        Log.i("APP", "keyboard height " + height);
+        //Log.i("APP", "keyboard height " + height);
         keyboard_height = height;
         MainFragment frag = (MainFragment) fragmentManager.findFragmentByTag("main");
         if (frag != null && frag.isVisible()) {

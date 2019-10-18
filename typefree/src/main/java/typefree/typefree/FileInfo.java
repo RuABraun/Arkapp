@@ -22,6 +22,7 @@ import android.text.Editable;
 import android.text.Layout;
 import android.text.Spannable;
 import android.text.TextWatcher;
+import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -40,6 +41,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
+import android.widget.SearchView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -63,7 +65,7 @@ public class FileInfo extends Fragment {
 
     private ImageButton mediaButton;
     private MediaPlayer mPlayer;
-    private Runnable title_runnable, seekbar_runnable, ed_trans_runnable;
+    private Runnable title_runnable, seekbar_runnable;
     private SeekBar mSeekBar;
     private AFile afile;
     private EditTextCursorListener ed_transtext;
@@ -75,19 +77,25 @@ public class FileInfo extends Fragment {
     private List<Integer> word_times_ms = new ArrayList<>();
     private List<String> original_words = new ArrayList<>();
     private List<Integer> word_start_c_idx = new ArrayList<>();  // start char
-    private TextWatcher title_textWatcher, text_textWatcher;
+    private TextWatcher title_textWatcher;
+    private SearchView.OnQueryTextListener search_textWatcher;
     private ImageView playView, fileViewHolder;
     private int playView_offset;
     private int fileholder_bottom_margin;
-    private int vs_top_margin;
     private MainActivity act;
     private View fview;
     private ImageView cursortick, opts_menu;
     private Toolbar toolbar;
-    private boolean title_in_focus = false;
     private boolean editing_transtext = false;
     private int start_idx_colored = -1;
     private int end_idx_colored = -1;
+    private SearchView trans_searchview;
+    private int index_searchstart = 0;
+    private int start_idx_highlighted = -1, end_idx_highlighted = -1;
+    private boolean is_keyboard_open = false;
+    private View.OnTouchListener transcript_touchListener;
+    private int switcher_top_margin = -1;
+    private Runnable reset_highlight_or_colored;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -117,6 +125,7 @@ public class FileInfo extends Fragment {
         fileViewHolder = view.findViewById(R.id.file_holder);
         opts_menu = view.findViewById(R.id.fileinfo_opts_menu);
         act.bottomNavigationView.setVisibility(View.INVISIBLE);
+        trans_searchview = view.findViewById(R.id.fileinfo_searchview);
 
         toolbar = (Toolbar) view.findViewById(R.id.toolbar);
 
@@ -168,7 +177,7 @@ public class FileInfo extends Fragment {
             }
         });
 
-        tv_transtext.setOnTouchListener(new View.OnTouchListener() {
+        transcript_touchListener = new View.OnTouchListener() {
             int MAX_CLICK_DUR = 1500;
             int MAX_CLICK_DIST = 25;
             long click_start_time, click_last_time;
@@ -246,18 +255,22 @@ public class FileInfo extends Fragment {
                             if (lineidx != lineidx_check || lineidx == 0) {
                                 int offset = layout.getOffsetForHorizontal(lineidx, x);
                                 int i = getIdxForCharOffset(offset);
-                                if (i == -1) return false;
+                                if (i == -1 || i >= word_times_ms.size()) return false;
                                 int time_ms = word_times_ms.get(i);
                                 mPlayer.seekTo(time_ms);
                                 playMediaPlayer();
+                                reset_colored_text();
                                 Spannable s = (Spannable) tv_transtext.getText();
                                 String word = original_words.get(i);
                                 int startidx = word_start_c_idx.get(i);
+                                ed_transtext.setSelection(startidx);
                                 int endidx = startidx + word.length();
                                 s.setSpan(new ForegroundColorSpan(ContextCompat.getColor(act, R.color.colorPrimary)),
                                         startidx, endidx, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                                 start_idx_colored = startidx;
                                 end_idx_colored = endidx;
+                                act.h_main.removeCallbacks(reset_highlight_or_colored);
+                                act.h_main.postDelayed(reset_highlight_or_colored, 5000);
                             }
                         }
                         return false;
@@ -265,7 +278,8 @@ public class FileInfo extends Fragment {
                 }
                 return false;
             }
-        });
+        };
+        tv_transtext.setOnTouchListener(transcript_touchListener);
 
         if (text == null) {
             setFileFields();
@@ -465,11 +479,6 @@ public class FileInfo extends Fragment {
         if (seekbar_runnable != null) {
             act.h_main.removeCallbacks(seekbar_runnable);
         }
-        if (start_idx_colored != -1) {
-            Spannable s = (Spannable) tv_transtext.getText();
-            s.setSpan(new ForegroundColorSpan(ContextCompat.getColor(act, R.color.colorText)),
-                    start_idx_colored, end_idx_colored, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
 
         seekbar_runnable = new Runnable() {
             @Override
@@ -529,38 +538,49 @@ public class FileInfo extends Fragment {
         }
     }
 
+    public Rect create_RectFromView(View view) {
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return new Rect(location[0], location[1], location[0] + view.getWidth(),
+                location[1] + view.getHeight());
+    }
+
     public void handle_touch_event(View view, MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_UP) {
             int x = (int) event.getRawX();
             int y = (int) event.getRawY();
 
-            int[] location_edit_button = new int[2];
-            editButton.getLocationOnScreen(location_edit_button);
-            Rect edit_rect = new Rect(location_edit_button[0], location_edit_button[1],
-                                      location_edit_button[0] + editButton.getWidth(),
-                                      location_edit_button[1] + editButton.getHeight());
+            Rect edit_rect = create_RectFromView(editButton);
+            Rect search_rect = create_RectFromView(trans_searchview);
+
             if (edit_rect.contains(x, y) && view != fileinfo_ed_title) {
                 on_edit_click(view);
-            } else if (view == ed_transtext) {
-                int[] location = new int[2];
-                ed_transtext.getLocationOnScreen(location);
-                Rect rect = new Rect(location[0], location[1],
-                                     location[0] + ed_transtext.getWidth(),
-                                     location[1] + ed_transtext.getHeight());
-                if (!rect.contains(x, y) && editing_transtext) {
+                return;
+            }
+            if (view == ed_transtext) {
+                Rect rect = create_RectFromView(ed_transtext);
+                if (!rect.contains(x, y) && is_keyboard_open) {
                     on_edit_click(view);
                 }
-            } else if (view == fileinfo_ed_title){
-                int[] location = new int[2];
-                fileinfo_ed_title.getLocationOnScreen(location);
-                Rect rect = new Rect(location[0], location[1],
-                        location[0] + fileinfo_ed_title.getWidth(),
-                        location[1] + fileinfo_ed_title.getHeight());
+                return;
+            }
+
+            if (view == fileinfo_ed_title) {
+                Rect rect = create_RectFromView(fileinfo_ed_title);
                 if (!rect.contains(x, y)) {
                     InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
                     imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
                     fileinfo_ed_title.clearFocus();
                 }
+                return;
+            }
+
+            if (search_rect.contains(x, y)) {
+                if (!is_keyboard_open) {
+                    adjust_for_keyboard_opening();
+                }
+            } else if (is_keyboard_open) {
+                adjust_for_keyboard_closing();
             }
         }
 
@@ -577,90 +597,91 @@ public class FileInfo extends Fragment {
             fileinfo_ed_title.setEnabled(false);
 
             ed_transtext.requestFocus();
-            InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
+            trans_searchview.setQuery("", false);
 
             editButton.setImageResource(R.drawable.done);
 
-            text_textWatcher = new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            trans_searchview.setVisibility(View.INVISIBLE);
 
-                }
+            adjust_for_keyboard_opening();
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                    final String new_text = s.toString().replaceAll("(^\\s+|\\s+$)", "");
-                    act.h_background.removeCallbacks(ed_trans_runnable);
-                    ed_trans_runnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                FileWriter fw = new FileWriter(new File(Base.filesdir + afile.fname + Base.file_suffixes.get("text")), false);
-                                fw.write(new_text);
-                                fw.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    };
-                    act.h_background.postDelayed(ed_trans_runnable, 500);
-                }
-            };
-            ed_transtext.addTextChangedListener(text_textWatcher);
-
-            int playview_top = playView.getTop() - 16;
-            playView_offset = -playview_top;
-            playView.animate().translationY(playView_offset);
-            mediaButton.animate().translationY(playView_offset);
-            tv_fduration.animate().translationY(playView_offset);
-            cursortick.animate().translationY(playView_offset);
-            mSeekBar.animate().translationY(playView_offset);
-            fileinfo_ed_title.setVisibility(View.INVISIBLE);
-
+            ConstraintLayout.LayoutParams trans_switcher_layout = (ConstraintLayout.LayoutParams) viewSwitcher.getLayoutParams();
+            switcher_top_margin = trans_switcher_layout.topMargin;
+            trans_switcher_layout.topMargin = trans_switcher_layout.topMargin - trans_searchview.getHeight();
+            viewSwitcher.invalidate();
+            viewSwitcher.requestLayout();
 
         } else {
             // TODO: crashes when called on text that was edited!!
             editing_transtext = false;
             cursortick.setVisibility(View.INVISIBLE);
             fileinfo_ed_title.setEnabled(true);
-            playView_offset = 0;
-            playView.animate().translationY(0);
-            mediaButton.animate().translationY(0);
-            tv_fduration.animate().translationY(0);
-            mSeekBar.animate().translationY(0);
-            cursortick.animate().translationY(0);
-            fileViewHolder.animate().translationY(0);
-            cursortick.animate().translationX(0);
-            fileinfo_ed_title.setVisibility(View.VISIBLE);
 
-            InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
+            trans_searchview.setVisibility(View.VISIBLE);
 
-            ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-            Log.i("APP", "length " + fileholder_bottom_margin);
-            fv_lay_params.bottomMargin = fileholder_bottom_margin;
-            fileViewHolder.invalidate();
-            fileViewHolder.requestLayout();
+            ConstraintLayout.LayoutParams trans_switcher_layout = (ConstraintLayout.LayoutParams) viewSwitcher.getLayoutParams();
+            trans_switcher_layout.topMargin = switcher_top_margin;
+            viewSwitcher.invalidate();
+            viewSwitcher.requestLayout();
 
-            if (ed_trans_runnable != null) {
-                act.h_background.removeCallbacks(ed_trans_runnable);
-                ed_trans_runnable.run();
+            adjust_for_keyboard_closing();
+
+            String new_text = ed_transtext.getText().toString().replaceAll("(^\\s+|\\s+$)", "");
+            FileWriter fw = null;
+            try {
+                fw = new FileWriter(new File(Base.filesdir + afile.fname + Base.file_suffixes.get("text")), false);
+                fw.write(new_text);
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            ed_transtext.removeTextChangedListener(text_textWatcher);
 
-            final String new_text = ed_transtext.getText().toString();
             tv_transtext.setText(new_text);
+            text = new_text;
 
             editButton.setImageResource(R.drawable.edit);
             viewSwitcher.showNext();
         }
         ed_transtext.setFocusableInTouchMode(false);
+    }
+
+    public void adjust_for_keyboard_opening() {
+        if (is_keyboard_open) return;
+        is_keyboard_open = true;
+        InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.showSoftInput(ed_transtext, InputMethodManager.SHOW_IMPLICIT);
+        tv_transtext.setOnTouchListener(null);
+        int playview_top = playView.getTop() - 16;
+        playView_offset = -playview_top;
+        playView.animate().translationY(playView_offset);
+        mediaButton.animate().translationY(playView_offset);
+        tv_fduration.animate().translationY(playView_offset);
+        cursortick.animate().translationY(playView_offset);
+        mSeekBar.animate().translationY(playView_offset);
+        fileinfo_ed_title.setVisibility(View.INVISIBLE);
+    }
+
+    public void adjust_for_keyboard_closing() {
+        if (!is_keyboard_open) return;
+        is_keyboard_open = false;
+        InputMethodManager imm = (InputMethodManager) act.getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(act.getWindow().getCurrentFocus().getWindowToken(), 0);
+        tv_transtext.setOnTouchListener(transcript_touchListener);
+        playView_offset = 0;
+        playView.animate().translationY(0);
+        mediaButton.animate().translationY(0);
+        tv_fduration.animate().translationY(0);
+        mSeekBar.animate().translationY(0);
+        cursortick.animate().translationY(0);
+        fileViewHolder.animate().translationY(0);
+        cursortick.animate().translationX(0);
+        fileinfo_ed_title.setVisibility(View.VISIBLE);
+
+        ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
+        Log.i("APP", "length " + fileholder_bottom_margin);
+        fv_lay_params.bottomMargin = fileholder_bottom_margin;
+        fileViewHolder.invalidate();
+        fileViewHolder.requestLayout();
     }
 
     public void delete(AFile afile) {
@@ -672,6 +693,9 @@ public class FileInfo extends Fragment {
         super.onStop();
         if (mSeekBar != null) {
             mSeekBar.setOnSeekBarChangeListener(null);
+        }
+        if (tv_transtext != null) {
+            tv_transtext.setOnTouchListener(null);
         }
         if (mPlayer != null) {
             pausePlaying();
@@ -705,7 +729,6 @@ public class FileInfo extends Fragment {
 
             @Override
             public void afterTextChanged(final Editable s) {
-                Log.i("APP", "In text change.");
                 String cname = s.toString().replaceAll("(^\\s+|\\s+$)", "");
                 if (cname.equals("")) {
                     cname = getString(R.string.default_convname);
@@ -717,7 +740,6 @@ public class FileInfo extends Fragment {
                 title_runnable = new Runnable() {
                     @Override
                     public void run() {
-                        Log.i("APP", "fname " + fname + " cname " + curname);
                         act.f_repo.rename(afile, curname, fname);
                         afile.title = curname;
                         afile.fname = fname;
@@ -729,31 +751,52 @@ public class FileInfo extends Fragment {
         };
         fileinfo_ed_title.addTextChangedListener(title_textWatcher);
 
-//        layoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-//            @Override
-//            public void onGlobalLayout() {
-//
-//                Rect r = new Rect();
-//                fview.getWindowVisibleDisplayFrame(r);
-//                int screenheight = fview.getRootView().getHeight();
-//                int height_diff = screenheight - (r.bottom - r.top);
-//                if (height_diff > 120 && !hidingKeyboard) {
-//                    if (!showingKeyboard) {
-//                        ConstraintLayout.LayoutParams fv_lay_params = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
-//                        ConstraintLayout.LayoutParams pv_lay_params = (ConstraintLayout.LayoutParams) playView.getLayoutParams();
-//                        showingKeyboard = true;
-//                        ed_transtext_bottom_margin = fv_lay_params.bottomMargin;
-//                        fv_lay_params.bottomMargin = height_diff - pv_lay_params.height;
-//                        fileViewHolder.invalidate();
-//                        fileViewHolder.requestLayout();
-//                    }
-//                } else {
-//                    hidingKeyboard = false;
-//                }
-//
-//            }
-//        };
-//        fview.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
+        reset_highlight_or_colored = new Runnable() {
+            @Override
+            public void run() {
+                reset_colored_text();
+                reset_highlighted_text();
+                act.h_main.postDelayed(this, 5000);
+            }
+        };
+
+        search_textWatcher = new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String search_string) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String search_string) {
+                int str_len = search_string.length();
+                if (str_len < 2) {
+                    reset_highlighted_text();
+                    return false;
+                }
+                act.h_main.removeCallbacks(reset_highlight_or_colored);
+                act.h_main.postDelayed(reset_highlight_or_colored, 5000);
+                int index = text.indexOf(search_string, index_searchstart);
+                if (index == -1) return false;
+                Spannable str = (Spannable) tv_transtext.getText();
+                start_idx_highlighted = index;
+                end_idx_highlighted = index + str_len;
+                str.setSpan(new BackgroundColorSpan(ContextCompat.getColor(act, R.color.colorAccent)),
+                        start_idx_highlighted, end_idx_highlighted, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                ed_transtext.setSelection(index);
+                Layout layout = tv_transtext.getLayout();
+                int line_idx = layout.getLineForOffset(index);
+                int offset = line_idx * tv_transtext.getLineHeight() - tv_transtext.getScrollY();
+                tv_transtext.scrollBy(0, offset);
+                int i = getIdxForCharOffset(index);
+                if (i == -1 || i >= word_times_ms.size()) return false;
+                int time_ms = word_times_ms.get(i);
+                mPlayer.seekTo(time_ms);
+                mSeekBar.setProgress(time_ms);
+                return false;
+            }
+        };
+
+        trans_searchview.setOnQueryTextListener(search_textWatcher);
     }
 
     @Override
@@ -763,25 +806,44 @@ public class FileInfo extends Fragment {
             act.h_background.removeCallbacks(title_runnable);
             title_runnable.run();
         }
-        if (ed_trans_runnable != null) {
-            act.h_background.removeCallbacks(ed_trans_runnable);
-            ed_trans_runnable.run();
+        if (reset_highlight_or_colored != null) {
+            act.h_main.removeCallbacks(reset_highlight_or_colored);
         }
         fileinfo_ed_title.removeTextChangedListener(title_textWatcher);
+        trans_searchview.setOnQueryTextListener(null);
         super.onPause();
     }
 
     public void resize_views(int height) {
         // is called twice per action for some reason
-        if (editing_transtext) {
+        if (is_keyboard_open) {
             ConstraintLayout.LayoutParams mainview_layout = (ConstraintLayout.LayoutParams) fileViewHolder.getLayoutParams();
             if (mainview_layout.bottomMargin < 100) {
                 fileholder_bottom_margin = mainview_layout.bottomMargin;
             }
-            Log.i("APP", "setlength " + fileholder_bottom_margin + " height " + height);
-            mainview_layout.bottomMargin = height - 100;
+            //Log.i("APP", "setlength " + fileholder_bottom_margin + " height " + height);
+            mainview_layout.bottomMargin = height - 125;
             fileViewHolder.invalidate();
             fileViewHolder.requestLayout();
+        }
+    }
+
+    public void reset_colored_text() {
+        if (start_idx_colored != -1) {
+            Spannable s = (Spannable) tv_transtext.getText();
+            s.setSpan(new ForegroundColorSpan(ContextCompat.getColor(act, R.color.colorText)),
+                    start_idx_colored, end_idx_colored, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+
+    }
+
+    public void reset_highlighted_text() {
+        if (start_idx_highlighted != -1) {
+            Spannable str = (Spannable) tv_transtext.getText();
+            str.setSpan(new BackgroundColorSpan(ContextCompat.getColor(act, R.color.colorDefaultWhite)),
+                    start_idx_highlighted, end_idx_highlighted, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            start_idx_highlighted = -1;
+            end_idx_highlighted = -1;
         }
     }
 }

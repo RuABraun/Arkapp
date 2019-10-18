@@ -66,6 +66,7 @@ public class MainFragment extends Fragment {
     private boolean paused_stream = false;
     Timer time_counter;
     int fab_rec_botmargin;
+    private int last_string_size;
 
     public MainFragment() {
         // Required empty public constructor
@@ -239,7 +240,10 @@ public class MainFragment extends Fragment {
         Bugsnag.leaveBreadcrumb("Stopped transcribing stream.");
         time_counter.cancel();
         act.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        if (paused_stream) pause_switch(view);
+        if (paused_stream) {
+            paused_stream = false;
+            fab_pause.setImageDrawable(act.getDrawable(R.drawable.pause_c));
+        }
         fab_pause.setVisibility(View.GONE);
         paused_stream = false;
         spinner.setVisibility(View.VISIBLE);
@@ -379,7 +383,7 @@ public class MainFragment extends Fragment {
                     trans_update_runnable=this;
                     update_text();
                     if (is_recording) {
-                        act.h_main.postDelayed(trans_update_runnable, 200);
+                        act.h_main.postDelayed(trans_update_runnable, 100);
                     }
                 }
             }, 100);
@@ -389,17 +393,19 @@ public class MainFragment extends Fragment {
                 int sec = 0;
                 @Override
                 public void run() {
-                    sec++;
-                    if (sec == 60) {
-                        min++;
-                        sec = 0;
-                    }
-                    act.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            tv_counter.setText(String.valueOf(min) + ":" + String.valueOf(sec));
+                    if (!paused_stream) {
+                        sec++;
+                        if (sec == 60) {
+                            min++;
+                            sec = 0;
                         }
-                    });
+                        act.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tv_counter.setText(String.valueOf(min) + ":" + String.valueOf(sec));
+                            }
+                        });
+                    }
                 }
             }, 0, 1000);
             tv_counter.setVisibility(View.VISIBLE);
@@ -420,23 +426,29 @@ public class MainFragment extends Fragment {
         String conststr = act.recEngine.get_const_text();
         int strlen = str.length();
         if (conststr.equals("")) {
-            trans_text.replace(const_trans_size, const_trans_size + strlen, str);
+            if (strlen != last_string_size) {
+                trans_text.replace(const_trans_size, const_trans_size + strlen, str);
+                ed_transtext.setText(trans_text);
+                ed_transtext.setSelection(trans_text.length());
+            }
+            last_string_size = strlen;
         } else {
             const_trans_size = conststr.length();
             trans_text.replace(0, const_trans_size, conststr);
             trans_text.replace(const_trans_size, const_trans_size + strlen, str);
+            ed_transtext.setText(trans_text);
+            ed_transtext.setSelection(trans_text.length());
         }
-
-        ed_transtext.setText(trans_text);
-        ed_transtext.setSelection(trans_text.length());
     }
 
     public void pause_switch(View v) {
         if (!paused_stream) {
+            Bugsnag.leaveBreadcrumb("Paused stream.");
             paused_stream = true;
             fab_pause.setImageDrawable(act.getDrawable(R.drawable.mic_full_inv));
             act.recEngine.pause_switch_stream();
         } else {
+            Bugsnag.leaveBreadcrumb("Unpaused stream");
             paused_stream = false;
             act.recEngine.pause_switch_stream();
             fab_pause.setImageDrawable(act.getDrawable(R.drawable.pause_c));

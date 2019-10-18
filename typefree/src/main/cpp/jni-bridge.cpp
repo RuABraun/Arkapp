@@ -15,7 +15,6 @@ JNIEXPORT void JNICALL Java_typefree_typefree_MainActivity_native_1load(JNIEnv* 
 
     AAssetDir* assetDir = AAssetManager_openDir(mgr, "model");
     const char* filename = (const char*)NULL;
-    LOGI("IN LOAD FUNCTION");
     size_t BUFSZ = 1000 * 512;
     const char* rootdir = (env)->GetStringUTFChars(modeldir, 0);
     while ((filename = AAssetDir_getNextFileName(assetDir)) != NULL) {
