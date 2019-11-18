@@ -71,6 +71,29 @@ public class ManageFragment extends Fragment {
         pb_import = view.findViewById(R.id.progbar_import);
         recview.setLayoutManager(new LinearLayoutManager(act));
         recview.setAdapter(adapter);
+
+        if (!act.just_imported_file) {
+            String tag = "knows_can_import";
+            if (!act.settings.getBoolean(tag, false)) {
+                String msg = "Use the + button to import audio or video files from your phone.";
+                TipDialog dialog = TipDialog.newInstance("Tip!", msg, tag);
+                dialog.show(act.fragmentManager, "TipDialog");
+            }
+        }
+        return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        Bugsnag.leaveBreadcrumb("In ManageFragment onStart()");
+        observer = new Observer<List<AFile>>() {
+            @Override
+            public void onChanged(@Nullable List<AFile> aFiles) {
+                adapter.setData(aFiles);
+            }
+        };
+        fviewmodel.getAllFiles().observe(act, observer);
         if (!act.just_imported_file) {
             pb_import.setVisibility(View.INVISIBLE);
         } else {
@@ -88,29 +111,6 @@ public class ManageFragment extends Fragment {
             };
             act.h_main.post(runnable);
         }
-        if (!act.just_imported_file) {
-            String tag = "knows_can_import";
-            if (!act.settings.getBoolean(tag, false)) {
-                String msg = "Use the + button to import audio or video files from your phone.";
-                TipDialog dialog = TipDialog.newInstance("Tip!", msg, tag);
-                dialog.show(act.fragmentManager, "TipDialog");
-            }
-        }
-        act.just_imported_file = false;
-        return view;
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-        observer = new Observer<List<AFile>>() {
-            @Override
-            public void onChanged(@Nullable List<AFile> aFiles) {
-                adapter.setData(aFiles);
-            }
-        };
-        fviewmodel.getAllFiles().observe(act, observer);
-//        act.h_main.postDelayed(runnable, 1000);
     }
 
     @Override
@@ -167,6 +167,7 @@ public class ManageFragment extends Fragment {
                 @Override
                 public void run() {
                     Bugsnag.leaveBreadcrumb("Finished importing file.");
+                    act.just_imported_file = false;
                     String tag = "knows_transcribe_after_import";
                     if (!act.settings.getBoolean(tag, false)) {
                         String msg = "Now press the microphone on the file you added to transcibe it.";
@@ -185,7 +186,6 @@ public class ManageFragment extends Fragment {
         switch(requestCode) {
             case 7:
                 if (resultCode == RESULT_OK) {
-                    act.just_imported_file = true;
                     Uri furi = data.getData();
                     String path = "";
                     String newpath = "";
@@ -240,7 +240,7 @@ public class ManageFragment extends Fragment {
                     r = new ConvertAudioRunnable(inpath, outpath);
                     act.finished_conversion = false;
                     new Thread(r).start();
-                    Log.i("APP", "Done importing.");
+                    Bugsnag.leaveBreadcrumb("Reached end of importing code.");
                     break;
                 }
             default:
@@ -251,6 +251,7 @@ public class ManageFragment extends Fragment {
 
     public void on_add_press(View view) {
         Bugsnag.leaveBreadcrumb("Importing file.");
+        act.just_imported_file = true;
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("audio/*");
         startActivityForResult(intent, 7);
