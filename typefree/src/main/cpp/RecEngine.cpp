@@ -8,7 +8,6 @@
 #include "RecEngine.h"
 #include <stdio.h>
 #include <chrono>
-#include <tensorflow/lite/c/c_api_internal.h>
 #include "qnnpack.h"
 
 extern "C"
@@ -79,11 +78,11 @@ int start_logger()
 void RecEngine::setupRnnlm(std::string modeldir) {
     rnn_ready = false;
 
-    std::string align_lex = modeldir + "align_lexicon.bin",
-            wsyms = modeldir + "words.txt",
+    std::string wsyms = modeldir + "words.txt",
             word_boundary_f = modeldir + "word_boundary.int";
     word_syms = SymbolTable::ReadText(wsyms);
-    idx_sb = (int32) word_syms->Find("<sb>");
+    idx_sb = (int32_t) word_syms->Find("<sb>");
+    unk_index_ = (int32_t) word_syms->Find("<unk>");
     wordb_info = new WordBoundaryInfo(opts, word_boundary_f);
 
     LOGI("Done lexicons.");
@@ -103,11 +102,14 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
     carpa_lm_fst_subtract = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
                                                                    carpa_lm_fst);
-
-    ReadKaldiObject(rnnlm_raw_fname, &rnnlm);
-    SetBatchnormTestMode(true, &(rnnlm));
-    SetDropoutTestMode(true, &(rnnlm));
-    SetQuantTestMode(true, &(rnnlm));
+    {
+        bool binary;
+        Input ki(rnnlm_raw_fname, &binary);
+        rnnlm.Read(ki.Stream(), binary, true);
+        SetBatchnormTestMode(true, &(rnnlm));
+        SetDropoutTestMode(true, &(rnnlm));
+        SetQuantTestMode(true, &(rnnlm));
+    }
 
     int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
     std::vector<int32> ids;
@@ -126,19 +128,10 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     // Case model
     LOGI("Doing case");
-    std::string casemodel_path = modeldir + "tf_model.tflite";
-    flatbuffer_model  = tflite::FlatBufferModel::BuildFromFile(casemodel_path.c_str());
 
-    tflite::ops::builtin::BuiltinOpResolver resolver;
-    tflite::InterpreterBuilder builder(*flatbuffer_model.get(), resolver);
-    builder(&interpreter);
-    std::vector<int32> dims = {1, CASE_INNUM};
-    interpreter->ResizeInputTensor(0, dims);
-    //    interpreter->ResizeInputTensor(1, dims);
-    if (interpreter->AllocateTensors() != kTfLiteOk) {
-        LOGE("FAILED TO ALLOCATE");
-    }
-    case_zero_index = 10295;  // TODO: remove constant!
+    case_module = torch::jit::load(modeldir + "traced_model.pt");
+
+    case_zero_index = 10246;  // TODO: remove constant!
     nid_to_caseid.push_back(case_zero_index);
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
     casepos_zero_index = CASE_INNUM;
@@ -154,7 +147,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "", modeldir + "cmvn.conf"),
                                             tot_num_frames_decoded(0),
                                             audio_buffer(16000 * 5) {
-    //start_logger();
+    start_logger();  // log stdout and stderr
     excl_cores = exclusiveCores;
     // ! -- ASR setup begin
     fin_sample_rate_fp = (BaseFloat) fin_sample_rate;
@@ -171,7 +164,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
         bool binary;
         Input ki(nnet3_rxfilename, &binary);
         trans_model.Read(ki.Stream(), binary);
-        am_nnet.Read(ki.Stream(), binary);
+        am_nnet.Read(ki.Stream(), binary, true);
 
         SetBatchnormTestMode(true, &(am_nnet.GetNnet()));
         SetDropoutTestMode(true, &(am_nnet.GetNnet()));
@@ -200,14 +193,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
 
     LOGI("Finished constructing rec");
 
-//    torch::jit::script::Module module;
-//    module = torch::jit::load(modeldir + "traced_model.pt");
-//
-//    std::vector<torch::jit::IValue> inputs;
-//    inputs.push_back(torch::ones({1, 3}));
-//    torch::autograd::AutoGradMode guard(false);
-//    at::Tensor output = module.forward(inputs).toTensor();
-//    LOGI("OKAY!");
+    LOGI("OKAY!");
 }
 
 RecEngine::~RecEngine() {
@@ -301,7 +287,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         f << "data----";  // (chunk size to be filled in later)
 
         // ---------------- Setting up ASR vars
-        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 30, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(7.0, 8000, 6.0, 30, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -436,9 +422,10 @@ void RecEngine::run_recognition() {
 void RecEngine::recognition_loop() {
     set_thread_affinity();
 //    Timer tt;
+    LOGI("TID: %d", std::this_thread::get_id());
     std::vector<std::string> dummy;
     std::vector<int32> dummyb;
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
     int32_t offset = 0, size = 0;
     while(recognition_on.load()) {
         run_recognition();
@@ -463,18 +450,20 @@ void RecEngine::pause_stream() {
     if (!recognition_on.load()) return;
     is_recognition_paused = true;
     paused_num_samples_ = audio_buffer.num_added_.load();
-    std::unique_lock<std::mutex> lock(mutex_decoding_);
-    this->cv_decoding_.wait_for(lock, std::chrono::seconds(5), [this]{return !is_decoding;});
-    int32 num_frames_decoded = decoder->NumFramesDecoded();
+    {
+        std::unique_lock<std::mutex> lock(mutex_decoding_);
+        this->cv_decoding_.wait_for(lock, std::chrono::seconds(5), [this] { return !is_decoding; });
+        int32 num_frames_decoded = decoder->NumFramesDecoded();
 
-    decoder->GetLattice(false, &finish_seg_clat);
+        decoder->GetLattice(false, &finish_seg_clat);
 
-    if (t_rnnlm.joinable()) t_rnnlm.join();
-    if (t_finishsegment.joinable()) t_finishsegment.join();
-    t_finishsegment = std::thread(&RecEngine::finish_segment, this,
-                                  &finish_seg_clat, num_frames_decoded);
+        if (t_rnnlm.joinable()) t_rnnlm.join();
+        if (t_finishsegment.joinable()) t_finishsegment.join();
+        t_finishsegment = std::thread(&RecEngine::finish_segment, this,
+                                      &finish_seg_clat, num_frames_decoded);
 
-    decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+        decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+    }
 }
 
 void RecEngine::resume_stream() {
@@ -515,27 +504,29 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
     CompactLattice clat_composed, best_path;
 
-    if (num_out_frames > 150) {
-        fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
-        ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
 
-        Lattice lat_composed;
-        ConvertLattice(clat_composed, &lat_composed);
-        Invert(&lat_composed);
-        CompactLattice determinized_clat;
-        DeterminizeLattice(lat_composed, &determinized_clat);
+    AddWordInsPenToCompactLattice(0.5, clat);
 
-        TopSortCompactLatticeIfNeeded(&determinized_clat);
+    fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
+    ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
 
-        if (t_rnnlm.joinable()) t_rnnlm.join();
-        CompactLattice clat_rescored;
-        ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
-                                     const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-                                     &clat_rescored, max_ngram_order, true);
-        CompactLatticeShortestPath(clat_rescored, &best_path);
-    } else {
-        CompactLatticeShortestPath(*clat, &best_path);
-    }
+    Lattice lat_composed;
+    ConvertLattice(clat_composed, &lat_composed);
+    Invert(&lat_composed);
+    CompactLattice determinized_clat;
+    DeterminizeLattice(lat_composed, &determinized_clat);
+
+    TopSortCompactLatticeIfNeeded(&determinized_clat);
+
+    if (t_rnnlm.joinable()) t_rnnlm.join();
+    CompactLattice clat_rescored;
+    Timer timer;
+    ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
+                                 const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                 &clat_rescored, max_ngram_order, true);
+    double timetaken = timer.Elapsed();
+    KALDI_LOG << "TIME TAKEN " << timetaken;
+    CompactLatticeShortestPath(clat_rescored, &best_path);
 
     CompactLattice aligned_clat;
     WordAlignLattice(best_path, trans_model, *wordb_info, 0, &aligned_clat);
@@ -543,6 +534,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     std::vector<int32> words, times, lengths;
     CompactLatticeToWordAlignment(aligned_clat, &words, &times, &lengths);
 
+    if (t_rnnlm.joinable()) t_rnnlm.join();
     std::vector<std::string> words_split;
     std::vector<int32> indcs_kept;
     std::string text = prettify_text(words, words_split, indcs_kept, true);
@@ -578,34 +570,34 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
 
 }
 
-int32 RecEngine::run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos) {
+int32 RecEngine::run_casing(std::vector<long> casewords) {
     int32 sz = casewords.size();
     if (sz != CASE_INNUM) {
         LOGE("SIZE IS DIFFERENT THAN CASE_INNUM, SOMETHING WENT WRONG");
     }
 
-    int32* input = interpreter->typed_input_tensor<int32>(0);
-    int32* input_pos = interpreter->typed_input_tensor<int32>(1);
-    for(int i = 0; i < CASE_INNUM; i++) {
-        input[i] = casewords[i];
-        input_pos[i] = casewords_pos[i];
-    }
+    std::vector<torch::jit::IValue> inputs;
+    auto input_tensor = torch::from_blob(casewords.data(), {1, 7}, at::ScalarType::Long);
+    inputs.push_back(input_tensor);
 
-    interpreter->Invoke();
-    float* output = interpreter->typed_output_tensor<float>(0);
+    torch::autograd::AutoGradMode guard(false);
+    at::Tensor output = case_module.forward(inputs).toTensor();
+
     int32 argmax = -1;
-    float maxprob = 0.f;
+    float maxprob = -100.f;
 
+    auto out_ptr = output.data<float>();
     for(int32 i = 0; i < 3; i++) {
-        float out = output[i];
+        float out = out_ptr[i];
         if (out > maxprob) {
             maxprob = out;
             argmax = i;
         }
     }
-    if (output[0] > 0.2f) {
+    if (out_ptr[0] > -1.6) {
         argmax = 0;
     }
+    KALDI_LOG << argmax;
     return argmax;
 }
 
@@ -622,7 +614,7 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
     words_nosil.reserve(sz);
     for(int32 i = 0; i < sz; i++) {  // removes epsilon and <sb> words
         int32 w = (*words)[i];
-        if (w != 0 && w != idx_sb) words_nosil.push_back(w);
+        if (w != 0 && w != idx_sb && w != unk_index_) words_nosil.push_back(w);
     }
 
     // Convert ids
@@ -634,8 +626,7 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
         casewords[i] = id;
     }
 
-    std::vector<int32> casewords_sentence(CASE_INNUM, case_zero_index);
-    std::vector<int32> casepos_sentence(CASE_INNUM, casepos_zero_index);
+    std::vector<long> casewords_sentence(CASE_INNUM, case_zero_index);
     casing->resize(sz, 0);
     for(int32 i = 1; i < sz; i++) {
         int32 startidx = i - (CASE_INNUM - CASE_OFFSET - 1);
@@ -644,20 +635,17 @@ void RecEngine::get_text_case(std::vector<int32>* words, std::vector<int32>* cas
 
         int32 k = CASE_INNUM - 1;
         for(int32 j = endidx; j >= startidx; j--, k--) {
-            int32 wid, pos;
+            long wid;
             if (j < sz) {
-                wid = casewords[j];
-                pos = k;
+                wid = (long) casewords[j];
             } else {
-                wid = case_zero_index;
-                pos = casepos_zero_index;
+                wid = (long) case_zero_index;
             }
             //LOGI("Ids %d %d", wid, pos);
             casewords_sentence[k] = wid;
-            casepos_sentence[k] = pos;
         }
 
-        (*casing)[i] = run_casing(casewords_sentence, casepos_sentence);
+        (*casing)[i] = run_casing(casewords_sentence);
     }
     LOGI("Done casing.");
 }
@@ -682,11 +670,9 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
     for(size_t j = 0; j < num_words; j++) {
 
         int32 w = words[j];
-        if (w == 0 || w == idx_sb) continue;
+        if (w == 0 || w == idx_sb || w == unk_index_) continue;
 
         std::string word = word_syms->Find(w);
-
-        if (word == "<unk>") word = "[unknown]";
 
         if (split && case_decs[wcnt] > 0) doupper = true;
         if (wcnt == 0 || doupper) {
@@ -741,34 +727,22 @@ int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
         SubVector<BaseFloat> data(wave_data.Data(), 0);
 
         BaseFloat samp_freq = wave_data.SampFreq();
-        int32 chunk_length;
 
-        if (chunk_length_secs > 0) {
-            chunk_length = int32(samp_freq * chunk_length_secs);
-            if (chunk_length == 0) chunk_length = 1;
-        } else {
-            chunk_length = std::numeric_limits<int32>::max();
-        }
-
-        int32 samp_offset = 0;
         LOGI("Starting decoding.");
 
-        while (samp_offset < data.Dim()) {
-            int32 samp_remaining = data.Dim() - samp_offset;
-            int32 num_samp = chunk_length < samp_remaining ? chunk_length : samp_remaining;
+        feature_pipeline->AcceptWaveform(samp_freq, data);
 
-            SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
+        feature_pipeline->InputFinished();
+        Timer timer;
+//        decoder->AdvanceDecoding();
+        std::thread t = std::thread(&SingleUtteranceNnet3Decoder::AdvanceDecodingLooped,
+                        std::ref(*decoder));
 
-            feature_pipeline->AcceptWaveform(samp_freq, wave_part);
+        decoder->FinishedLoopedDecoding();
+        t.join();
+        double timetaken = timer.Elapsed();
+        KALDI_LOG << "AM TIME TAKEN " << timetaken;
 
-            samp_offset += num_samp;
-            if (samp_offset == data.Dim()) {
-                // no more input. flush out last frames
-                feature_pipeline->InputFinished();
-            }
-            decoder->AdvanceDecoding();
-
-        }
         decoder->FinalizeDecoding();
         CompactLattice clat;
         bool end_of_utterance = true;

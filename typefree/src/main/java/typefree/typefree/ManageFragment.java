@@ -198,7 +198,7 @@ public class ManageFragment extends Fragment {
                         for (int i = 1; i < split.length - 1; i++) {
                             basename += split[i];
                         }
-                        basename = MainActivity.getFileName(basename, act.f_repo);
+                        basename = act.f_repo.getFileName(basename);
                         newpath = Base.filesdir + basename + ".wav";
                         Log.i("APP", "SCHEME_FILE: path " + path + " newpath " + newpath);
                     } else if (furi.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
@@ -222,7 +222,7 @@ public class ManageFragment extends Fragment {
                         for (int i = 1; i < split.length - 1; i++) {
                             basename += split[i];
                         }
-                        basename = MainActivity.getFileName(basename, act.f_repo);
+                        basename = act.f_repo.getFileName(basename);
                         newpath = Base.filesdir + basename + ".wav";
                         Log.i("APP", "SCHEME_CONTENT: path " + path + " newpath " + newpath);
                     } else {

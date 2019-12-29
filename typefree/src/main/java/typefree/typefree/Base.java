@@ -159,11 +159,13 @@ public class Base extends AppCompatActivity {
                     @Override
                     public void run() {
                         Log.i("APP", "Turning sustainedperf off for good");
+                        Log.i("APP", "YOYOYOYO");
                         act.getWindow().setSustainedPerformanceMode(false);
                     }
                 });
             }
         } catch (InterruptedException e) {
+            Log.i("APP", "Interrupted!");
             return;
         }
     }

@@ -174,15 +174,35 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     String fname = afile_to_use.fname;
                     final String fpath = Base.filesdir + fname;
                     final String wavpath = Base.filesdir + fname + ".wav";
-                    Bugsnag.leaveBreadcrumb("About to transcribe imported file " + wavpath);
+                    File f = new File(wavpath);
+                    boolean exists = f.exists();
+                    Bugsnag.leaveBreadcrumb("About to transcribe imported file " + wavpath + "\nFile exists? " + exists);
                     Log.i("APP", "Pressed on file " + fpath + " with name " + afile_to_use.title);
-                    MediaPlayer mPlayer = MediaPlayer.create(context, Uri.parse(wavpath));
-                    int dur = (int) ((float)mPlayer.getDuration() / 2000.0f);
+                    MediaPlayer mPlayer;
+                    int dur;
+                    try {
+                        mPlayer = MediaPlayer.create(context, Uri.parse(wavpath));
+                        dur = (int) ((float)mPlayer.getDuration() / 2000.0f);
+                    } catch (NullPointerException e) {
+                        Bugsnag.leaveBreadcrumb("Error trying to get duration of audio file!");
+                        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                        builder.setTitle("Warning")
+                                .setMessage("Something went wrong transcribing the file, contact support for help: contact@typefree.io\n")
+                                .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                    }
+                                });
+                        AlertDialog alert = builder.create();
+                        alert.show();
+                        return;
+                    }
                     String est_time = Base.sec_to_timestr(dur);
                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
 
                     builder.setTitle("Transcribe audio file")
-                            .setMessage("This is estimated to take: " + est_time + "\n\nPlease wait for the process to finish, do not switch to another app (or it will likely fail).")
+                            .setMessage("This is estimated to take: " + est_time + "\n\nPlease wait for the process to finish, do not switch to another app (or it will fail)!")
                             .setPositiveButton("Transcribe", new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final RecEngine recEngine = RecEngine.getInstance(rmodeldir, context.exclusiveCores);  // RISKY!! what if it was GCed and needs to be recreated?
@@ -190,12 +210,14 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     button_trans.setVisibility(View.INVISIBLE);
                                     recog_done = false;
                                     context.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                                    context.h_background.postDelayed(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            Base.temper_performance(context, 60, 30, 15);
-                                        }
-                                    }, 500);
+//                                    if (context.pm.isSustainedPerformanceModeSupported()) {
+//                                        context.h_background.postDelayed(new Runnable() {
+//                                            @Override
+//                                            public void run() {
+//                                                Base.temper_performance(context, 60, 30, 15);
+//                                            }
+//                                        }, 500);
+//                                    }
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
@@ -275,13 +297,16 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                             switch (item.getItemId()) {
                                 case R.id.View:
                                     File f = new File(Base.filesdir + afile_to_use.fname + ".wav");
-                                    Bugsnag.leaveBreadcrumb("Opening file " + Base.filesdir + afile_to_use.fname + ".wav");
+
                                     if (!f.exists()) {
-                                        Log.i("APP", "File does not exist, title: " +
-                                                afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath());
+                                        String s = "File does not exist, title: " +
+                                                afile_to_use.title + " fname: " + afile_to_use.fname + " fpath: " + f.getPath();
+                                        Log.i("APP", s);
+                                        Bugsnag.leaveBreadcrumb(s);
                                         Toast.makeText(context, "File does not exist! Contact support for help: contact@typefree.io", Toast.LENGTH_SHORT).show();
                                         break;
                                     }
+                                    Bugsnag.leaveBreadcrumb("Opening file " + Base.filesdir + afile_to_use.fname + ".wav");
                                     Bundle bundle = new Bundle();
                                     bundle.putParcelable("file_obj", afile_to_use);
                                     FileInfo finfo_frag = new FileInfo();

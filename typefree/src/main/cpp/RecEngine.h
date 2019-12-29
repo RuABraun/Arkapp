@@ -25,13 +25,10 @@
 #include <thread>
 #include "base/timer.h"
 #include <memory>
-#include "tensorflow/lite/model.h"
-#include "tensorflow/lite/interpreter.h"
-#include "tensorflow/lite/kernels/register.h"
-#include "tensorflow/lite/string_util.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include "torch/script.h"
 
 class RingBuffer {
 public:
@@ -138,6 +135,9 @@ public:
 
     int32 tot_num_frames_decoded;
 private:
+
+    int32_t unk_index_;
+
     // ASR vars
     std::string model_dir;
     kaldi::nnet3::AmNnetSimple am_nnet;
@@ -182,13 +182,12 @@ private:
     // case model
     int32 CASE_INNUM = 7;
     int32 CASE_OFFSET = 1;
-    std::unique_ptr<tflite::FlatBufferModel> flatbuffer_model;
-    std::unique_ptr<tflite::Interpreter> interpreter;
+    torch::jit::script::Module case_module;
     std::vector<int32> nid_to_caseid;  // ngram index (id) to case index
     int32 case_zero_index;  // number of case words, doubles as index to a zeroed embedding
     int32 casepos_zero_index;
 
-    int32 run_casing(std::vector<int32> casewords, std::vector<int32> casewords_pos);
+    int32 run_casing(std::vector<long> casewords);
 
 };
 

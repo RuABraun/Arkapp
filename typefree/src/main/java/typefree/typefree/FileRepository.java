@@ -8,6 +8,7 @@ import android.util.Log;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static typefree.typefree.Base.file_suffixes;
 import static typefree.typefree.Base.filesdir;
@@ -92,21 +93,57 @@ public class FileRepository {
 
     public void rename(AFile afile_old, String cname, String fname) {
         AFile afile = new AFile(afile_old);
-        new renameAsyncTask(afileDao).execute(afile, cname, fname);
+        new renameAsyncTask(afileDao, this).execute(afile, cname, fname);
     }
 
     private static class renameAsyncTask extends AsyncTask<Object, Void, Void> {
         private AFileDao aSyncTaskaFileDao;
+        private FileRepository fRepo;
 
-        renameAsyncTask(AFileDao dao) { aSyncTaskaFileDao = dao; }
+        renameAsyncTask(AFileDao dao, FileRepository cls) { aSyncTaskaFileDao = dao; fRepo = cls;}
         @Override
         protected Void doInBackground(Object... objects) {
             AFile afile = (AFile) objects[0];
             String cname = (String) objects[1];
             String fname = (String) objects[2];
+            if (fname.isEmpty()) {
+                fname = fRepo.getFileName("No_name");
+            }
             aSyncTaskaFileDao.rename(afile.getId(), fname, cname);
             Base.renameConv(afile.fname, fname);
             return null;
         }
+    }
+
+    public String getFileName(String cname) {
+        final AtomicInteger fcount = new AtomicInteger();
+        final FileRepository cls = this;
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int num = cls.getNumFiles();
+                fcount.set(num);
+            }
+        });
+        t.setPriority(10);
+        t.start();
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        int cnt = fcount.get() + 1;
+        cname = cname.replaceAll("[ ?\\\\:\\/]", "_") + "_";
+        String fname = cname + Integer.toString(cnt);
+        String wavpath = filesdir + fname + ".wav";
+        File f = new File(wavpath);
+        while (f.exists()) {
+            cnt++;
+            fname = cname + Integer.toString(cnt);
+            wavpath = filesdir + fname + ".wav";
+            f = new File(wavpath);
+        }
+        return fname;
     }
 }

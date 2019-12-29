@@ -294,7 +294,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
         String uniqueID = InstanceID.getInstance(this).getId();
         Bugsnag.setUser(uniqueID, "email", "user");
-        Log.i("APP", "Starting up activity.");
+        Log.i("APP", "Starting up main activity.");
+        Bugsnag.leaveBreadcrumb("Starting up main activity.");
 
         appUpdateManager = AppUpdateManagerFactory.create(this);
         if (!settings.getBoolean("knows_is_first_start", true)) {
@@ -444,38 +445,6 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         FileInfo frag = (FileInfo) fragmentManager.findFragmentByTag("fileinfo");
         frag.on_edit_click(view);
     }
-
-    public static String getFileName(String cname, final FileRepository f_repo_) {
-        final AtomicInteger fcount = new AtomicInteger();
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int num = f_repo_.getNumFiles();
-                fcount.set(num);
-            }
-        });
-        t.setPriority(10);
-        t.start();
-        try {
-            t.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        int cnt = fcount.get() + 1;
-        cname = cname.replaceAll("[ ?\\\\:\\/]", "_") + "_";
-        String fname = cname + Integer.toString(cnt);
-        String wavpath = filesdir + fname + ".wav";
-        File f = new File(wavpath);
-        while (f.exists()) {
-            cnt++;
-            fname = cname + Integer.toString(cnt);
-            wavpath = filesdir + fname + ".wav";
-            f = new File(wavpath);
-        }
-        return fname;
-    }
-
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {

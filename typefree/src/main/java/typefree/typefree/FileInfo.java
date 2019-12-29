@@ -96,6 +96,7 @@ public class FileInfo extends Fragment {
     private View.OnTouchListener transcript_touchListener;
     private int switcher_top_margin = -1;
     private Runnable reset_highlight_or_colored;
+    private boolean timed_file_found = true;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -230,13 +231,11 @@ public class FileInfo extends Fragment {
                             float vel = ((float) dy) / ((float) dt);
                             int dist = (int) vel * 50;
                             int curr_scroll_y = tv_transtext.getScrollY();
-                            Log.i("APP", " " + curr_scroll_y + " " + dist + " " + dy);
                             if (curr_scroll_y - dist < 0) {
                                 dist = curr_scroll_y;
                             }
                             int size_text_y = tv_transtext.getLineCount() * tv_transtext.getLineHeight();
                             int tv_height = tv_transtext.getHeight();
-                            Log.i("APP", "scrollinga " + dist);
                             if (size_text_y < tv_height) {
                                 dist = 0;
                             } else if (curr_scroll_y - dist > (size_text_y - tv_height)) {
@@ -244,8 +243,8 @@ public class FileInfo extends Fragment {
                                 dist = curr_scroll_y - (size_text_y - tv_height);
                             }
                             tv_transtext.scrollBy(0, -dist);
-                            Log.i("APP", "scrolling " + dist);
                         } else {
+                            if (!timed_file_found) return false;
                             Layout layout = tv_transtext.getLayout();
                             int yscroll = tv_transtext.getScrollY();
                             int lineidx = layout.getLineForVertical(y + yscroll);
@@ -431,6 +430,9 @@ public class FileInfo extends Fragment {
                 text_timed_str = new String(buffer);
             } catch (IOException ex) {
                 text_timed_str = "Timed text file not found!";
+                Bugsnag.leaveBreadcrumb("Timed text file not found though normal one was!?");
+                timed_file_found = false;
+                return;
             }
             StringReader reader = new StringReader(text_timed_str);
             BufferedReader br = new BufferedReader(reader);
@@ -734,7 +736,7 @@ public class FileInfo extends Fragment {
                     cname = getString(R.string.default_convname);
                 }
                 final String curname = cname;
-                final String fname = MainActivity.getFileName(cname, act.f_repo);
+                final String fname = act.f_repo.getFileName(cname);
                 act.h_background.removeCallbacks(title_runnable);
 
                 title_runnable = new Runnable() {

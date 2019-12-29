@@ -134,7 +134,7 @@ public class MainFragment extends Fragment {
     public void onStart() {
         super.onStart();
         Log.i("APP", "Starting main fragment");
-        Bugsnag.leaveBreadcrumb("In MainFragment onStart");
+        Bugsnag.leaveBreadcrumb("In MainFragment onStart()");
         act.h_main.postDelayed(new Runnable() {
             public void run() {
                 runnable=this;
@@ -191,7 +191,7 @@ public class MainFragment extends Fragment {
                         curr_cname = getString(R.string.default_convname);
                     }
 
-                    fname_prefix = MainActivity.getFileName(curr_cname, act.f_repo);
+                    fname_prefix = act.f_repo.getFileName(curr_cname);
                     act.h_background.removeCallbacks(title_runnable);
                     if (recognition_done && !manually_editing_title) {
                         title_runnable = new Runnable() {
@@ -249,8 +249,8 @@ public class MainFragment extends Fragment {
         spinner.setVisibility(View.VISIBLE);
         is_recording = false;
         RecEngine.isrunning = false;
-        t_perf_adjuster.interrupt();
         if (act.pm.isSustainedPerformanceModeSupported()) {
+            t_perf_adjuster.interrupt();
             Log.i("APP", "Turning sustainedperf off for good");
             act.getWindow().setSustainedPerformanceMode(false);
         }
@@ -299,16 +299,16 @@ public class MainFragment extends Fragment {
 
                 String date = act.getFileDate();
                 String title = curr_cname;
-                String fname = MainActivity.getFileName(curr_cname, act.f_repo);
+                String fname = act.f_repo.getFileName(curr_cname);
                 fname_prefix = fname;
 
                 MainActivity.renameConv("tmpfile", fname);
 
                 int duration_s = (int) (3 * num_out_frames) / 100;
+                Log.i("APP", "title " + title + " fname " + fname + " duration " + duration_s + " " + date);
                 AFile afile = new AFile(title, fname, duration_s, date);
                 long id = act.f_repo.insert(afile);
                 curr_afile = act.f_repo.getById(id);  // has correct ID
-                Log.i("APP", "FILE ID " + curr_afile.getId() + " title: " + title + " fname: " + fname);
                 recognition_done = true;
                 Log.i("APP", "Finished recording.");
             }
@@ -368,13 +368,15 @@ public class MainFragment extends Fragment {
             t_starttrans.setPriority(9);
             t_starttrans.start();
 
-            t_perf_adjuster = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    Base.temper_performance(act, 10, 60, 5);
-                }
-            });
-            t_perf_adjuster.start();
+            if (act.pm.isSustainedPerformanceModeSupported()) {
+                t_perf_adjuster = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Base.temper_performance(act, 10, 10, 5);
+                    }
+                });
+                t_perf_adjuster.start();
+            }
 
             is_recording = true;
 
