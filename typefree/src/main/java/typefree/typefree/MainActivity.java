@@ -58,8 +58,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
     private boolean start_main;
     public int fragment_id = 1;
 
-    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int", "id_mapping.int",
-            "final.raw", "ids.int", "ini.int", "mfcc.conf", "tf_model.tflite", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
+    private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int",
+            "mfcc.conf", "traced_model.pt", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
     private Runnable startup_runnable;
@@ -237,7 +237,10 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         boolean all_exist = true;
         for(String fname: mfiles) {
             File mf = new File(rmodeldir + fname);
-            if (!mf.exists()) all_exist = false;
+            if (!mf.exists()) {
+                Log.i("APP", "File missing " + fname);
+                all_exist = false;
+            }
         }
         if (!all_exist) {
             start_main = false;
