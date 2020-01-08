@@ -146,7 +146,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "", modeldir + "cmvn.conf"),
                                             tot_num_frames_decoded(0),
-                                            audio_buffer(16000 * 5) {
+                                            audio_buffer(16000 * 8) {
     start_logger();  // log stdout and stderr
     excl_cores = exclusiveCores;
     // ! -- ASR setup begin
@@ -349,7 +349,14 @@ int RecEngine::stop_trans_stream() {
         finish_segment(&olat, num_out_frames);
         fclose(os_txt);
         fclose(os_ctm);
-        // Finishing wav write
+//         Finishing wav write
+        int32_t array_size = wav_data_array.size();
+        int16_t factor = static_cast<int16_t>(std::numeric_limits<int16_t>::max() / max_number_);
+        for (int32_t i = 0; i < array_size; i++) {
+            int16 val = wav_data_array[i] * factor;
+            f.write((char *) &val, sizeof(int16_t));
+        }
+
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
         int32 num_bytes = file_length - data_chunk_pos - 8;
@@ -404,11 +411,17 @@ void RecEngine::run_recognition() {
                 is_decoding = false;
                 cv_decoding_.notify_one();
             }
-            for (int32_t i = 0; i < size; i++) {
-                float val = data(i);
-                int16_t vali = static_cast<int16_t>(val + 0.5f);
-                f.write((char *) &vali, sizeof(int16_t));
+
+            if (wav_data_array.size() == 0 || wav_data_array.size() + 2 * 16000 > wav_data_array.capacity() ) {
+                wav_data_array.reserve(10 * wav_data_array.capacity() + 60 * 16000);
             }
+
+            for (int32_t i = 0; i < size; i++) {
+                int16_t vali = static_cast<int16_t>(data(i));
+                if (vali > max_number_) max_number_ = vali;
+                wav_data_array.push_back(vali);
+            }
+
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -573,7 +586,7 @@ int32 RecEngine::run_casing(std::vector<long> casewords) {
     int32 argmax = -1;
     float maxprob = -100.f;
 
-    auto out_ptr = output.data<float>();
+    auto out_ptr = output.data_ptr<float>();
     for(int32 i = 0; i < 3; i++) {
         float out = out_ptr[i];
         if (out > maxprob) {

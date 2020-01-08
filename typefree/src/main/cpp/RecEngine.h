@@ -17,9 +17,6 @@
 #include "online2/onlinebin-util.h"
 #include "online2/online-timing.h"
 #include "lat/word-align-lattice.h"
-#include "lat/compose-lattice-pruned.h"
-#include "rnnlm/rnnlm-lattice-rescoring.h"
-#include "rnnlm/rnnlm-utils.h"
 #include "lm/const-arpa-lm.h"
 #include "nnet3/nnet-utils.h"
 #include <thread>
@@ -163,21 +160,8 @@ private:
     kaldi::CompactLattice finish_seg_clat;
 
     // RNN vars
-    int32 max_ngram_order = 4;
-    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_large;
-    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_med;
-    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_small;
     kaldi::ConstArpaLm* const_arpa = NULL;
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_fst = NULL;
-    fst::ScaleDeterministicOnDemandFst* carpa_lm_fst_subtract = NULL;
-    kaldi::nnet3::Nnet rnnlm;
-    kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts = NULL;
-    kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info = NULL;
-    kaldi::rnnlm::KaldiRnnlmDeterministicFstAdapt* lm_to_add_orig = NULL;
-    fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add = NULL;
-    const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms = NULL;
-    const kaldi::ComposeLatticePrunedOptions* compose_opts = NULL;
-    bool rnn_ready;
 
     // case model
     int32 CASE_INNUM = 7;
@@ -185,9 +169,11 @@ private:
     torch::jit::script::Module case_module;
     std::vector<int32> nid_to_caseid;  // ngram index (id) to case index
     int32 case_zero_index;  // number of case words, doubles as index to a zeroed embedding
-    int32 casepos_zero_index;
 
     int32 run_casing(std::vector<long> casewords);
+
+    std::vector<int16_t> wav_data_array;
+    int32_t max_number_ = 0;
 
 };
 
