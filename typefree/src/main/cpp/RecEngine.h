@@ -130,7 +130,7 @@ public:
     std::thread t_rnnlm;
     std::thread t_finishsegment;
 
-    int32 tot_num_frames_decoded;
+    int32 tot_num_frames_decoded_;
 private:
 
     int32_t unk_index_;

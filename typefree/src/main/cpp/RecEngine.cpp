@@ -76,7 +76,6 @@ int start_logger()
 
 
 void RecEngine::setupRnnlm(std::string modeldir) {
-    rnn_ready = false;
 
     std::string wsyms = modeldir + "words.txt",
             word_boundary_f = modeldir + "word_boundary.int";
@@ -88,41 +87,10 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     LOGI("Done lexicons.");
 
     std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa";
-//            word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
-//            word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
-//            word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
-//            rnnlm_raw_fname = modeldir + "final.raw";
 
-//    ReadKaldiObject(word_large_emb_fname, &word_emb_mat_large);
-//    ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
-//    ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
-//    BaseFloat rnn_scale = 0.8f;
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
     carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
-//    carpa_lm_fst_subtract = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
-//                                                                   carpa_lm_fst);
-//    {
-//        bool binary;
-//        Input ki(rnnlm_raw_fname, &binary);
-//        rnnlm.Read(ki.Stream(), binary, true);
-//        SetBatchnormTestMode(true, &(rnnlm));
-//        SetDropoutTestMode(true, &(rnnlm));
-//        SetQuantTestMode(true, &(rnnlm));
-//    }
-
-//    int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
-//    std::vector<int32> ids;
-//    kaldi::readNumsFromFile(modeldir + "ids.int", ids);
-//    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 150005, rnnlm_vocab_sz, modeldir);
-//
-//    rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
-//        word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
-//    lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
-//    lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
-//    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(carpa_lm_fst_subtract, lm_to_add);
-//
-//    compose_opts = new ComposeLatticePrunedOptions(4.0, 900, 1.25, 75);
 
     LOGI("done setuprnnlm");
 
@@ -134,10 +102,8 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     case_zero_index = 10246;  // TODO: remove constant!
 //    nid_to_caseid.push_back(case_zero_index);
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
-    casepos_zero_index = CASE_INNUM;
 
     LOGI("All ASR setup complete.");
-    rnn_ready = true;
 }
 
 
@@ -145,7 +111,7 @@ RecEngine::RecEngine(std::string modeldir, std::vector<int> exclusiveCores):
                                             decodable_opts(1.0, 51, 3),
                                             sil_config(0.001f, ""),
                                             feature_opts(modeldir + "mfcc.conf", "mfcc", "", sil_config, "", modeldir + "cmvn.conf"),
-                                            tot_num_frames_decoded(0),
+                                            tot_num_frames_decoded_(0),
                                             audio_buffer(16000 * 8) {
     start_logger();  // log stdout and stderr
     excl_cores = exclusiveCores;
@@ -245,7 +211,7 @@ void RecEngine::transcribe_stream(std::string fpath){
     oboe::Result result = builder.openStream(&mRecStream);
 
     oboe::AudioFormat mFormat;
-    tot_num_frames_decoded = 0;
+    tot_num_frames_decoded_ = 0;
     if (result == oboe::Result::OK && mRecStream != nullptr) {
         mSampleRate = mRecStream->getSampleRate();
         mFormat = mRecStream->getFormat();
@@ -294,7 +260,7 @@ void RecEngine::transcribe_stream(std::string fpath){
         decoder = new SingleUtteranceNnet3Decoder(*decoder_opts, trans_model,
                                                          *decodable_info, *decode_fst, feature_pipeline);
 
-        tot_num_frames_decoded = 0;
+
         // Text output
         std::string ctmpath = fpath + "_timed.txt";
         os_ctm = fopen(ctmpath.c_str(), "wt");
@@ -344,7 +310,7 @@ int RecEngine::stop_trans_stream() {
         CompactLattice olat;
         decoder->GetLattice(true, &olat);
 
-        int32 num_out_frames = tot_num_frames_decoded + decoder->NumFramesDecoded();
+        int32 num_out_frames = tot_num_frames_decoded_ + decoder->NumFramesDecoded();
         if (t_finishsegment.joinable()) t_finishsegment.join();
         finish_segment(&olat, num_out_frames);
         fclose(os_txt);
@@ -398,7 +364,7 @@ void RecEngine::run_recognition() {
                     t_finishsegment = std::thread(&RecEngine::finish_segment, this,
                                                   &finish_seg_clat, num_frames_decoded);
 
-                    decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+                    decoder->InitDecoding(tot_num_frames_decoded_ + num_frames_decoded);
                 } else if (decoder->NumFramesDecoded() > 0) {
                     Lattice olat;
                     decoder->GetBestPath(false, &olat);
@@ -472,7 +438,7 @@ void RecEngine::pause_stream() {
         t_finishsegment = std::thread(&RecEngine::finish_segment, this,
                                       &finish_seg_clat, num_frames_decoded);
 
-        decoder->InitDecoding(tot_num_frames_decoded + num_frames_decoded);
+        decoder->InitDecoding(tot_num_frames_decoded_ + num_frames_decoded);
     }
 }
 
@@ -552,7 +518,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     fwrite("\n", 1, 1, os_txt);
 
     int32 num_words = words_split.size();
-    int32 time_offset_seconds = static_cast<int32>(tot_num_frames_decoded * 3 / 100.f);
+    int32 time_offset_seconds = static_cast<int32>(tot_num_frames_decoded_ * 3 / 100.f);
     for(size_t j = 0; j < num_words; j++) {
         std::string word = words_split[j];
         fwrite(word.c_str(), 1, word.size(), os_ctm);
@@ -563,7 +529,7 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
         fwrite("\n", 1, 1, os_ctm);
     }
 
-    tot_num_frames_decoded += num_out_frames;
+    tot_num_frames_decoded_ += num_out_frames;
 //    if (rnn_ready) {
 //        lm_to_add_orig->Clear();
 //    }  // TODO: check why ClearToContinue is worse
@@ -710,8 +676,8 @@ int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
         typedef int64 int64;
 
         BaseFloat chunk_length_secs = 0.72;
-
-        decoder_opts = new LatticeFasterDecoderConfig(7.0, 1500, 6.0, 600, 6.0);
+        tot_num_frames_decoded_ = 0;
+        decoder_opts = new LatticeFasterDecoderConfig(8.0, 10000, 6.0, 600, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
@@ -732,12 +698,8 @@ int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
 
         feature_pipeline->InputFinished();
         Timer timer;
-//        decoder->AdvanceDecoding();
-        std::thread t = std::thread(&SingleUtteranceNnet3Decoder::AdvanceDecodingLooped,
-                        std::ref(*decoder));
+        decoder->AdvanceDecoding();
 
-        decoder->FinishedLoopedDecoding();
-        t.join();
         double timetaken = timer.Elapsed();
         KALDI_LOG << "AM TIME TAKEN " << timetaken;
 
@@ -974,12 +936,12 @@ int32_t RingBuffer::Set(int32_t* offset) {
     int32_t next_index = next_index_.load();
     int32_t size;
     int32_t newest_gotten_index = newest_gotten_index_.load();
-    if (next_index >= newest_gotten_index_) {
-        size = next_index - newest_gotten_index_;
+    if (next_index >= newest_gotten_index) {
+        size = next_index - newest_gotten_index;
     } else {
-        size = (size_ - newest_gotten_index_) + next_index;
+        size = (size_ - newest_gotten_index) + next_index;
     }
-    *offset = newest_gotten_index_;
+    *offset = newest_gotten_index;
     newest_gotten_index_ = next_index;
     //KALDI_LOG << "offset " << *offset << " size " << size;
     return size;
