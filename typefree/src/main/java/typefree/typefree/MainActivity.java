@@ -60,6 +60,8 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
 
     private static List<String> mfiles = Arrays.asList("HCLG.fst", "final.mdl", "words.txt", "mfcc.conf", "word_boundary.int",
             "mfcc.conf", "traced_model.pt", "word2tag.int", "o3_2p5M.carpa", "means.vec", "cmvn.conf");
+    private static List<String> rnn_files = Arrays.asList("final.raw", "id_mapping.bin", "ini.int", "ids.int", "word_embedding_large.final.mat",
+            "word_embedding_med.final.mat", "word_embedding_small.final.mat");
     protected FragmentManager fragmentManager;
     private static boolean perm_granted = false;
     private Runnable startup_runnable;
@@ -235,15 +237,26 @@ public class MainActivity extends Base implements KeyboardHeightObserver {
         File f2 = new File(filesdir);
         if (!f2.exists()) f2.mkdirs();
         boolean all_exist = true;
-        for(String fname: mfiles) {
+        ArrayList<String> all_files = new ArrayList<>();
+        all_files.addAll(mfiles);
+        all_files.addAll(rnn_files);
+        for(String fname: all_files) {
             File mf = new File(rmodeldir + fname);
             if (!mf.exists()) {
                 Log.i("APP", "File missing " + fname);
                 all_exist = false;
             }
         }
+//        for (String fname: rnn_files) {
+//            File mf = new File(rmodeldir + fname);
+//            if (!mf.exists()) {
+//                boolean is_deleted = mf.delete();
+//                Bugsnag.leaveBreadcrumb("Deleting old RNN file " + is_deleted);
+//            }
+//        }
         if (!all_exist) {
             start_main = false;
+            Bugsnag.leaveBreadcrumb("Extracting model as does not exist on filesystem yet.");
             Log.i("APP", "before getasset");
             mgr = getResources().getAssets();
             Log.i("APP", "extracting");

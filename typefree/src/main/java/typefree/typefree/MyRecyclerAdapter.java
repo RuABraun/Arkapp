@@ -176,7 +176,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     final String wavpath = Base.filesdir + fname + ".wav";
                     File f = new File(wavpath);
                     boolean exists = f.exists();
-                    Bugsnag.leaveBreadcrumb("About to transcribe imported file " + wavpath + "\nFile exists? " + exists);
+                    Bugsnag.leaveBreadcrumb("About to transcribe file " + wavpath + "\nFile exists? " + exists);
                     Log.i("APP", "Pressed on file " + fpath + " with name " + afile_to_use.title);
                     MediaPlayer mPlayer;
                     int dur;
@@ -187,7 +187,7 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                         Bugsnag.leaveBreadcrumb("Error trying to get duration of audio file!");
                         AlertDialog.Builder builder = new AlertDialog.Builder(context);
                         builder.setTitle("Warning")
-                                .setMessage("Something went wrong transcribing the file, contact support for help: contact@typefree.io\n")
+                                .setMessage("Something went wrong transcribing the file (unusual file format?), contact support for help: contact@typefree.io\n")
                                 .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
@@ -210,14 +210,6 @@ public class MyRecyclerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                                     button_trans.setVisibility(View.INVISIBLE);
                                     recog_done = false;
                                     context.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-//                                    if (context.pm.isSustainedPerformanceModeSupported()) {
-//                                        context.h_background.postDelayed(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                Base.temper_performance(context, 60, 30, 15);
-//                                            }
-//                                        }, 500);
-//                                    }
                                     t = new Thread(new Runnable() {
                                         @Override
                                         public void run() {

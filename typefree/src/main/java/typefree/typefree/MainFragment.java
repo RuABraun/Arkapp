@@ -44,7 +44,7 @@ public class MainFragment extends Fragment {
 
     public boolean is_recording = false;
     Runnable title_runnable, runnable, trans_update_runnable, trans_done_runnable,
-        trans_edit_runnable, performance_runnable;
+        trans_edit_runnable;
     private EditText ed_transtext;
     private FloatingActionButton fab_rec, fab_edit, fab_copy, fab_share, fab_del, fab_pause;
     private EditText ed_title;
@@ -54,7 +54,7 @@ public class MainFragment extends Fragment {
     private AFile curr_afile;
     private int const_trans_size = 0;
     private ProgressBar spinner;
-    Thread t_stoptrans, t_starttrans, t_perf_adjuster;
+    Thread t_stoptrans, t_starttrans;
     private boolean manually_editing_title = false;  // we dont want to call afterTextChanged because we set the title (as happens at the start of recognition)
     private boolean editing_transtext = false;
     private TextView tv_counter, tv_transcribe_hint;
@@ -249,11 +249,6 @@ public class MainFragment extends Fragment {
         spinner.setVisibility(View.VISIBLE);
         is_recording = false;
         RecEngine.isrunning = false;
-        if (act.pm.isSustainedPerformanceModeSupported()) {
-            t_perf_adjuster.interrupt();
-            Log.i("APP", "Turning sustainedperf off for good");
-            act.getWindow().setSustainedPerformanceMode(false);
-        }
 
         act.h_main.postDelayed(new Runnable() {
             public void run() {
@@ -368,16 +363,6 @@ public class MainFragment extends Fragment {
             t_starttrans.setPriority(9);
             t_starttrans.start();
 
-            if (act.pm.isSustainedPerformanceModeSupported()) {
-                t_perf_adjuster = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Base.temper_performance(act, 10, 10, 5);
-                    }
-                });
-                t_perf_adjuster.start();
-            }
-
             is_recording = true;
 
             act.h_main.postDelayed(new Runnable() {
@@ -472,7 +457,7 @@ public class MainFragment extends Fragment {
             } else if (v == ed_transtext) {
                 int[] location = new int[2];
                 ed_transtext.getLocationOnScreen(location);
-                Rect transtext_rect = new Rect(location[0], location[1],
+                Rect transtext_rect = new Rect(location[0], location[1] - 10,
                         location[0] + ed_transtext.getWidth(),
                         location[1] + ed_transtext.getHeight());
                 if (!transtext_rect.contains(x, y) && editing_transtext) {
@@ -561,7 +546,7 @@ public class MainFragment extends Fragment {
             tv_transcribe_hint.setVisibility(View.INVISIBLE);
             editing_transtext = true;
             fab_edit.setImageResource(R.drawable.done);
-            fab_edit.animate().translationY(-700);
+            fab_edit.animate().setDuration(50).translationY(-700);
 
             ed_transtext.requestFocus();
             InputMethodManager imm = (InputMethodManager) act.getSystemService(Activity.INPUT_METHOD_SERVICE);
@@ -608,7 +593,7 @@ public class MainFragment extends Fragment {
                 act.h_background.post(trans_edit_runnable);
             }
             ed_transtext.removeTextChangedListener(text_textWatcher);
-            fab_edit.animate().translationY(0.f);
+            fab_edit.animate().setDuration(50).translationY(0.f);
             fab_edit.setImageResource(R.drawable.edit);
             fab_share.show();
             fab_copy.show();

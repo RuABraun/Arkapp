@@ -396,7 +396,7 @@ void RecEngine::run_recognition() {
 
 
 void RecEngine::recognition_loop() {
-    set_thread_affinity();
+//    set_thread_affinity();
 //    Timer tt;
     LOGI("TID: %d", std::this_thread::get_id());
     std::vector<std::string> dummy;
@@ -665,7 +665,7 @@ std::string RecEngine::prettify_text(std::vector<int32>& words, std::vector<std:
 }
 
 int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
-    set_thread_affinity();
+//    set_thread_affinity();
     reset_text();
     try {
         LOGI("Transcribing file");
@@ -867,23 +867,24 @@ int RecEngine::convert_audio(const char* audiopath, const char* wavpath) {
 }
 
 void RecEngine::set_thread_affinity() {
-    if (excl_cores.size() == 0) return;
-    pid_t current_thread_id = gettid();
-    cpu_set_t cpu_set;
-    CPU_ZERO(&cpu_set);
-
-    for (int i = 0; i < excl_cores.size(); i++) {
-        int cpu_id = excl_cores[i];
-        CPU_SET(cpu_id, &cpu_set);
-    }
-
-    int result = sched_setaffinity(current_thread_id, sizeof(cpu_set_t), &cpu_set);
-    if (result == 0) {
-        LOGI("APP", "Thread affinity set");
-    } else {
-        LOGE("APP", "Error setting thread affinity!");
-    }
-    thread_affinity_set = true;
+    return;
+//    if (excl_cores.size() == 0) return;
+//    pid_t current_thread_id = gettid();
+//    cpu_set_t cpu_set;
+//    CPU_ZERO(&cpu_set);
+//
+//    for (int i = 0; i < excl_cores.size(); i++) {
+//        int cpu_id = excl_cores[i];
+//        CPU_SET(cpu_id, &cpu_set);
+//    }
+//
+//    int result = sched_setaffinity(current_thread_id, sizeof(cpu_set_t), &cpu_set);
+//    if (result == 0) {
+//        LOGI("APP", "Thread affinity set");
+//    } else {
+//        LOGE("APP", "Error setting thread affinity!");
+//    }
+//    thread_affinity_set = true;
 }
 
 RingBuffer::RingBuffer() {
