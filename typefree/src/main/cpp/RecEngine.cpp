@@ -76,6 +76,7 @@ int start_logger()
 
 
 void RecEngine::setupRnnlm(std::string modeldir) {
+    rnn_ready = false;
 
     std::string wsyms = modeldir + "words.txt",
             word_boundary_f = modeldir + "word_boundary.int";
@@ -86,11 +87,43 @@ void RecEngine::setupRnnlm(std::string modeldir) {
 
     LOGI("Done lexicons.");
 
-    std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa";
+    std::string lm_to_subtract_fname = modeldir + "o3_2p5M.carpa",
+                word_small_emb_fname = modeldir + "word_embedding_small.final.mat",
+            word_med_emb_fname = modeldir + "word_embedding_med.final.mat",
+            word_large_emb_fname = modeldir + "word_embedding_large.final.mat",
+            rnnlm_raw_fname = modeldir + "final.raw";
+
+    ReadKaldiObject(word_large_emb_fname, &word_emb_mat_large);
+    ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
+    ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
+
 
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
     carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
+    carpa_lm_fst_subtract = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
+                                                                   carpa_lm_fst);
+    {
+        bool binary;
+        Input ki(rnnlm_raw_fname, &binary);
+        rnnlm.Read(ki.Stream(), binary, true);
+        SetBatchnormTestMode(true, &(rnnlm));
+        SetDropoutTestMode(true, &(rnnlm));
+        SetQuantTestMode(true, &(rnnlm));
+    }
+
+    int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
+    std::vector<int32> ids;
+    kaldi::readNumsFromFile(modeldir + "ids.int", ids);
+    rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 150005, rnnlm_vocab_sz, modeldir);
+
+    rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
+        word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
+    lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
+    lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
+    combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(carpa_lm_fst_subtract, lm_to_add);
+
+    compose_opts = new ComposeLatticePrunedOptions(2.0, 800, 1.25, 75);
 
     LOGI("done setuprnnlm");
 
@@ -100,10 +133,10 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     case_module = torch::jit::load(modeldir + "traced_model.pt");
 
     case_zero_index = 10246;  // TODO: remove constant!
-//    nid_to_caseid.push_back(case_zero_index);
     kaldi::readNumsFromFile(modeldir + "word2tag.int", nid_to_caseid);
 
     LOGI("All ASR setup complete.");
+    rnn_ready = true;
 }
 
 
@@ -173,7 +206,7 @@ RecEngine::~RecEngine() {
     delete decoder_opts;
     delete os_ctm, os_txt;
     delete const_arpa;
-//    delete rnn_info;
+    delete rnn_info;
 }
 
 const char* RecEngine::get_text(){
@@ -485,14 +518,22 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     fst::ScaleLattice(fst::GraphLatticeScale(0.), clat);
     ComposeCompactLatticeDeterministic(*clat, carpa_lm_fst, &clat_composed);
 
+    Lattice lat_composed;
+    ConvertLattice(clat_composed, &lat_composed);
+    Invert(&lat_composed);
+    CompactLattice determinized_clat;
+    DeterminizeLattice(lat_composed, &determinized_clat);
+
+    TopSortCompactLatticeIfNeeded(&determinized_clat);
+
     if (t_rnnlm.joinable()) t_rnnlm.join();
-//    CompactLattice clat_rescored;
+    CompactLattice clat_rescored;
     Timer timer;
-//    ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
-//                                 const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
-//                                 &clat_rescored, max_ngram_order, true);
-//    double timetaken = timer.Elapsed();
-//    KALDI_LOG << "TIME TAKEN " << timetaken;
+    ComposeCompactLatticePrunedB(*compose_opts, determinized_clat,
+                                 const_cast<ComposeDeterministicOnDemandFst<StdArc> *>(combined_lms),
+                                 &clat_rescored, max_ngram_order, true);
+    double timetaken = timer.Elapsed();
+    KALDI_LOG << "TIME TAKEN " << timetaken;
     CompactLatticeShortestPath(clat_composed, &best_path);
 
     CompactLattice aligned_clat;
@@ -530,9 +571,9 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     }
 
     tot_num_frames_decoded_ += num_out_frames;
-//    if (rnn_ready) {
-//        lm_to_add_orig->Clear();
-//    }  // TODO: check why ClearToContinue is worse
+    if (rnn_ready) {
+        lm_to_add_orig->Clear();
+    }  // TODO: check why ClearToContinue is worse
 
 }
 

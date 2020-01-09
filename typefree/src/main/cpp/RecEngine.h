@@ -18,6 +18,9 @@
 #include "online2/online-timing.h"
 #include "lat/word-align-lattice.h"
 #include "lm/const-arpa-lm.h"
+#include "lat/compose-lattice-pruned.h"
+#include "rnnlm/rnnlm-lattice-rescoring.h"
+#include "rnnlm/rnnlm-utils.h"
 #include "nnet3/nnet-utils.h"
 #include <thread>
 #include "base/timer.h"
@@ -162,6 +165,17 @@ private:
     // RNN vars
     kaldi::ConstArpaLm* const_arpa = NULL;
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_fst = NULL;
+    int32 max_ngram_order = 4;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_large;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_med;
+    fst::ScaleDeterministicOnDemandFst* carpa_lm_fst_subtract = NULL;
+    kaldi::nnet3::Nnet rnnlm;
+    kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts = NULL;
+    kaldi::rnnlm::RnnlmComputeStateInfoAdapt* rnn_info = NULL;
+    kaldi::rnnlm::KaldiRnnlmDeterministicFstAdapt* lm_to_add_orig = NULL;
+    fst::DeterministicOnDemandFst<fst::StdArc>* lm_to_add = NULL;
+    const fst::ComposeDeterministicOnDemandFst<fst::StdArc>* combined_lms = NULL;
+    const kaldi::ComposeLatticePrunedOptions* compose_opts = NULL;
 
     // case model
     int32 CASE_INNUM = 7;
