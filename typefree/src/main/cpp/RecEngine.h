@@ -163,11 +163,14 @@ private:
     kaldi::CompactLattice finish_seg_clat;
 
     // RNN vars
+    bool rnn_ready = false;
+    float rnn_scale = 0.8;
     kaldi::ConstArpaLm* const_arpa = NULL;
     fst::DeterministicOnDemandFst<fst::StdArc> *carpa_lm_fst = NULL;
     int32 max_ngram_order = 4;
     kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_large;
     kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_med;
+    kaldi::CuMatrix<kaldi::BaseFloat> word_emb_mat_small;
     fst::ScaleDeterministicOnDemandFst* carpa_lm_fst_subtract = NULL;
     kaldi::nnet3::Nnet rnnlm;
     kaldi::rnnlm::RnnlmComputeStateComputationOptions* rnn_opts = NULL;

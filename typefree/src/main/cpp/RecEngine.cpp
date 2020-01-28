@@ -97,33 +97,32 @@ void RecEngine::setupRnnlm(std::string modeldir) {
     ReadKaldiObject(word_med_emb_fname, &word_emb_mat_med);
     ReadKaldiObject(word_small_emb_fname, &word_emb_mat_small);
 
-
+    LOGI("A");
     const_arpa = new ConstArpaLm();
     ReadKaldiObject(lm_to_subtract_fname, const_arpa);
     carpa_lm_fst = new ConstArpaLmDeterministicFst(*const_arpa);
     carpa_lm_fst_subtract = new fst::ScaleDeterministicOnDemandFst(-rnn_scale,
                                                                    carpa_lm_fst);
+    LOGI("AA");
     {
         bool binary;
         Input ki(rnnlm_raw_fname, &binary);
         rnnlm.Read(ki.Stream(), binary, true);
-        SetBatchnormTestMode(true, &(rnnlm));
-        SetDropoutTestMode(true, &(rnnlm));
         SetQuantTestMode(true, &(rnnlm));
     }
-
+    LOGI("B");
     int32 rnnlm_vocab_sz = word_emb_mat_large.NumRows() + word_emb_mat_med.NumRows() + word_emb_mat_small.NumRows();
     std::vector<int32> ids;
     kaldi::readNumsFromFile(modeldir + "ids.int", ids);
     rnn_opts = new rnnlm::RnnlmComputeStateComputationOptions(ids[0], ids[1], ids[3], ids[2], ids[4], 150005, rnnlm_vocab_sz, modeldir);
-
+    LOGI("C");
     rnn_info = new rnnlm::RnnlmComputeStateInfoAdapt(*rnn_opts, rnnlm, word_emb_mat_large,
         word_emb_mat_med, word_emb_mat_small, word_emb_mat_large.NumRows(), word_emb_mat_med.NumRows());
     lm_to_add_orig = new rnnlm::KaldiRnnlmDeterministicFstAdapt(max_ngram_order, *rnn_info);
     lm_to_add = new ScaleDeterministicOnDemandFst(rnn_scale, lm_to_add_orig);
     combined_lms = new ComposeDeterministicOnDemandFst<StdArc>(carpa_lm_fst_subtract, lm_to_add);
 
-    compose_opts = new ComposeLatticePrunedOptions(2.0, 800, 1.25, 75);
+    compose_opts = new ComposeLatticePrunedOptions(2.5, 800, 1.25, 75);
 
     LOGI("done setuprnnlm");
 
@@ -335,14 +334,14 @@ int RecEngine::stop_trans_stream() {
             run_recognition();
         }
         is_recognition_paused = false;
-
+        LOGI("Stopping stream A");
         feature_pipeline->InputFinished();
         decoder->AdvanceDecoding();
         decoder->FinalizeDecoding();
-
+        LOGI("Stopping stream B");
         CompactLattice olat;
         decoder->GetLattice(true, &olat);
-
+        LOGI("Stopping stream C");
         int32 num_out_frames = tot_num_frames_decoded_ + decoder->NumFramesDecoded();
         if (t_finishsegment.joinable()) t_finishsegment.join();
         finish_segment(&olat, num_out_frames);
@@ -355,7 +354,6 @@ int RecEngine::stop_trans_stream() {
             int16 val = wav_data_array[i] * factor;
             f.write((char *) &val, sizeof(int16_t));
         }
-
         size_t file_length = f.tellp();
         f.seekp(data_chunk_pos + 4);
         int32 num_bytes = file_length - data_chunk_pos - 8;
@@ -545,8 +543,10 @@ void RecEngine::finish_segment(CompactLattice* clat, int32 num_out_frames) {
     if (t_rnnlm.joinable()) t_rnnlm.join();
     std::vector<std::string> words_split;
     std::vector<int32> indcs_kept;
+    timer.Reset();
     std::string text = prettify_text(words, words_split, indcs_kept, true);
-
+    timetaken = timer.Elapsed();
+    KALDI_LOG << "TIME TAKEN " << timetaken;
     outtext = "";
     if (const_outtext != "") {
         const_outtext = const_outtext + '\n' + text;
@@ -601,7 +601,7 @@ int32 RecEngine::run_casing(std::vector<long> casewords) {
             argmax = i;
         }
     }
-    if (out_ptr[0] > -1.6) {
+    if (out_ptr[0] > -2.3) {
         argmax = 0;
     }
     return argmax;
@@ -718,7 +718,7 @@ int RecEngine::transcribe_file(std::string wavpath, std::string fpath) {
 
         BaseFloat chunk_length_secs = 0.72;
         tot_num_frames_decoded_ = 0;
-        decoder_opts = new LatticeFasterDecoderConfig(8.0, 10000, 6.0, 600, 6.0);
+        decoder_opts = new LatticeFasterDecoderConfig(8.0, 9000, 6.0, 600, 6.0);
         decoder_opts->determinize_lattice = true;
 
         feature_pipeline = new OnlineNnet2FeaturePipeline(*feature_info);
